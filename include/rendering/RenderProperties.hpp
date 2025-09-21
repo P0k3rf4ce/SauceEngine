@@ -30,6 +30,11 @@ public:
      * Run shaders for this object
     */
     void update(const modeling::ModelProperties &modelProps, const animation::AnimationProperties &animProps);
+
+    /**
+     * Generate an irradiance map from a given environment cubemap
+    */
+    unsigned int genIrradianceMap(unsigned int envCubemap, unsigned int captureFBO, unsigned int captureRBO, Eigen::Matrix4i captureViews[], Eigen::Matrix4i captureProj);
 };
 
 }
