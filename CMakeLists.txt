@@ -35,3 +35,12 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/src/rendering)
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/shared)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE sharedLib animationLib modelingLib renderingLib)
+
+# Enable testing
+enable_testing()
+
+# Find GTest
+find_package(GTest CONFIG REQUIRED)
+
+# Add test subdirectory
+add_subdirectory(test)
