@@ -6,6 +6,7 @@
     "opengl",
     "opengl-registry",
     "stb",
-    "eigen3"
+    "eigen3",
+    "gtest"
   ]
 }

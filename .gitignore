@@ -4,3 +4,6 @@ CMakeUserPresets.json
 build/
 .vscode
 vcpkg_installed
+coverage
+*.log
+scripts
