@@ -1,18 +1,15 @@
 //==============================================================================
-// ODESolver.h - ODE Solver Interface and Euler Implementation for SauceEngine
+// ODESolver.hpp - ODE Solver Interface and Declarations for SauceEngine
 //==============================================================================
 
-#ifndef SAUCE_ENGINE_ODE_SOLVER_H
-#define SAUCE_ENGINE_ODE_SOLVER_H
+#ifndef ODE_SOLVER_HPP
+#define ODE_SOLVER_HPP
 
 #include <vector>
-#include <functional>
 #include <memory>
-#include <stdexcept>
 #include <string>
-#include <algorithm>
 
-namespace SauceEngine {
+namespace animation {
 
 /**
  * @brief Function pointer type for derivative functions in ODE systems
@@ -89,11 +86,7 @@ public:
      * @brief Constructor with default step size
      * @param stepSize Integration step size (default: 0.01)
      */
-    explicit EulerSolver(double stepSize = 0.01) : m_stepSize(stepSize) {
-        if (stepSize <= 0.0) {
-            throw std::invalid_argument("Step size must be positive");
-        }
-    }
+    explicit EulerSolver(double stepSize = 0.01);
 
     /**
      * @brief Solve ODE using Euler's method
@@ -112,63 +105,19 @@ public:
              std::vector<double>& xEnd, 
              double t0, 
              double t1, 
-             DerivFunc dxdt) override {
-        
-        if (x0.empty()) {
-            throw std::invalid_argument("Initial state vector cannot be empty");
-        }
-        
-        if (t1 <= t0) {
-            throw std::invalid_argument("Final time must be greater than initial time");
-        }
-
-        const size_t dim = x0.size();
-        xEnd.resize(dim);
-        
-        // Copy initial conditions
-        std::vector<double> x_current = x0;
-        std::vector<double> xdot(dim);
-        
-        double t_current = t0;
-        
-        // Integrate using Euler's method
-        while (t_current < t1) {
-            // Adjust step size if we would overshoot the final time
-            double h = std::min(m_stepSize, t1 - t_current);
-            
-            // Compute derivatives at current state
-            dxdt(t_current, x_current, xdot);
-            
-            // Euler step: x_new = x_old + h * dx/dt
-            for (size_t i = 0; i < dim; ++i) {
-                x_current[i] += h * xdot[i];
-            }
-            
-            t_current += h;
-        }
-        
-        // Copy final result
-        xEnd = x_current;
-    }
+             DerivFunc dxdt) override;
 
     /**
      * @brief Set the integration step size
      * @param stepSize New step size (must be positive)
      */
-    void setStepSize(double stepSize) override {
-        if (stepSize <= 0.0) {
-            throw std::invalid_argument("Step size must be positive");
-        }
-        m_stepSize = stepSize;
-    }
+    void setStepSize(double stepSize) override;
 
     /**
      * @brief Get the current step size
      * @return Current integration step size
      */
-    double getStepSize() const override {
-        return m_stepSize;
-    }
+    double getStepSize() const override;
 };
 
 /**
@@ -177,14 +126,8 @@ public:
  * @param stepSize Integration step size
  * @return Unique pointer to ODE solver instance
  */
-inline std::unique_ptr<ODESolver> createODESolver(const std::string& solverType, double stepSize = 0.01) {
-    if (solverType == "euler") {
-        return std::make_unique<EulerSolver>(stepSize);
-    }
-    // Future solver types can be added here
-    throw std::invalid_argument("Unknown solver type: " + solverType);
-}
+std::unique_ptr<ODESolver> createODESolver(const std::string& solverType, double stepSize = 0.01);
 
-} // namespace SauceEngine
+} // namespace animation
 
-#endif // SAUCE_ENGINE_ODE_SOLVER_H
+#endif // SAUCE_ENGINE_ODE_SOLVER_HPP
