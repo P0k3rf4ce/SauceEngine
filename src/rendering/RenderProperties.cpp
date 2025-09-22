@@ -71,6 +71,10 @@ unsigned int RenderProperties::genIrradianceMap(unsigned int envCubemap, unsigne
     // tells openGL to render to the framebuffer object instead of the default framebuffer (the screen)
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
 
+    // set viewport to the dimensions of the irradiance map
+    glViewport(0, 0, 32, 32);
+
+
     // configure the renderbuffer object for depth testing during cubemap face rendering
     glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
 
