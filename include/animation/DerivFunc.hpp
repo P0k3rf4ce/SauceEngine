@@ -2,6 +2,8 @@
 #define ANIMATION_DERIVFUNC_HPP
 
 #include <vector>
+#include <Eigen/Geometry>
+#include <cmath>
 
 namespace animation {
 

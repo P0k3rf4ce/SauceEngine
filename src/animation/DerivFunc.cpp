@@ -80,6 +80,7 @@ void ArrayToState(const std::vector<double> &y, std::vector<double> &rigidBodySt
  * Computes forces and torques acting on the rigid body at time t.
  */
 void ComputeForceAndTorque(double t, std::vector<double> &rigidBodyState) {
+    if (rigidBodyState.size() < 24) rigidBodyState.resize(24);
     // Simple example: gravity and no torque
     // In a real implementation, this would compute all forces and torques:
     // gravity, wind, interaction with other bodies, etc.
@@ -88,6 +89,13 @@ void ComputeForceAndTorque(double t, std::vector<double> &rigidBodyState) {
     // For this implementation, we'll use simple constant forces
     // F = [0, -9.81, 0] (gravity in y direction)
     // τ = [0, 0, 0] (no torque)
+    rigidBodyState[18] = 0.0;      // Fx
+    rigidBodyState[19] = -9.81;    // Fy
+    rigidBodyState[20] = 0.0;      // Fz
+
+    rigidBodyState[21] = 0.0;      // τx
+    rigidBodyState[22] = 0.0;      // τy
+    rigidBodyState[23] = 0.0;      // τz
 }
 
 /**
@@ -160,15 +168,38 @@ void DdtStateToArray(const std::vector<double> &rigidBodyState, std::vector<doub
         }
     }
     
-    // dP/dt = F(t) 
-    xdot[idx++] = 0.0;    // Fx = 0
-    xdot[idx++] = -9.81;  // Fy = -9.81 (gravity)
-    xdot[idx++] = 0.0;    // Fz = 0
+    // dP/dt = F(t) and dL/dt = τ(t)
+    // Check if forces and torques are already computed (extended state vector)
+    // or need to be computed directly
+    double fx, fy, fz, tau_x, tau_y, tau_z;
     
+    if (rigidBodyState.size() >= 24) {
+        // Use precomputed forces and torques
+        fx = rigidBodyState[18];
+        fy = rigidBodyState[19]; 
+        fz = rigidBodyState[20];
+        tau_x = rigidBodyState[21];
+        tau_y = rigidBodyState[22];
+        tau_z = rigidBodyState[23];
+    } else {
+        // Compute forces and torques directly
+        fx = 0.0;      // force in x
+        fy = -9.81;    // gravity in y
+        fz = 0.0;      // force in z
+        tau_x = 0.0;   // torque about x
+        tau_y = 0.0;   // torque about y  
+        tau_z = 0.0;   // torque about z
+    }
+    
+    // dP/dt = F(t) 
+    xdot[idx++] = fx;    // dPx/dt = Fx
+    xdot[idx++] = fy;    // dPy/dt = Fy
+    xdot[idx++] = fz;    // dPz/dt = Fz
+
     // dL/dt = τ(t)
-    xdot[idx++] = 0.0;    // τx = 0
-    xdot[idx++] = 0.0;    // τy = 0  
-    xdot[idx++] = 0.0;    // τz = 0
+    xdot[idx++] = tau_x; // dLx/dt = τx
+    xdot[idx++] = tau_y; // dLy/dt = τy
+    xdot[idx++] = tau_z; // dLz/dt = τz
 }
 
 /**
