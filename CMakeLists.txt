@@ -35,3 +35,7 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/src/rendering)
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/shared)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE sharedLib animationLib modelingLib renderingLib)
+
+if (BUILD_TESTS)
+    add_subdirectory(${PROJECT_SOURCE_DIR}/test)
+endif()

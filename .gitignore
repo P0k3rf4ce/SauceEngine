@@ -4,3 +4,8 @@ CMakeUserPresets.json
 build/
 .vscode
 vcpkg_installed
+run.sh
+build_and_run.sh
+build.sh
+.idea/
+.cmake/
