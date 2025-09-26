@@ -1,12 +1,13 @@
 {
   "dependencies": [
-    "eigen3",
     "glad",
     "glfw3",
     "glm",
     "opengl",
     "opengl-registry",
     "stb",
-    "assimp"
+    "assimp",
+    "eigen3",
+    "gtest"
   ]
 }
