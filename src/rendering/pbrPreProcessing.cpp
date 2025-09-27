@@ -1,5 +1,5 @@
 #include "rendering/pbrPreProcessing.hpp"
-#include "shared/Shader.hpp"
+#include "utils/Shader.hpp"
 
 #include <glad/glad.h>
 #include <stb_image.h>
@@ -236,7 +236,7 @@ GLuint genEnvCubemap(const std::string hdrEnvMap) {
     // actual conversion
     equirectToCubemap.bind();
     equirectToCubemap.setUniform("equirectangularMap", 0);
-    // equirectToCubemap.setUniform("projection", captureProj);
+    equirectToCubemap.setUniform("projection", captureProj);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, hdrTexture);
@@ -246,7 +246,7 @@ GLuint genEnvCubemap(const std::string hdrEnvMap) {
     for (unsigned int i = 0; i < 6; i++)
     {
         // set view and render
-        // equirectToCubemap.setUniform("view", captureViews[i]);
+        equirectToCubemap.setUniform("view", captureViews[i]);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
