@@ -6,6 +6,7 @@
     "opengl",
     "opengl-registry",
     "stb",
+    "assimp",
     "eigen3",
     "gtest"
   ]
