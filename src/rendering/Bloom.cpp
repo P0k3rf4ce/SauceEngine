@@ -6,7 +6,7 @@
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 
-#include "shared/Shader.hpp"
+#include "utils/Shader.hpp"
 #include "rendering/Quad.hpp"
 #include "rendering/Bloom.hpp"
 
