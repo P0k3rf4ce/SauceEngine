@@ -26,14 +26,14 @@ uint genEnvCubemap(const std::string hdrEnvMap);
  * 
  * returns the OpenGL ID of the irradiance map
  */
-uint genIrradianceMap(const uint& envCubemap, const uint& captureFBO, const uint& captureRBO, const std::array<Eigen::Matrix4i, 6>& captureViews, const Eigen::Matrix4i& captureProj);
+uint genIrradianceMap(const uint& captureFBO, const uint& captureRBO, const std::array<Eigen::Matrix4i, 6>& captureViews, const Eigen::Matrix4i& captureProj);
 
  /**
   * given an environment cubemap, generate a pre-filtered environment map
   * 
   * returns the OpenGL ID of the pre-filtered environment map
   */
-uint genPrefilterMap(const uint& envCubemap, const uint& captureFBO, const uint& captureRBO, const std::array<Eigen::Matrix4i, 6>& captureViews, const Eigen::Matrix4i& captureProj);
+uint genPrefilterMap(const std::string hdrEnvMap, const uint& captureFBO, const uint& captureRBO, const std::array<Eigen::Matrix4i, 6>& captureViews, const Eigen::Matrix4i& captureProj);
 
 /**
  * given an environment cubemap, generate a BRDF lookup texture

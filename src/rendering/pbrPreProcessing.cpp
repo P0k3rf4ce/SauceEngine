@@ -1,8 +1,12 @@
 #include "rendering/pbrPreProcessing.hpp"
-#include "shared/Shader.hpp"
+#include "utils/Shader.hpp"
 
 #include <glad/glad.h>
+
+#ifndef STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION 
 #include <stb_image.h>
+#endif
 
 #include <iostream>
 
@@ -195,4 +199,76 @@ uint genEnvCubemap(const std::string hdrEnvMap) {
     // generate mipmaps from first face - combat visible dots artifact
     glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+}
+
+uint genPrefilterMap(uint captureFBO, uint captureRBO, const Eigen::Matrix4f &captureProj, const std::array<Eigen::Matrix4f, 6> &captureViews)
+{
+    int size = 512;
+    uint envCubemap = setupCubemap(size);
+    // 1. Load and compile the pre-filter shader program (only once)
+    static Shader pbrShader;
+    static bool initialized = false;
+    if (!initialized)
+    {
+        pbrShader.loadFromFiles({{SHADER_TYPE::VERTEX, "shaders/pbr/cubemap.vs"},
+                                       {SHADER_TYPE::FRAGMENT, "shaders/pbr/prefilter.fs"}});
+        initialized = true;
+    }
+
+    // 2. Create the destination pre-filter cubemap texture
+    uint prefilterMap;
+    glGenTextures(1, &prefilterMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 128, 128, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+
+    // 3. Configure the shader with static uniforms and bind the input environment map
+    pbrShader.bind();
+    pbrShader.setUniform("environmentMap", 0);
+    pbrShader.setUniform("projection", captureProj);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+
+    // 4. Bind the provided framebuffer to render offscreen
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+
+    // 5. Render to each mip level of the pre-filter cubemap
+    const unsigned int maxMipLevels = 5;
+    for (unsigned int mip = 0; mip < maxMipLevels; ++mip)
+    {
+        // Resize renderbuffer and viewport to match the current mip level's size
+        unsigned int mipWidth = static_cast<unsigned int>(128 * std::pow(0.5, mip));
+        unsigned int mipHeight = static_cast<unsigned int>(128 * std::pow(0.5, mip));
+
+        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
+        glViewport(0, 0, mipWidth, mipHeight);
+
+        float roughness = (float)mip / (float)(maxMipLevels - 1);
+        pbrShader.setUniform("roughness", roughness);
+
+        // Render each of the 6 cubemap faces for the current roughness
+        for (unsigned int i = 0; i < 6; ++i)
+        {
+            pbrShader.setUniform("view", captureViews[i]);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterMap, mip);
+
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            // renderCube();
+        }
+    }
+
+    // 6. Restore the default framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    pbrShader.unbind();
+
+    return prefilterMap;
 }
