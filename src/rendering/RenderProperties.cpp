@@ -38,8 +38,9 @@ void RenderProperties::update(const modeling::ModelProperties &modelProps, const
 
 /**
  * Generate an irradiance map from a given environment cubemap
+ * TODO: Migrate logic to a more appropriate file location
 */
-unsigned int RenderProperties::genIrradianceMap(unsigned int envCubemap, unsigned int captureFBO, unsigned int captureRBO, Eigen::Matrix4i captureViews[], Eigen::Matrix4i captureProj) {
+unsigned int RenderProperties::genIrradianceMap(unsigned int envCubemap, unsigned int captureFBO, unsigned int captureRBO, Eigen::Matrix4i captureViews[], Eigen::Matrix4i captureProj, unsigned int cubeVAO, unsigned int cubeIndexCount, std::shared_ptr<Shader> irradianceShader) {
     // using a small 32x32 cubemap as irradiance map
     const unsigned int IRRADIANCE_SIZE = 32;
 
@@ -82,10 +83,10 @@ unsigned int RenderProperties::genIrradianceMap(unsigned int envCubemap, unsigne
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, IRRADIANCE_SIZE, IRRADIANCE_SIZE);
     // ----------------------------------------------------------------------------
 
-    // TODO: use irradiance shader to convolve envCubemap into irradianceMap
-    // ...where is the irradiance shader?
-    // - bind irradianceShader
-    // - set uniforms: environmentMap, projection, view
+    // bind the irradiance shader
+    irradianceShader->bind();
+    irradianceShader->setUniform("environmentMap", 0);
+    irradianceShader->setUniform("projection", captureProj.cast<float>().eval().data());
 
     // this will bind the environment map to texture unit 0 so that the shader can sample it
     // may need to change GL_TEXTURE0 to another texture unit if other textures are being used
@@ -93,15 +94,20 @@ unsigned int RenderProperties::genIrradianceMap(unsigned int envCubemap, unsigne
     glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
 
     for (unsigned int i = 0; i < 6; ++i) {
-        // TODO: set the view matrix uniform in the shader
+        // set the view matrix uniform in the shader
+        irradianceShader->setUniform("view", captureViews[i].cast<float>().eval().data());
 
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                                 GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceMap, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // TODO: render a unit cube with inward-facing normals to sample the environment map
-        // ...how?
+        // render a unit cube with inward-facing normals to sample the environment map
+        glBindVertexArray(cubeVAO);
+        glDrawElements(GL_TRIANGLES, cubeIndexCount, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
     }
+
+    irradianceShader->unbind();
 
     // this unbinds the framebuffer so we can render to the screen again (?)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);

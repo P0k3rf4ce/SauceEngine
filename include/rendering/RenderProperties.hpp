@@ -2,6 +2,7 @@
 #define RENDER_PROPERTIES_HPP
 
 #include "modeling/ModelProperties.hpp"
+#include "shared/Shader.hpp"
 
 namespace rendering {
 
@@ -34,7 +35,7 @@ public:
     /**
      * Generate an irradiance map from a given environment cubemap
     */
-    unsigned int genIrradianceMap(unsigned int envCubemap, unsigned int captureFBO, unsigned int captureRBO, Eigen::Matrix4i captureViews[], Eigen::Matrix4i captureProj);
+    unsigned int genIrradianceMap(unsigned int envCubemap, unsigned int captureFBO, unsigned int captureRBO, Eigen::Matrix4i captureViews[], Eigen::Matrix4i captureProj, unsigned int cubeVAO, unsigned int cubeIndexCount, std::shared_ptr<Shader> irradianceShader);
 };
 
 }
