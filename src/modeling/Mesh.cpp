@@ -1,6 +1,7 @@
-#include "mesh.hpp"
-
 #include <glad/glad.h>
+
+#include "modeling/Mesh.hpp"
+#include "shared/Logger.hpp"
 
 using namespace std;
 
@@ -10,6 +11,11 @@ Mesh::Mesh(vector<Vertex> vertices, vector<unsigned int> indices,
 	this->vertices = vertices;
 	this->indices = indices;
 	this->textures = textures;
+
+	if (!this->validate()) {
+		throw std::runtime_error("Bad mesh loaded");
+	}
+
 	setupMesh();
 }
 
@@ -42,4 +48,26 @@ void Mesh::setupMesh()
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
 		(void*)offsetof(Vertex, TexCoords));
 	glBindVertexArray(0);
+}
+
+bool Mesh::validate() {
+	auto nvert = this->vertices.size();
+
+	if (nvert < 1) {
+		LOG_ERROR("Bad mesh contains no vertices");
+		return false;
+	}
+	if (this->indices.size() <= 1) {
+		LOG_ERROR_F("Bad mesh has %d indices",this->indices.size());
+		return false;
+	}
+
+	for (int i=0; i<this->indices.size(); i++) {
+		if (this->indices[i] >= nvert) {
+			LOG_ERROR_F("Bad mesh: indices[%d]=%d, exceeding %d vertices",i,this->indices[i],nvert);
+			return false;
+		}
+	}
+
+	return true;
 }
