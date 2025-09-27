@@ -257,4 +257,7 @@ GLuint genEnvCubemap(const std::string hdrEnvMap) {
     // generate mipmaps from first face - combat visible dots artifact
     glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+    return envCubemap;
 }
