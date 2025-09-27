@@ -2,7 +2,7 @@
 // ODESolver.cpp - ODE Solver Implementation for SauceEngine
 //==============================================================================
 
-#include "animation/ODESolver.hpp"
+#include "animation/ODEsolver.hpp"
 #include <stdexcept>
 #include <algorithm>
 
@@ -18,11 +18,11 @@ EulerSolver::EulerSolver(double stepSize) : m_stepSize(stepSize) {
     }
 }
 
-void EulerSolver::ode(const std::vector<double>& x0, 
-                      std::vector<double>& xEnd, 
-                      double t0, 
-                      double t1, 
-                      DerivFunc dxdt) {
+double EulerSolver::ode(const std::vector<double>& x0, 
+                        std::vector<double>& xEnd, 
+                        double t0, 
+                        double t1, 
+                        DerivFunc dxdt) {
     
     if (x0.empty()) {
         throw std::invalid_argument("Initial state vector cannot be empty");
@@ -58,6 +58,9 @@ void EulerSolver::ode(const std::vector<double>& x0,
     
     // Copy final result
     xEnd = x_current;
+    
+    // Return time left over
+    return t1 - t_current;
 }
 
 void EulerSolver::setStepSize(double stepSize) {

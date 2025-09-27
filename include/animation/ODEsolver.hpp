@@ -41,16 +41,17 @@ public:
      * starting with initial conditions x0 and storing the final result in xEnd.
      * 
      * @param x0 Initial state vector at time t0
-     * @param xEnd Output vector for final state at time t1
+     * @param xEnd Output vector for final state at time reached
      * @param t0 Initial time
-     * @param t1 Final time
+     * @param t1 Target final time
      * @param dxdt Derivative function defining the ODE system
+     * @return Time remaining (t1 - t_final_reached)
      */
-    virtual void ode(const std::vector<double>& x0, 
-                     std::vector<double>& xEnd, 
-                     double t0, 
-                     double t1, 
-                     DerivFunc dxdt) = 0;
+    virtual double ode(const std::vector<double>& x0, 
+                       std::vector<double>& xEnd, 
+                       double t0, 
+                       double t1, 
+                       DerivFunc dxdt) = 0;
 
     /**
      * @brief Set the step size for the numerical integration
@@ -96,16 +97,17 @@ public:
      * of size m_stepSize and applies the Euler formula at each step.
      * 
      * @param x0 Initial state vector
-     * @param xEnd Output vector for final state
+     * @param xEnd Output vector for final state at time reached
      * @param t0 Initial time
-     * @param t1 Final time  
+     * @param t1 Target final time  
      * @param dxdt Derivative function
+     * @return Time remaining (t1 - t_final_reached)
      */
-    void ode(const std::vector<double>& x0, 
-             std::vector<double>& xEnd, 
-             double t0, 
-             double t1, 
-             DerivFunc dxdt) override;
+    double ode(const std::vector<double>& x0, 
+               std::vector<double>& xEnd, 
+               double t0, 
+               double t1, 
+               DerivFunc dxdt) override;
 
     /**
      * @brief Set the integration step size
@@ -130,4 +132,4 @@ std::unique_ptr<ODESolver> createODESolver(const std::string& solverType, double
 
 } // namespace animation
 
-#endif // SAUCE_ENGINE_ODE_SOLVER_HPP
+#endif // ODE_SOLVER_HPP
