@@ -130,11 +130,11 @@ namespace
 
         // Swap Joey's fixed blur for our dynamic kernel blur shader.
         const std::unordered_map<SHADER_TYPE, std::string> blurFiles = {
-            {VERTEX, "shaders/bloom/blur.vs"},
+            {VERTEX, "shaders/bloom/bloom.vs"},
             {FRAGMENT, "shaders/bloom/blur.fs"}};
         const std::unordered_map<SHADER_TYPE, std::string> combineFiles = {
-            {VERTEX, "assets/bloom_blend.vs"},
-            {FRAGMENT, "assets/bloom_blend.fs"}};
+            {VERTEX, "shaders/bloom/bloom.vs"},
+            {FRAGMENT, "shaders/bloom/bloom_blend.fs"}};
 
         bool ok = blurShader.loadFromFiles(blurFiles) && combineShader.loadFromFiles(combineFiles);
         if (!ok)
@@ -142,8 +142,6 @@ namespace
             LOG_ERROR("Bloom: failed to load blur/combine shaders. Check asset paths.");
             return false;
         }
-        shadersReady = true;
-
         shadersReady = true;
 
         blurShader.bind();
@@ -211,11 +209,9 @@ namespace
      * @param shader The shader to upload to.
      * @param kernelRadius The radius of the kernel.
      * @param weights The kernel weights.
-     * @param width The width of the texture.
-     * @param height The height of the texture.
      * @return true if successful, false otherwise.
      */
-    bool uploadKernelToShader(Shader *shader, int kernelRadius, std::vector<float> *weights, int width, int height)
+    bool uploadKernelToShader(Shader *shader, int kernelRadius, std::vector<float> *weights)
     {
         if (!shader || !weights)
             return false;
@@ -264,7 +260,7 @@ namespace
             blurShader.unbind();
             return 0;
         }
-        if (!uploadKernelToShader(&blurShader, kernelRadius, &weights, widthFixed, heightFixed))
+        if (!uploadKernelToShader(&blurShader, kernelRadius, &weights))
         {
             LOG_ERROR("Bloom: uploadKernelToShader failed.");
             blurShader.unbind();
@@ -307,11 +303,10 @@ namespace
      *
      * @param sceneTex The scene texture.
      * @param bloomTex The bloom (blurred) texture.
-     * @param bloomOn Whether to apply bloom.
      * @param exposure The exposure adjustment.
      * @return true if successful, false otherwise.
      */
-    bool compositeSceneAndBloom(GLuint sceneTex, GLuint bloomTex, bool bloomOn, float exposure)
+    bool compositeSceneAndBloom(GLuint sceneTex, GLuint bloomTex, float exposure)
     {
         combineShader.bind();
 
@@ -321,7 +316,6 @@ namespace
 
         combineShader.setUniform("scene", 0);
         combineShader.setUniform("bloomBlur", 1);
-        combineShader.setUniform("bloom", bloomOn);
         combineShader.setUniform("exposure", exposure);
 
         glActiveTexture(GL_TEXTURE0);
@@ -362,8 +356,7 @@ bool initBloom(int width, int height)
 GLuint applyBloom(GLuint sceneTex,
                   GLuint brightTex,
                   int iterations,
-                  float exposure,
-                  bool bloomOn)
+                  float exposure)
 {
     if (sceneTex == 0 || brightTex == 0)
     {
@@ -393,7 +386,7 @@ GLuint applyBloom(GLuint sceneTex,
         }
     }
 
-    if (!compositeSceneAndBloom(sceneTex, currentSource, bloomOn, exposure))
+    if (!compositeSceneAndBloom(sceneTex, currentSource, exposure))
     {
         LOG_ERROR("applyBloom: composite failed.");
         return 0;
@@ -405,8 +398,7 @@ GLuint applyBloomWithKernel(GLuint sceneTex,
                             GLuint brightTex,
                             int kernelRadius,
                             float sigma,
-                            float exposure,
-                            bool bloomOn)
+                            float exposure)
 {
     if (sceneTex == 0 || brightTex == 0)
     {
@@ -425,7 +417,7 @@ GLuint applyBloomWithKernel(GLuint sceneTex,
         LOG_ERROR("applyBloomWithKernel: blur failed.");
         return 0;
     }
-    if (!compositeSceneAndBloom(sceneTex, blurred, bloomOn, exposure))
+    if (!compositeSceneAndBloom(sceneTex, blurred, exposure))
     {
         LOG_ERROR("applyBloomWithKernel: composite failed.");
         return 0;

@@ -19,15 +19,13 @@ bool initBloom(int width, int height);
  * @param brightTex The bright parts texture.
  * @param iterations The number of iterations for the bloom effect.
  * @param exposure The exposure adjustment.
- * @param bloomOn Whether to apply bloom.
  * @return GLuint The ID of the bloom texture, or 0 on failure.
  */
 GLuint applyBloom(
     GLuint sceneTex,
     GLuint brightTex,
     int iterations,
-    float exposure,
-    bool bloomOn);
+    float exposure);
 
 /**
  * @brief Apply bloom effect with custom kernel.
@@ -38,15 +36,13 @@ GLuint applyBloom(
  * @param kernelRadius The radius of the Gaussian kernel (MUST be odd).
  * @param sigma The standard deviation for the Gaussian kernel (use -1 for auto).
  * @param exposure The exposure adjustment.
- * @param bloomOn Whether to apply bloom.
  * @return GLuint The ID of the bloom texture, or 0 on failure.
  */
 GLuint applyBloomWithKernel(GLuint sceneTex,
                             GLuint brightTex,
                             int kernelRadius,
                             float sigma,
-                            float exposure,
-                            bool bloomOn);
+                            float exposure);
 
 /**
  * @brief Destroy bloom effect resources.
