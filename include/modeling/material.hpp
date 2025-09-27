@@ -2,63 +2,80 @@
 #include <glm/glm.hpp>
 #include <assimp/scene.h>
 #include "assimp/material.h"
+struct Texture {
+    const std::unique_ptr<const uint8_t> data;
+    const uint32_t width;
+    const uint32_t height;
+    const uint32_t n_channels;
+    const uint32_t id;
+
+    Texture(
+        std::unique_ptr<const uint8_t> data,
+        uint32_t width,
+        uint32_t height,
+        uint32_t n_channels,
+        uint32_t id
+    ): 
+        data(std::move(data)),
+        width(width),
+        height(height),
+        n_channels(n_channels),
+        id(id) {}
+
+    Texture() = delete;
+    ~Texture() = default;
+    
+private:
+    // no copy
+    Texture(const Texture&) = delete;
+    Texture& operator=(const Texture&) = delete;
+    
+    // no move
+    Texture(Texture&&) = delete;
+    Texture& operator=(Texture&&) = delete;
+};
 
 // A Material 
 struct Material {
     // name of the material
     const std::string name;
 
-    // how reflective the material is
-    // 0.0 = smooth 
-    // 1.0 = rough
-    const float roughness;      
+    // aiTextureType_BASE_COLOR
+    const Texture &base_color;
 
-    // how metallic the surface is
-    // 0.0 = dielectric
-    // 1.0 = metal
-    const float metallic;       
+    // aiTextureType_NORMAL_CAMERA
+    const Texture &normal_camera;
 
-    // how transparent the material is
-    // 0.0 = opaque
-    // 1.0 = transparent
-    const float opacity;        
+    // aiTextureType_EMISSION_COLOR
+    const Texture &emission_color;
+
+    // aiTextureType_METALNESS
+    const Texture &metalness;
+
+    // aiTextureType_DIFFUSE_ROUGHNESS
+    const Texture &diffuse_roughness;
+
+    // aiTextureType_AMBIENT_OCCLUSION
+    const Texture &ambient_occlusion;
     
-    // Uniform general illumination
-    const glm::vec4 ambient;    
-    
-    // Color and brightness from light source
-    const glm::vec4 diffuse;    
-
-    // Shiny bight lights from reflections
-    const glm::vec4 specular;   
-
-    // Emitting color and light
-    const glm::vec4 emissive;   
     
     Material(
         std::string name,
-        float roughness,
-        float metallic,
-        float opacity,
-        glm::vec4 ambient,
-        glm::vec4 diffuse,
-        glm::vec4 specular,
-        glm::vec4 emissive
+        Texture &base_color,
+        Texture &normal_camera,
+        Texture &emission_color,
+        Texture &metalness,
+        Texture &diffuse_roughness,
+        Texture &ambient_occlusion
     ):
         name(std::move(name)),
-        roughness(roughness),
-        metallic(metallic),
-        opacity(opacity),
-        ambient(ambient),
-        emissive(emissive),
-        diffuse(diffuse),
-        specular(specular)
-    {
-        // validation
-        assert(0.0 <= roughness && roughness <= 1.0 && "roughness must be within [0.0, 1.0]");
-        assert(0.0 <= metallic  && metallic  <= 1.0 && "metallic must be within [0.0, 1.0]");
-        assert(0.0 <= opacity   && opacity   <= 1.0 && "opacity must be within [0.0, 1.0]");
-    };
+        base_color(base_color),
+        normal_camera(normal_camera),
+        emission_color(emission_color),
+        metalness(metalness),
+        diffuse_roughness(diffuse_roughness),
+        ambient_occlusion(ambient_occlusion)
+    {};
     ~Material() = default;
 
     // constructs a `Material` from an imported aiMaterial
@@ -95,7 +112,7 @@ class MaterialManager {
 public:
 
     // constructor from an imported scene
-    MaterialManager() = default;
+    explicit MaterialManager(aiScene *scene);
     ~MaterialManager() = default;
 
     // prevent copies
@@ -120,4 +137,7 @@ public:
 private:
     // list of all materials in a scene 
     std::vector<Material> materials;
+
+    // list of all textures in a scene
+    std::vector<Texture> textures;
 };
