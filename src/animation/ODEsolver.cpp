@@ -2,7 +2,7 @@
 // ODESolver.cpp - ODE Solver Implementation for SauceEngine
 //==============================================================================
 
-#include "animation/ODEsolver.hpp"
+#include "animation/ODESolver.hpp"
 #include <stdexcept>
 #include <algorithm>
 
@@ -41,20 +41,19 @@ void EulerSolver::ode(const std::vector<double>& x0,
     
     double t_current = t0;
     
-    // Integrate using Euler's method
-    while (t_current < t1) {
-        // Adjust step size if we would overshoot the final time
-        double h = std::min(m_stepSize, t1 - t_current);
-        
+    // Integrate using Euler's method with consistent step size
+    // Use a small epsilon to handle floating-point precision issues
+    const double eps = 1e-14;
+    while (t_current + m_stepSize <= t1 + eps) {
         // Compute derivatives at current state
         dxdt(t_current, x_current, xdot);
         
         // Euler step: x_new = x_old + h * dx/dt
         for (size_t i = 0; i < dim; ++i) {
-            x_current[i] += h * xdot[i];
+            x_current[i] += m_stepSize * xdot[i];
         }
         
-        t_current += h;
+        t_current += m_stepSize;
     }
     
     // Copy final result
