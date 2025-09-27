@@ -65,7 +65,7 @@ namespace
 
             if (!allocateColorTextureRGBA16F(&pingTex[i], widthFixed, heightFixed))
             {
-                LOG_ERROR("Bloom: failed to allocate ping-pong texture %d", i);
+                LOG_ERROR(("Bloom: failed to allocate ping-pong texture " + std::to_string(i)).c_str());
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
                 return false;
             }
@@ -75,7 +75,9 @@ namespace
             GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
             if (status != GL_FRAMEBUFFER_COMPLETE)
             {
-                LOG_ERROR("Bloom: ping-pong FBO %d incomplete (0x%X)", i, status);
+                LOG_ERROR(("Bloom: ping-pong FBO " + std::to_string(i) + " incomplete (0x" +
+                           std::to_string(static_cast<unsigned int>(status)) + ")")
+                              .c_str());
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
                 return false;
             }
@@ -107,7 +109,7 @@ namespace
         GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
         if (status != GL_FRAMEBUFFER_COMPLETE)
         {
-            LOG_ERROR("Bloom: output FBO incomplete (0x%X)", status);
+            LOG_ERROR(("Bloom: output FBO incomplete (0x" + std::to_string(static_cast<unsigned int>(status)) + ")").c_str());
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             return false;
         }
@@ -340,7 +342,8 @@ bool initBloom(int width, int height)
 {
     if (width <= 0 || height <= 0)
     {
-        LOG_ERROR("initBloom: invalid size %dx%d", width, height);
+        std::string errMsg = "initBloom: invalid size " + std::to_string(width) + "x" + std::to_string(height);
+        LOG_ERROR(errMsg.c_str());
         return false;
     }
     widthFixed = width;
@@ -364,7 +367,7 @@ GLuint applyBloom(GLuint sceneTex,
 {
     if (sceneTex == 0 || brightTex == 0)
     {
-        LOG_ERROR("applyBloom: invalid inputs (sceneTex=%u, brightTex=%u).", sceneTex, brightTex);
+        LOG_ERROR(("applyBloom: invalid inputs (sceneTex=" + std::to_string(sceneTex) + ", brightTex=" + std::to_string(brightTex) + ").").c_str());
         return 0;
     }
     if (!shadersReady || outFbo == 0 || pingFbo[0] == 0 || pingFbo[1] == 0)
@@ -385,7 +388,7 @@ GLuint applyBloom(GLuint sceneTex,
         currentSource = runSeparableGaussianBlur(currentSource, kernelRadius, sigma);
         if (currentSource == 0)
         {
-            LOG_ERROR("applyBloom: blur pass %d failed.", i);
+            LOG_ERROR(("applyBloom: blur pass " + std::to_string(i) + " failed.").c_str());
             return 0;
         }
     }
@@ -407,7 +410,7 @@ GLuint applyBloomWithKernel(GLuint sceneTex,
 {
     if (sceneTex == 0 || brightTex == 0)
     {
-        LOG_ERROR("applyBloomWithKernel: invalid inputs (sceneTex=%u, brightTex=%u).", sceneTex, brightTex);
+        LOG_ERROR(("applyBloomWithKernel: invalid inputs (sceneTex=" + std::to_string(sceneTex) + ", brightTex=" + std::to_string(brightTex) + ").").c_str());
         return 0;
     }
     if (!shadersReady || outFbo == 0 || pingFbo[0] == 0 || pingFbo[1] == 0)
