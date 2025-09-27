@@ -9,3 +9,6 @@ build_and_run.sh
 build.sh
 .idea/
 .cmake/
+scripts
+coverage
+*.log
