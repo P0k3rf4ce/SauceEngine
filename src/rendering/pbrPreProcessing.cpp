@@ -122,9 +122,19 @@ static std::pair<Eigen::Matrix4i, std::array<Eigen::Matrix4i, 6>> getCaptureMatr
     return {captureProj, captureViews};
 }
 
-// helper: set pbr uniforms
-static void setPBRUniforms(Shader& pbrShader)
+// helper: init pbr shader and set static uniforms
+// assumption: this is called in irradiance map generation
+static void initPBRShader(Shader& pbrShader)
 {
+    static bool initialized = false;
+    if (initialized) return;
+    initialized = true;
+
+    pbrShader.loadFromFiles({
+        {SHADER_TYPE::VERTEX, "shaders/pbr/pbr.vs"},
+        {SHADER_TYPE::FRAGMENT, "shaders/pbr/pbr.fs"}
+    });
+
     pbrShader.bind();
     pbrShader.setUniform("irradianceMap", 0);
     pbrShader.setUniform("prefilterMap", 1);
@@ -191,18 +201,16 @@ static void renderCube()
     glBindVertexArray(0);
 }
 
+/**
+ * generates an environment cubemap from an equirectangular HDR image
+ * returns the OpenGL ID of the cubemap texture
+ */
 GLuint genEnvCubemap(const std::string hdrEnvMap) {
 
     // create shader programs
-    static Shader pbrShader;
     static Shader equirectToCubemap;
     static bool initialized = false;
     if (!initialized) {
-        pbrShader.loadFromFiles({
-            {SHADER_TYPE::VERTEX, "shaders/pbr/pbr.vs"},
-            {SHADER_TYPE::FRAGMENT, "shaders/pbr/pbr.fs"}
-        });
-        setPBRUniforms(pbrShader);
         equirectToCubemap.loadFromFiles({
             {SHADER_TYPE::VERTEX, "shaders/pbr/cubemap.vs"},
             {SHADER_TYPE::FRAGMENT, "shaders/pbr/equirect_to_cube.fs"}
@@ -242,7 +250,7 @@ GLuint genEnvCubemap(const std::string hdrEnvMap) {
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // renderCube();
+        renderCube();
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
