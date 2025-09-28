@@ -42,6 +42,5 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/src/shared)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE sharedLib animationLib modelingLib renderingLib)
 
-if (BUILD_TESTS)
-    add_subdirectory(${PROJECT_SOURCE_DIR}/test)
-endif()
+# Add test subdirectory. Everything for tests is loaded there
+add_subdirectory(test)
