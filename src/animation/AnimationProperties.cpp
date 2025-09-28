@@ -116,36 +116,3 @@ void AnimationProperties::update(double timestep) {
 Eigen::Affine3d getModelMatrix() {
     return Eigen::Affine3d::Identity();
 }
-
-// From https://www.melax.com/volint.html
-// float3x3 Inertia(const float3 *vertices, const int3 *tris, const int count, const float3& com)  
-// {
-// 	// count is the number of triangles (tris) 
-// 	// The moments are calculated based on the center of rotation com which you should calculate first
-// 	// assume mass==1.0  you can multiply by mass later.
-// 	// for improved accuracy the next 3 variables, the determinant d, and its calculation should be changed to double
-// 	float  volume=0;                          // technically this variable accumulates the volume times 6
-// 	float3 diag(0,0,0);                       // accumulate matrix main diagonal integrals [x*x, y*y, z*z]
-// 	float3 offd(0,0,0);                       // accumulate matrix off-diagonal  integrals [y*z, x*z, x*y]
-// 	for(int i=0; i < count; i++)  // for each triangle
-// 	{
-// 		float3x3 A(vertices[tris[i][0]]-com,vertices[tris[i][1]]-com,vertices[tris[i][2]]-com);  // matrix trick for volume calc by taking determinant
-// 		float    d = Determinant(A);  // vol of tiny parallelapiped= d * dr * ds * dt (the 3 partials of my tetral triple integral equasion)
-// 		volume +=d;                   // add vol of current tetra (note it could be negative - that's ok we need that sometimes)
-// 		for(int j=0;j < 3;j++)
-// 		{
-// 			int j1=(j+1)%3;   
-// 			int j2=(j+2)%3;   
-// 			diag[j] += (A[0][j]*A[1][j] + A[1][j]*A[2][j] + A[2][j]*A[0][j] + 
-// 			            A[0][j]*A[0][j] + A[1][j]*A[1][j] + A[2][j]*A[2][j]  ) *d; // divide by 60.0f later;
-// 			offd[j] += (A[0][j1]*A[1][j2]  + A[1][j1]*A[2][j2]  + A[2][j1]*A[0][j2]  +
-// 			            A[0][j1]*A[2][j2]  + A[1][j1]*A[0][j2]  + A[2][j1]*A[1][j2]  +
-// 			            A[0][j1]*A[0][j2]*2+ A[1][j1]*A[1][j2]*2+ A[2][j1]*A[2][j2]*2 ) *d; // divide by 120.0f later
-// 		}
-// 	}
-// 	diag /= volume*(60.0f /6.0f);  // divide by total volume (vol/6) since density=1/volume
-// 	offd /= volume*(120.0f/6.0f);
-// 	return float3x3(diag.y+diag.z  , -offd.z      , -offd.y,
-// 				-offd.z        , diag.x+diag.z, -offd.x,
-// 				-offd.y        , -offd.x      , diag.x+diag.y );
-// }
