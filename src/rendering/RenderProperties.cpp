@@ -1,5 +1,4 @@
 #include "rendering/RenderProperties.hpp"
-#include <glad/glad.h>
 
 using namespace rendering;
 
