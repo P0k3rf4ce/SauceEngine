@@ -9,3 +9,4 @@ build_and_run.sh
 build.sh
 .idea/
 .cmake/
+test_coverage.sh
