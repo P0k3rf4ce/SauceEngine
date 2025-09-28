@@ -20,19 +20,12 @@ struct Vertex {
 	glm::vec2 TexCoords;
 };
 
-struct Texture {
-	unsigned int id;
-	string type;
-};
-
 class Mesh {
     public:
 		// mesh data
 		vector<Vertex> vertices;
 		vector<unsigned int> indices;
-		vector<Texture> textures;
-		Mesh(vector<Vertex> vertices, vector<unsigned int> indices,
-			vector<Texture> textures);
+		Mesh(vector<Vertex> vertices, vector<unsigned int> indices);
 		void Draw(Shader &shader);
 	private:
 		// render data

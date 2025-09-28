@@ -69,12 +69,11 @@ TEST_F(MeshTest, BadConstructors) {
     vector<unsigned int> indices = {
 		2, 0, 0,
 	};
-	vector<Texture> textures = {};
 
 	/*
 	 * test creating a mesh with out-of-bounds indices
 	 */
-	EXPECT_ANY_THROW( Mesh mesh(vertices,indices,textures) );
+	EXPECT_ANY_THROW( Mesh mesh(vertices,indices) );
 
 	vector<unsigned int> indices2 = {
 		0,
@@ -83,7 +82,7 @@ TEST_F(MeshTest, BadConstructors) {
 	/*
 	 * test creating a mesh with not enough indices
 	 */
-	EXPECT_ANY_THROW( Mesh mesh2(vertices,indices2,textures) );
+	EXPECT_ANY_THROW( Mesh mesh2(vertices,indices2) );
 }
 
 TEST_F(MeshTest, GoodConstructors) {
@@ -108,8 +107,7 @@ TEST_F(MeshTest, GoodConstructors) {
 		0, 4, 6, 0, 6, 2,
 		1, 5, 7, 1, 7, 3,
 	};
-	vector<Texture> unitcubet = {{0,"a"}}; // TODO no textures yet
 
-	Mesh mesh3(unitcubev,unitcubei,unitcubet);
-	EXPECT_EQ(1,1);
+	Mesh mesh3(unitcubev,unitcubei);
+	EXPECT_EQ(1,1); // expect no throw
 }
