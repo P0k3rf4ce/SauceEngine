@@ -2,7 +2,6 @@
 #define RENDER_PROPERTIES_HPP
 
 #include "modeling/ModelProperties.hpp"
-#include "shared/Shader.hpp"
 
 namespace rendering {
 
@@ -32,6 +31,7 @@ public:
     */
     void update(const modeling::ModelProperties &modelProps, const animation::AnimationProperties &animProps);
 };
+
 }
 
 #endif
