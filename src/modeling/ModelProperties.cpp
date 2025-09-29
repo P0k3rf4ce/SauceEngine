@@ -1,9 +1,12 @@
 #include "modeling/ModelProperties.hpp"
+#include "modeling/ModelLoader.hpp"  
 
 using namespace modeling;
 
-ModelProperties::ModelProperties(std::string gltfFilename) {
+static std::string s_modelPath;
 
+ModelProperties::ModelProperties(std::string gltfFilename) {
+    s_modelPath = std::move(gltfFilename);
 }
 ModelProperties::~ModelProperties() {
 
@@ -14,7 +17,7 @@ ModelProperties::~ModelProperties() {
  * Model properties back into use
 */
 void ModelProperties::load() {
-
+    ModelLoader::load(s_modelPath);
 }
 
 /**
