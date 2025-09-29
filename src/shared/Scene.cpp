@@ -34,8 +34,8 @@ void Scene::unload() {
 /**
  * Update the Animation properties <timestep> seconds into the future
 */
-void Scene::update(double timestep) {
+void Scene::update(double deltatime) {
     for (auto object: this->objects) {
-        object.update(timestep);
+        object.update(deltatime);
     }
 }

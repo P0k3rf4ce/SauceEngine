@@ -16,7 +16,7 @@ public:
 
     void load();
     void unload();
-    void update(double timestep);
+    void update(double deltatime);
 };
 
 #endif
