@@ -16,7 +16,7 @@ MaterialHandle MaterialHandle::new_unchecked(size_t id) {
 }
 
 const Material& MaterialManager::get(MaterialHandle handle) const noexcept {
-    this->materials[handle.id];
+    return this->materials[handle.id];
 }
 
 const Material& MaterialManager::find(std::string name) const {

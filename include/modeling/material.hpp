@@ -3,6 +3,7 @@
 #include <assimp/scene.h>
 #include "assimp/material.h"
 #include <memory>
+#include <vector>
 struct Texture {
     const std::unique_ptr<const uint8_t> data;
     const uint32_t width;
