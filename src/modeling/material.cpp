@@ -1,4 +1,4 @@
-#include "material.hpp" 
+#include "modeling/material.hpp" 
 #include <iostream> 
 
 Material Material::from_aiMaterial(aiMaterial *material) {

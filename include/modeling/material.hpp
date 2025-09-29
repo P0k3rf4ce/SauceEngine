@@ -2,6 +2,7 @@
 #include <glm/glm.hpp>
 #include <assimp/scene.h>
 #include "assimp/material.h"
+#include <memory>
 struct Texture {
     const std::unique_ptr<const uint8_t> data;
     const uint32_t width;
