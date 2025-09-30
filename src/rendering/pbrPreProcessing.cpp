@@ -79,7 +79,7 @@ static std::pair<Eigen::Affine3d, std::array<Eigen::Affine3d, 6>> getCaptureMatr
     float far = 10.0f;
     float fov = 90.0f;
     float aspect = 1.0f;
-    float f = 1.0f / tanf(fov * 0.5f * (M_PI / 180.0f));
+    float f = 1.0f / tanf(fov * 0.5f * (PI / 180.0f));
 
     captureProj.matrix() <<
         f / aspect, 0,  0,                      0,

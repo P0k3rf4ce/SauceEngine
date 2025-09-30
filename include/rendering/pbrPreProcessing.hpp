@@ -4,6 +4,8 @@
 #include <Eigen/Geometry>
 #include <string>
 
+#define PI 3.14159265358979323846f
+
 typedef unsigned int uint;
 
 namespace rendering {
