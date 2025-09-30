@@ -29,8 +29,8 @@ unsigned int genBRDFLUT(
 
     Shader brdfShader;
     std::unordered_map<SHADER_TYPE, std::string> shaderFiles = {
-        {VERTEX, "src/rendering/shaders/brdf.vert"},
-        {FRAGMENT, "src/rendering/shaders/brdf.frag"}
+        {VERTEX, "src/rendering/shaders/pbr/brdf.vert"},
+        {FRAGMENT, "src/rendering/shaders/pbr/brdf.frag"}
     };
     brdfShader.loadFromFiles(shaderFiles);
 
