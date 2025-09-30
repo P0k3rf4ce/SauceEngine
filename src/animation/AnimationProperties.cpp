@@ -67,6 +67,14 @@ Eigen::Matrix3f AnimationProperties::computeInertiaTensor(
     return inertia.cast<float>(); 
 }
 
+Eigen::Matrix3f AnimationProperties::computeInverseInertiaTensor(
+    const Eigen::Matrix3f &inertia) const
+{
+    // Direct inversion (fast, but less safe if the matrix is nearly singular)
+    return inertia.inverse();
+}
+
+
 AnimationProperties::~AnimationProperties() {
 
 }
