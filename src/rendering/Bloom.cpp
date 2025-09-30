@@ -128,13 +128,12 @@ namespace
         if (shadersReady)
             return true;
 
-        // Swap Joey's fixed blur for our dynamic kernel blur shader.
         const std::unordered_map<SHADER_TYPE, std::string> blurFiles = {
-            {VERTEX, "shaders/bloom/bloom.vs"},
-            {FRAGMENT, "shaders/bloom/blur.fs"}};
+            {VERTEX, "shaders/bloom/bloom.vert"},
+            {FRAGMENT, "shaders/bloom/blur.frag"}};
         const std::unordered_map<SHADER_TYPE, std::string> combineFiles = {
-            {VERTEX, "shaders/bloom/bloom.vs"},
-            {FRAGMENT, "shaders/bloom/bloom_blend.fs"}};
+            {VERTEX, "shaders/bloom/bloom.vert"},
+            {FRAGMENT, "shaders/bloom/bloom_blend.frag"}};
 
         bool ok = blurShader.loadFromFiles(blurFiles) && combineShader.loadFromFiles(combineFiles);
         if (!ok)

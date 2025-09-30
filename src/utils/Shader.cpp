@@ -331,11 +331,11 @@ void Shader::setUniform(const std::string& name, float x, float y, float z, floa
 }
 
 /* Mat4f uniform */
-void Shader::setUniform(const std::string& name, const Eigen::Matrix4f& mat4) {
+void Shader::setUniform(const std::string& name, const Eigen::Affine3d& mat) {
     GLint location = getUniformLocation(name);
     if (location != -1) {
         ensureShaderActive([&]() {
-            glUniformMatrix4fv(location, 1, GL_FALSE, mat4.data());
+            glUniformMatrix4dv(location, 1, GL_FALSE, mat.data());
         });
     }
 }
