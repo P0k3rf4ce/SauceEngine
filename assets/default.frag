@@ -1,7 +1,7 @@
 #version 330 core
 out vec4 FragColor;
-in vec2 TexCoords;
-in vec3 WorldPos;
+in vec2 TexCoord;
+in vec3 FragPos;
 in vec3 Normal;
 
 // material parameters
@@ -27,12 +27,12 @@ const float PI = 3.14159265359;
 // trick to get tangent normals to world space - according to book source code
 vec3 getNormal()
 {
-    vec3 tangentNormal = texture(normalMap, TexCoords).xyz * 2.0 - 1.0;
+    vec3 tangentNormal = texture(normalMap, TexCoord).xyz * 2.0 - 1.0;
 
-    vec3 Q1  = dFdx(WorldPos);
-    vec3 Q2  = dFdy(WorldPos);
-    vec2 st1 = dFdx(TexCoords);
-    vec2 st2 = dFdy(TexCoords);
+    vec3 Q1  = dFdx(FragPos);
+    vec3 Q2  = dFdy(FragPos);
+    vec2 st1 = dFdx(TexCoord);
+    vec2 st2 = dFdy(TexCoord);
 
     vec3 N   = normalize(Normal);
     vec3 T   = normalize(Q1*st2.t - Q2*st1.t);
@@ -82,13 +82,13 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
 
 void main()
 {		
-    vec3 albedo     = pow(texture(albedoMap, TexCoords).rgb, vec3(2.2));
-    float metallic  = texture(metallicMap, TexCoords).r;
-    float roughness = texture(roughnessMap, TexCoords).r;
-    float ao        = texture(aoMap, TexCoords).r;
+    vec3 albedo     = pow(texture(albedoMap, TexCoord).rgb, vec3(2.2));
+    float metallic  = texture(metallicMap, TexCoord).r;
+    float roughness = texture(roughnessMap, TexCoord).r;
+    float ao        = texture(aoMap, TexCoord).r;
 
     vec3 N = getNormal(); // function from book
-    vec3 V = normalize(camPos - WorldPos);
+    vec3 V = normalize(camPos - FragPos);
     vec3 R = reflect(-V, N);
 
     // base reflectance
@@ -100,10 +100,10 @@ void main()
     for(int i = 0; i < 4; i++) 
     {
         // calculate radiance
-        vec3 L = normalize(lightPositions[i] - WorldPos);
+        vec3 L = normalize(lightPositions[i] - FragPos);
         vec3 H = normalize(V + L);
 
-        float distance = length(lightPositions[i] - WorldPos);
+        float distance = length(lightPositions[i] - FragPos);
         float attenuation = 1.0 / (distance * distance);
         vec3 radiance = lightColors[i] * attenuation;
 
