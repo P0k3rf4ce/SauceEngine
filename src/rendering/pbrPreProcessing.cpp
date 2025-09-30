@@ -123,6 +123,23 @@ setupIrradianceMap(const int size)
  * @param size width/height of each cubemap face
  * @return the OpenGL ID of the prefilter cubemap texture
  */
+static GLuint
+setupPrefilterMap(const int size)
+{
+    GLuint prefilterMap;
+    glGenTextures(1, &prefilterMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, size, size, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+}
 
 /**
  * helper: setup brdf lut
@@ -366,8 +383,6 @@ genEnvCubemap(const std::string hdrEnvMap) {
 /**
  * given an environment cubemap, generate an irradiance map
  * @param envCubemap the OpenGL ID of the environment cubemap texture
- * @param captureFBO framebuffer object used for rendering
- * @param captureRBO renderbuffer object used for depth testing
  * @return the OpenGL ID of the irradiance cubemap texture
  */
 GLuint
@@ -431,53 +446,40 @@ genIrradianceMap(const GLuint envCubemap)
 /**
  * given an environment cubemap, generate an irradiance map
  * @param envCubemap the OpenGL ID of the environment cubemap texture
- * @param captureFBO framebuffer object used for rendering
- * @param captureRBO renderbuffer object used for depth testing
- * @param captureViews view matrices for cubemap face rendering
- * @param captureProj projection matrix for cubemap rendering
  * @return the OpenGL ID of the irradiance cubemap texture
  */
 GLuint
-genPrefilterMap(const GLuint envCubemap, const GLuint captureFBO, const GLuint captureRBO, const Eigen::Affine3d &captureProj, const std::array<Eigen::Affine3d, 6> &captureViews)
+genPrefilterMap(const GLuint envCubemap)
 {
-    int size = 512;
-    uint envCubemap = setupCubemap(size);
-    // 1. Load and compile the pre-filter shader program (only once)
-    static Shader pbrShader;
+    // Load and compile the pre-filter shader program (only once)
+    static Shader prefilterShader;
     static bool initialized = false;
     if (!initialized)
     {
-        pbrShader.loadFromFiles({{SHADER_TYPE::VERTEX, "shaders/pbr/cubemap.vs"},
+        prefilterShader.loadFromFiles({{SHADER_TYPE::VERTEX, "shaders/pbr/cubemap.vs"},
                                        {SHADER_TYPE::FRAGMENT, "shaders/pbr/prefilter.fs"}});
         initialized = true;
     }
 
-    // 2. Create the destination pre-filter cubemap texture
-    uint prefilterMap;
-    glGenTextures(1, &prefilterMap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
-    for (unsigned int i = 0; i < 6; ++i)
-    {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 128, 128, 0, GL_RGB, GL_FLOAT, nullptr);
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+    // Create the destination pre-filter cubemap texture
+    const uint PREFILTER_SIZE = 128;
+    GLuint prefilterMap = setupPrefilterMap(PREFILTER_SIZE);
 
-    // 3. Configure the shader with static uniforms and bind the input environment map
-    pbrShader.bind();
-    pbrShader.setUniform("environmentMap", 0);
-    pbrShader.setUniform("projection", captureProj);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-
-    // 4. Bind the provided framebuffer to render offscreen
+    // get framebuffer/renderbuffer
+    auto [captureFBO, captureRBO] = createBuffers();
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
 
-    // 5. Render to each mip level of the pre-filter cubemap
+    // get capture matrices
+    auto [captureProj, captureViews] = getCaptureMatrices();
+
+    // Configure the shader with static uniforms and bind the input environment map
+    prefilterShader.bind();
+    prefilterShader.setUniform("environmentMap", 0);
+    prefilterShader.setUniform("projection", captureProj);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+    // Render to each mip level of the pre-filter cubemap
     const unsigned int maxMipLevels = 5;
     for (unsigned int mip = 0; mip < maxMipLevels; ++mip)
     {
@@ -490,40 +492,33 @@ genPrefilterMap(const GLuint envCubemap, const GLuint captureFBO, const GLuint c
         glViewport(0, 0, mipWidth, mipHeight);
 
         float roughness = (float)mip / (float)(maxMipLevels - 1);
-        pbrShader.setUniform("roughness", roughness);
+        prefilterShader.setUniform("roughness", roughness);
 
         // Render each of the 6 cubemap faces for the current roughness
         for (unsigned int i = 0; i < 6; ++i)
         {
-            pbrShader.setUniform("view", captureViews[i]);
+            prefilterShader.setUniform("view", captureViews[i]);
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterMap, mip);
-
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            // renderCube();
+
+            renderCube();
         }
     }
 
-    // 6. Restore the default framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    pbrShader.unbind();
-
+    prefilterShader.unbind();
     return prefilterMap;
 }
 
 /**
  * given an environment cubemap, generate a BRDF LUT
  * @param envCubemap the OpenGL ID of the environment cubemap texture
- * @param captureFBO framebuffer object used for rendering
- * @param captureRBO renderbuffer object used for depth testing
- * @param captureViews view matrices for rendering
- * @param captureProj projection matrix for rendering
  * @return the OpenGL ID of the BRDF lookup texture
  */
 GLuint
-genBRDFLUT(const GLuint envCubemap, const GLuint captureFBO, const GLuint captureRBO, const Eigen::Affine3d &captureProj, const std::array<Eigen::Affine3d, 6> &captureViews)
+genBRDFLUT(const GLuint envCubemap)
 {
     // create BRDF LUT texture
-    // -----------------------
     const uint LUT_SIZE = 512;
     GLuint brdfLUTTexture = setupBRDFLUT(LUT_SIZE);
 
