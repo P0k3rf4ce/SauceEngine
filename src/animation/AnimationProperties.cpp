@@ -26,62 +26,46 @@ void AnimationProperties::computeCenreOfMassAndVolume(
 }
 
 AnimationProperties::AnimationProperties(const modeling::ModelProperties &modelProps) {
-    std::vector<Eigen::Vector3d> vertices = modelProps.vertices;
-    std::vector<Eigen::Vector3i> tris = modelProps.triangles;
-    Eigen::Vector3d com = modelProps.centerOfMass;
 
-    inertiaTensor_ = computeInertiaTensor(vertices, tris, com);
-    inverseInertiaTensor_ = inertiaTensor_.inverse();
-    currentTime_ = 0.0;
-    loaded_ = false;
 }
 
-Eigen::Matrix3d AnimationProperties::computeInertiaTensor(
+Eigen::Matrix3f AnimationProperties::computeInertiaTensor(
     const std::vector<Eigen::Vector3d> &vertices,
     const std::vector<Eigen::Vector3i> &tris,
-    const Eigen::Vector3d &com) const
-{
+    const Eigen::Vector3d &com) const {
     double volume = 0.0;
-    Eigen::Vector3d diag(0,0,0);
-    Eigen::Vector3d offd(0,0,0);
+    Eigen::Vector3d diag = Eigen::Vector3d::Zero();
+    Eigen::Vector3d offd = Eigen::Vector3d::Zero();
 
-    for (const auto &tri : tris) {
+    for (int i = 0; i < tris.size(); i++) {
         Eigen::Matrix3d A;
-        A.col(0) = vertices[tri[0]] - com;
-        A.col(1) = vertices[tri[1]] - com;
-        A.col(2) = vertices[tri[2]] - com;
-
-        double d = determinantFromCols(A.col(0), A.col(1), A.col(2));
+        A.col(0) = vertices[tris[i][0]] - com;
+        A.col(1) = vertices[tris[i][1]] - com;
+        A.col(2) = vertices[tris[i][2]] - com;
+        double d = A.determinant();
         volume += d;
 
         for (int j = 0; j < 3; j++) {
             int j1 = (j + 1) % 3;
             int j2 = (j + 2) % 3;
-
-            diag[j] += (
-                A(0,j)*A(1,j) + A(1,j)*A(2,j) + A(2,j)*A(0,j) +
-                A(0,j)*A(0,j) + A(1,j)*A(1,j) + A(2,j)*A(2,j)
-            ) * d;
-
-            offd[j] += (
-                A(0,j1)*A(1,j2) + A(1,j1)*A(2,j2) + A(2,j1)*A(0,j2) +
-                A(0,j1)*A(2,j2) + A(1,j1)*A(0,j2) + A(2,j1)*A(1,j2) +
-                2*A(0,j1)*A(0,j2) + 2*A(1,j1)*A(1,j2) + 2*A(2,j1)*A(2,j2)
-            ) * d;
+            diag[j] += (A(0,j)*A(1,j) + A(1,j)*A(2,j) + A(2,j)*A(0,j) +
+                        A(0,j)*A(0,j) + A(1,j)*A(1,j) + A(2,j)*A(2,j)) * d;
+            offd[j] += (A(0,j1)*A(1,j2) + A(1,j1)*A(2,j2) + A(2,j1)*A(0,j2) +
+                        A(0,j1)*A(2,j2) + A(1,j1)*A(0,j2) + A(2,j1)*A(1,j2) +
+                        2*A(0,j1)*A(0,j2) + 2*A(1,j1)*A(1,j2) + 2*A(2,j1)*A(2,j2)) * d;
         }
     }
 
     diag /= volume * (60.0 / 6.0);
     offd /= volume * (120.0 / 6.0);
 
-    Eigen::Matrix3d tensor;
-    tensor << diag.y() + diag.z(), -offd.z(),          -offd.y(),
-              -offd.z(),           diag.x() + diag.z(), -offd.x(),
-              -offd.y(),           -offd.x(),           diag.x() + diag.y();
+    Eigen::Matrix3d inertia;
+    inertia << diag.y() + diag.z(),   -offd.z(),            -offd.y(),
+               -offd.z(),             diag.x() + diag.z(),  -offd.x(),
+               -offd.y(),             -offd.x(),            diag.x() + diag.y();
 
-    return tensor;
+    return inertia.cast<float>(); 
 }
-
 
 AnimationProperties::~AnimationProperties() {
 
