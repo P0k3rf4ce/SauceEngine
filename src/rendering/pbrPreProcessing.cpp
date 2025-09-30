@@ -14,14 +14,15 @@ using namespace rendering;
 
 /**
  * helper: inits/returns framebuffer and renderbuffer
- * @param size width/height of the buffers
  * @return tuple of OpenGL IDs of the framebuffer and renderbuffer
  */
 static std::tuple<GLuint, GLuint>
-createBuffers(const int size)
+createBuffers()
 {
+    const uint SIZE = 512;
+
     static GLuint captureFBO = 0;
-    static GLuint captureRBO = 0;
+    static GLuint captureRBO;
     if (captureFBO != 0) { return {captureFBO, captureRBO}; }
 
     glGenFramebuffers(1, &captureFBO);
@@ -29,7 +30,7 @@ createBuffers(const int size)
 
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
     glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, size, size);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, SIZE, SIZE);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
 
     return {captureFBO, captureRBO};
@@ -118,6 +119,33 @@ setupIrradianceMap(const int size)
 }
 
 /**
+ * helper: setup prefilter map
+ * @param size width/height of each cubemap face
+ * @return the OpenGL ID of the prefilter cubemap texture
+ */
+
+/**
+ * helper: setup brdf lut
+ * @param size width/height of the lut texture
+ * @return the OpenGL ID of the brdf lut texture
+ */
+static GLuint
+setupBRDFLUT(const int size)
+{
+    GLuint brdfLUTTexture;
+    glGenTextures(1, &brdfLUTTexture);
+
+    glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, size, size, 0, GL_RG, GL_FLOAT, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    return brdfLUTTexture;
+}
+
+/**
  * helper: get projection/view matrices
  * @return pair of projection matrix and array of 6 view matrices
  */
@@ -179,52 +207,6 @@ getCaptureMatrices()
 }
 
 /**
- * helper: init pbr shader and set static uniforms
- * @param pbrShader Shader object to initialize
- * 
- * i think this is unused actually lol
- */
-//static void
-//initPBRShader(Shader& shader)
-//{
-//    static bool initialized = false;
-//    if (initialized) return;
-//    initialized = true;
-//
-//    assert(shader.loadFromFiles({
-//        {SHADER_TYPE::VERTEX, "../../assets/default.vert"},
-//        {SHADER_TYPE::FRAGMENT, "../../assets/default.frag"}
-//    }));
-//    shader.bind();
-//    shader.setUniform("irradianceMap", 0);
-//    shader.setUniform("prefilterMap", 1);
-//    shader.setUniform("brdfLUT", 2);
-//    shader.setUniform("albedo", 3);
-//    shader.setUniform("normalMap", 4);
-//    shader.setUniform("metallicMap", 5);
-//    shader.setUniform("roughnessMap", 6);
-//    shader.setUniform("aoMap", 7);
-//    shader.unbind();
-//}
-
-/**
- * helper: init irradiance shader
- * @param shader Shader object to initialize
- */
-static void
-initIrradianceShader(Shader& shader)
-{
-    static bool initialized = false;
-    if (initialized) return;
-    initialized = true;
-
-    assert(shader.loadFromFiles({
-        {SHADER_TYPE::VERTEX, "src/rendering/shaders/irradiance.vert"},
-        {SHADER_TYPE::FRAGMENT, "src/rendering/shaders/irradiance.frag"}
-    }));
-}
-
-/**
  * helper: render a cube
  */
 static void
@@ -282,6 +264,42 @@ renderCube()
 }
 
 /**
+ * helper: render a quad
+ */
+static void
+renderQuad()
+{
+    static GLuint quadVAO = 0;
+    static GLuint quadVBO;
+
+    if (quadVAO == 0)
+    {
+        float quadVertices[] = {
+            // positions        // texture Coords
+            -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+            -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+             1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+             1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+        };
+        // setup plane VAO
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    }
+
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+}
+
+/**
  * given an HDR environment map, generate a cubemap
  * @param hdrEnvMap path to the HDR environment map
  * @return the OpenGL ID of the cubemap texture
@@ -304,7 +322,7 @@ genEnvCubemap(const std::string hdrEnvMap) {
     // create buffers
     // note we don't use the rbo
     const int SIZE = 512;
-    auto [captureFBO, captureRBO] = createBuffers(SIZE);
+    auto [captureFBO, captureRBO] = createBuffers();
     
     // create hdr texture
     int width, height, nrComponents;
@@ -357,10 +375,9 @@ genIrradianceMap(const GLuint envCubemap)
 {
     // using a small 32x32 cubemap as irradiance map
     const uint IRRADIANCE_SIZE = 32;
-    const int SIZE = 512;
 
     // get framebuffer/renderbuffer
-    auto [captureFBO, captureRBO] = createBuffers(SIZE);
+    auto [captureFBO, captureRBO] = createBuffers();
 
     // get capture matrices
     auto [captureProj, captureViews] = getCaptureMatrices();
@@ -370,7 +387,17 @@ genIrradianceMap(const GLuint envCubemap)
 
     // compile shader
     static Shader irradianceShader;
-    initIrradianceShader(irradianceShader);
+    static bool initialized = false;
+    
+    if (!initialized)
+    {
+        assert(irradianceShader.loadFromFiles({
+            {SHADER_TYPE::VERTEX, "src/rendering/shaders/irradiance.vert"},
+            {SHADER_TYPE::FRAGMENT, "src/rendering/shaders/irradiance.frag"}
+        }));
+        initialized = true;
+    }
+
 
     // prepare framebuffer for rendering each cubemap face during irradiance convolution
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
@@ -411,7 +438,7 @@ genIrradianceMap(const GLuint envCubemap)
  * @return the OpenGL ID of the irradiance cubemap texture
  */
 GLuint
-genPrefilterMap(uint captureFBO, uint captureRBO, const Eigen::Affine3d &captureProj, const std::array<Eigen::Affine3d, 6> &captureViews)
+genPrefilterMap(const GLuint envCubemap, const GLuint captureFBO, const GLuint captureRBO, const Eigen::Affine3d &captureProj, const std::array<Eigen::Affine3d, 6> &captureViews)
 {
     int size = 512;
     uint envCubemap = setupCubemap(size);
@@ -481,4 +508,48 @@ genPrefilterMap(uint captureFBO, uint captureRBO, const Eigen::Affine3d &capture
     pbrShader.unbind();
 
     return prefilterMap;
+}
+
+/**
+ * given an environment cubemap, generate a BRDF LUT
+ * @param envCubemap the OpenGL ID of the environment cubemap texture
+ * @param captureFBO framebuffer object used for rendering
+ * @param captureRBO renderbuffer object used for depth testing
+ * @param captureViews view matrices for rendering
+ * @param captureProj projection matrix for rendering
+ * @return the OpenGL ID of the BRDF lookup texture
+ */
+GLuint
+genBRDFLUT(const GLuint envCubemap, const GLuint captureFBO, const GLuint captureRBO, const Eigen::Affine3d &captureProj, const std::array<Eigen::Affine3d, 6> &captureViews)
+{
+    // create BRDF LUT texture
+    // -----------------------
+    const uint LUT_SIZE = 512;
+    GLuint brdfLUTTexture = setupBRDFLUT(LUT_SIZE);
+
+    // get framebuffer/renderbuffer
+    auto [captureFBO, captureRBO] = createBuffers();
+
+    // compile shader
+    static Shader brdfShader;
+    static bool initialized = false;
+
+    if (!initialized)
+    {
+        assert(brdfShader.loadFromFiles({
+            {SHADER_TYPE::VERTEX, "src/rendering/shaders/pbr/brdf.vert"},
+            {SHADER_TYPE::FRAGMENT, "src/rendering/shaders/pbr/brdf.frag"}
+        }));
+        initialized = true;
+    }
+
+    // render
+    glViewport(0, 0, 512, 512);
+    brdfShader.bind();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    renderQuad();
+
+    brdfShader.unbind();
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    return brdfLUTTexture;
 }

@@ -12,11 +12,6 @@ typedef unsigned int uint;
 
 namespace rendering {
 
-/**
- * contains some helper functions for pre-processing environment maps for PBR
- *    as well as pbr shader initialization
- */
-
 
 /**
  * given an HDR environment map, generate a cubemap
@@ -35,9 +30,9 @@ GLuint genEnvCubemap(
  * @return the OpenGL ID of the irradiance cubemap texture
  */
 GLuint genIrradianceMap(
-  const uint& envCubemap,
-  const uint& captureFBO,
-  const uint& captureRBO
+  const GLuint& envCubemap,
+  const GLuint& captureFBO,
+  const GLuint& captureRBO
 );
 
  /**
@@ -51,10 +46,10 @@ GLuint genIrradianceMap(
   * @return the OpenGL ID of the pre-filtered cubemap texture
   */
 GLuint genPrefilterMap(
-  const uint& envCubemap,
+  const GLuint& envCubemap,
   const std::string hdrEnvMap,
-  const uint& captureFBO,
-  const uint& captureRBO,
+  const GLuint& captureFBO,
+  const GLuint& captureRBO,
   const std::array<Eigen::Affine3d, 6>& captureViews,
   const Eigen::Affine3d& captureProj
 );
@@ -69,9 +64,9 @@ GLuint genPrefilterMap(
  * @return the OpenGL ID of the BRDF lookup texture
  */
 GLuint genBRDFLUT(
-  const uint& envCubemap,
-  const uint& captureFBO,
-  const uint& captureRBO,
+  const GLuint& envCubemap,
+  const GLuint& captureFBO,
+  const GLuint& captureRBO,
   const std::array<Eigen::Affine3d, 6>& captureViews,
   const Eigen::Affine3d& captureProj
 );
