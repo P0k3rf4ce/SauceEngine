@@ -2,7 +2,11 @@
 #include "utils/Shader.hpp"
 
 #include <glad/glad.h>
+
+#ifndef STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#endif
 
 #include <iostream>
 
@@ -66,54 +70,54 @@ static GLuint setupCubemap(const int size)
 }
 
 // helper: get projection/view matrices
-static std::pair<Eigen::Matrix4i, std::array<Eigen::Matrix4i, 6>> getCaptureMatrices()
+static std::pair<Eigen::Affine3d, std::array<Eigen::Affine3d, 6>> getCaptureMatrices()
 {
     // sure would be nice if eigen did this for me. well whatever. go my copilot
-    std::array<Eigen::Matrix4i, 6> captureViews;
-    Eigen::Matrix4i captureProj = Eigen::Matrix4i::Zero();
+    std::array<Eigen::Affine3d, 6> captureViews;
+    Eigen::Affine3d captureProj = Eigen::Affine3d::Identity();
     float near = 0.1f;
     float far = 10.0f;
     float fov = 90.0f;
     float aspect = 1.0f;
     float f = 1.0f / tanf(fov * 0.5f * (M_PI / 180.0f));
 
-    captureProj <<
+    captureProj.matrix() <<
         f / aspect, 0,  0,                      0,
         0,          f,  0,                      0,
         0,          0, (far+near)/(near-far),   (2.0f*far*near)/(near-far),
         0,          0, -1,                      0;
 
-    captureViews[0] << 
+    captureViews[0].matrix() << 
          0,  0, -1, 0,
          0, -1,  0, 0,
         -1,  0,  0, 0,
          0,  0,  0, 1;
 
-    captureViews[1] << 
+    captureViews[1].matrix() << 
         0,  0, 1, 0,
         0, -1, 0, 0,
         1,  0, 0, 0,
         0,  0, 0, 1;
 
-    captureViews[2] << 
+    captureViews[2].matrix() << 
         1,  0, 0, 0,
         0,  0, 1, 0,
         0, -1, 0, 0,
         0,  0, 0, 1;
 
-    captureViews[3] << 
+    captureViews[3].matrix() << 
         1, 0,  0, 0,
         0, 0, -1, 0,
         0, 1,  0, 0,
         0, 0,  0, 1;
 
-    captureViews[4] << 
+    captureViews[4].matrix() << 
         1,  0,  0, 0,
         0, -1,  0, 0,
         0,  0, -1, 0,
         0,  0,  0, 1;
 
-    captureViews[5] << 
+    captureViews[5].matrix() << 
         -1,  0, 0, 0,
          0, -1, 0, 0,
          0,  0, 1, 0,
