@@ -28,9 +28,8 @@ TEST(AnimationPropertiesTests, CubeInertiaTensor) {
     };
 
     Eigen::Vector3d com(0,0,0);
-    AnimationProperties animPropsMock; // default constructor if available
     
-    Eigen::Matrix3d I = animPropsMock.computeInertiaTensor(vertices, triangles, com);
+    Eigen::Matrix3d I = AnimationProperties::computeInertiaTensor(vertices, triangles, com);
     
     // For a unit cube of side=2 and mass=1: Ixx = Iyy = Izz = 2/3
     double expected = 2.0 / 3.0;
@@ -57,10 +56,7 @@ TEST(AnimationPropertiesTests, InverseTensor) {
          0, 3.0, 0,
          0, 0, 4.0;
 
-    AnimationProperties animPropsMock; // default constructor
-    animPropsMock.setInertiaTensor(I); // assume you add a setter for testing
-
-    Eigen::Matrix3d Iinv = animPropsMock.getInverseInertiaTensor();
+    Eigen::Matrix3d Iinv = AnimationProperties::computeInverseInertiaTensor(I);
 
     Eigen::Matrix3d identity = I * Iinv;
     EXPECT_NEAR(identity(0,0), 1.0, 1e-6);
@@ -82,8 +78,7 @@ TEST(AnimationPropertiesTests, NonZeroCOM) {
     std::vector<Eigen::Vector3i> triangles = {{0,1,2}};
     Eigen::Vector3d com(1,1,1);
 
-    AnimationProperties animPropsMock;
-    Eigen::Matrix3d I = animPropsMock.computeInertiaTensor(vertices, triangles, com);
+    Eigen::Matrix3d I = AnimationProperties::computeInertiaTensor(vertices, triangles, com);
 
     // Diagonal elements should be small but non-zero due to shifted COM
     EXPECT_GT(I(0,0), 0.0);
