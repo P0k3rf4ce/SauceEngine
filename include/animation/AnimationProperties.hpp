@@ -59,11 +59,10 @@ public:
     */
     Eigen::Affine3d getModelMatrix();
 
-    static Eigen::Matrix3d computeInertiaTensor(
+    Eigen::Matrix3f computeInertiaTensor(
         const std::vector<Eigen::Vector3d> &vertices,
-        const std::vector<Eigen::Vector3i> &tris,
-        const Eigen::Vector3d &com);
-
+        const std::vector<unsigned int> &indices,
+        const Eigen::Vector3d &com) const;
     /**
      * Compute inverse inertia tensor (direct inversion)
      */
