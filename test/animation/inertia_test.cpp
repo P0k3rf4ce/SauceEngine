@@ -34,7 +34,6 @@ TEST(AnimationPropertiesTest, TetrahedronInertia) {
 
     // Compute inertia tensor
     Eigen::Matrix3f inertia = animProps.computeInertiaTensor(vertices, indices, com);
-    std::cout << "Computed inertia:\n" << inertia << std::endl;
 
     // Expected inertia tensor (matches your function for density = 1)
     Eigen::Matrix3f expected;
