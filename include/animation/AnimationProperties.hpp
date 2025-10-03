@@ -57,6 +57,17 @@ public:
      * A model matrix places the object in the correct point in world space
     */
     Eigen::Affine3d getModelMatrix();
+
+        Eigen::Matrix3f computeInertiaTensor(
+        const std::vector<Eigen::Vector3d> &vertices,
+        const std::vector<Eigen::Vector3i> &tris,
+        const Eigen::Vector3d &com) const;
+
+    /**
+     * Compute inverse inertia tensor (direct inversion)
+     */
+    Eigen::Matrix3f computeInverseInertiaTensor(
+        const Eigen::Matrix3f &inertia) const;
 };
 
 }
