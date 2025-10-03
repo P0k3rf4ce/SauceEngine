@@ -31,17 +31,17 @@ AnimationProperties::AnimationProperties(const modeling::ModelProperties &modelP
 
 Eigen::Matrix3f AnimationProperties::computeInertiaTensor(
     const std::vector<Eigen::Vector3d> &vertices,
-    const std::vector<Eigen::Vector3i> &tris,
+    const std::vector<unsigned int> &indices,
     const Eigen::Vector3d &com) const {
     double volume = 0.0;
     Eigen::Vector3d diag = Eigen::Vector3d::Zero();
     Eigen::Vector3d offd = Eigen::Vector3d::Zero();
 
-    for (int i = 0; i < tris.size(); i++) {
+    for (auto indices_iter = indices.begin(); indices_iter != indices.end(); indices_iter += 3) {
         Eigen::Matrix3d A;
-        A.col(0) = vertices[tris[i][0]] - com;
-        A.col(1) = vertices[tris[i][1]] - com;
-        A.col(2) = vertices[tris[i][2]] - com;
+        A.col(0) = vertices[indices_iter[0]] - com;
+        A.col(1) = vertices[indices_iter[1]] - com;
+        A.col(2) = vertices[indices_iter[2]] - com;
         double d = A.determinant();
         volume += d;
 
