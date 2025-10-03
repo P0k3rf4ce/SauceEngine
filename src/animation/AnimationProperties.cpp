@@ -25,14 +25,18 @@ void AnimationProperties::computeCenreOfMassAndVolume(
     volume = std::abs(volumeX6 / 6.0);
 }
 
+AnimationProperties::AnimationProperties() {
+
+}
+
 AnimationProperties::AnimationProperties(const modeling::ModelProperties &modelProps) {
 
 }
 
-Eigen::Matrix3f AnimationProperties::computeInertiaTensor(
+Eigen::Matrix3d AnimationProperties::computeInertiaTensor(
     const std::vector<Eigen::Vector3d> &vertices,
     const std::vector<Eigen::Vector3i> &tris,
-    const Eigen::Vector3d &com) const {
+    const Eigen::Vector3d &com) {
     double volume = 0.0;
     Eigen::Vector3d diag = Eigen::Vector3d::Zero();
     Eigen::Vector3d offd = Eigen::Vector3d::Zero();
@@ -64,11 +68,11 @@ Eigen::Matrix3f AnimationProperties::computeInertiaTensor(
                -offd.z(),             diag.x() + diag.z(),  -offd.x(),
                -offd.y(),             -offd.x(),            diag.x() + diag.y();
 
-    return inertia.cast<float>(); 
+    return inertia; 
 }
 
-Eigen::Matrix3f AnimationProperties::computeInverseInertiaTensor(
-    const Eigen::Matrix3f &inertia) const
+Eigen::Matrix3d AnimationProperties::computeInverseInertiaTensor(
+    const Eigen::Matrix3d &inertia)
 {
     // Direct inversion (fast, but less safe if the matrix is nearly singular)
     return inertia.inverse();

@@ -2,6 +2,7 @@
     #include <vector>
     #include "animation/ODEsolver.hpp"
     #include <cmath>
+#include <corecrt_math_defines.h>
 
     using namespace animation;
 
