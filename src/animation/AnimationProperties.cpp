@@ -33,48 +33,54 @@ AnimationProperties::AnimationProperties(const modeling::ModelProperties &modelP
 
 }
 
+
 Eigen::Matrix3f AnimationProperties::computeInertiaTensor(
     const std::vector<Eigen::Vector3d> &vertices,
     const std::vector<unsigned int> &indices,
-    const Eigen::Vector3d &com) const {
-    double volume = 0.0;
-    Eigen::Vector3d diag = Eigen::Vector3d::Zero();
-    Eigen::Vector3d offd = Eigen::Vector3d::Zero();
+    const Eigen::Vector3d &com) const 
+{
+    Eigen::Matrix3d inertia = Eigen::Matrix3d::Zero();
 
-    for (auto indices_iter = indices.begin(); indices_iter != indices.end(); indices_iter += 3) {
-        Eigen::Matrix3d A;
-        A.col(0) = vertices[indices_iter[0]] - com;
-        A.col(1) = vertices[indices_iter[1]] - com;
-        A.col(2) = vertices[indices_iter[2]] - com;
-        double d = A.determinant();
-        volume += d;
+    double totalVolume = 0.0;
 
-        for (int j = 0; j < 3; j++) {
-            int j1 = (j + 1) % 3;
-            int j2 = (j + 2) % 3;
-            diag[j] += (A(0,j)*A(1,j) + A(1,j)*A(2,j) + A(2,j)*A(0,j) +
-                        A(0,j)*A(0,j) + A(1,j)*A(1,j) + A(2,j)*A(2,j)) * d;
-            offd[j] += (A(0,j1)*A(1,j2) + A(1,j1)*A(2,j2) + A(2,j1)*A(0,j2) +
-                        A(0,j1)*A(2,j2) + A(1,j1)*A(0,j2) + A(2,j1)*A(1,j2) +
-                        2*A(0,j1)*A(0,j2) + 2*A(1,j1)*A(1,j2) + 2*A(2,j1)*A(2,j2)) * d;
-        }
+    for (size_t i = 0; i < indices.size(); i += 3) {
+        const Eigen::Vector3d &v0 = vertices[indices[i]];
+        const Eigen::Vector3d &v1 = vertices[indices[i + 1]];
+        const Eigen::Vector3d &v2 = vertices[indices[i + 2]];
+
+        double vol = v0.dot(v1.cross(v2)) / 6.0;
+        totalVolume += vol;
+
+        Eigen::Vector3d r0 = v0 - com;
+        Eigen::Vector3d r1 = v1 - com;
+        Eigen::Vector3d r2 = v2 - com;
+
+        Eigen::Matrix3d C = (r0 * r0.transpose() +
+                             r1 * r1.transpose() +
+                             r2 * r2.transpose() +
+                             r0 * r1.transpose() +
+                             r1 * r2.transpose() +
+                             r2 * r0.transpose());
+
+        inertia += vol * C / 10.0; 
     }
 
-    diag /= volume * (60.0 / 6.0);
-    offd /= volume * (120.0 / 6.0);
+    inertia = 0.5 * (inertia + inertia.transpose());
 
-    Eigen::Matrix3d inertia;
-    inertia << diag.y() + diag.z(),   -offd.z(),            -offd.y(),
-               -offd.z(),             diag.x() + diag.z(),  -offd.x(),
-               -offd.y(),             -offd.x(),            diag.x() + diag.y();
+    Eigen::Matrix3d inertiaTensor = Eigen::Matrix3d::Zero();
+    inertiaTensor(0,0) = inertia(1,1) + inertia(2,2);
+    inertiaTensor(1,1) = inertia(0,0) + inertia(2,2);
+    inertiaTensor(2,2) = inertia(0,0) + inertia(1,1);
+    inertiaTensor(0,1) = inertiaTensor(1,0) = -inertia(0,1);
+    inertiaTensor(1,2) = inertiaTensor(2,1) = -inertia(1,2);
+    inertiaTensor(0,2) = inertiaTensor(2,0) = -inertia(0,2);
 
-    return inertia.cast<float>(); 
+    return inertiaTensor.cast<float>();
 }
 
 Eigen::Matrix3d AnimationProperties::computeInverseInertiaTensor(
     const Eigen::Matrix3d &inertia)
 {
-    // Direct inversion (fast, but less safe if the matrix is nearly singular)
     return inertia.inverse();
 }
 
