@@ -4,12 +4,6 @@
 
 using namespace animation;
 
-// Helper for approximate comparison of Eigen matrices
-bool isApprox(const Eigen::Matrix3f &a, const Eigen::Matrix3f &b, float tol = 1e-6f) {
-    return (a - b).cwiseAbs().maxCoeff() < tol;
-}
-
-
 TEST(AnimationPropertiesTest, TetrahedronInertia) {
     AnimationProperties animProps;
 
@@ -21,11 +15,11 @@ TEST(AnimationPropertiesTest, TetrahedronInertia) {
         {0.0, 0.0, 1.0}   // v3
     };
 
-    // Triangle indices
+    // Triangle indices with consistent orinetation
     std::vector<unsigned int> indices = {
-        0,1,2,  // base
+        0,2,1,
         0,1,3,
-        0,2,3,
+        0,3,2,
         1,2,3
     };
 
@@ -33,16 +27,16 @@ TEST(AnimationPropertiesTest, TetrahedronInertia) {
     Eigen::Vector3d com(0.25, 0.25, 0.25);
 
     // Compute inertia tensor
-    Eigen::Matrix3f inertia = animProps.computeInertiaTensor(vertices, indices, com);
+    Eigen::Matrix3d inertia = animProps.computeInertiaTensor(vertices, indices, com);
 
     // Expected inertia tensor (matches your function for density = 1)
-    Eigen::Matrix3f expected;
-    expected << 0.0125f,       -0.00208333f,  0.00625f,
-               -0.00208333f,   0.0125f,      -0.00208333f,
-                0.00625f,     -0.00208333f,  0.0125f;
+    Eigen::Matrix3d expected;
+    expected << 0.0125,       0.00208333,  0.00208333,
+                0.00208333,   0.0125,      0.00208333,
+                0.00208333,   0.00208333,  0.0125;
 
-    // Compare with tolerance
-    EXPECT_TRUE(inertia.isApprox(expected, 1e-6f));
+    // A = 0 iff norm(A) = 0
+    EXPECT_NEAR((inertia - expected).norm(), 0.0, 1e-6f);
 }
 
 TEST(AnimationPropertiesTest, InverseInertiaTensor) {
@@ -61,6 +55,6 @@ TEST(AnimationPropertiesTest, InverseInertiaTensor) {
     Eigen::Matrix3d identityCheck = inertia * inverse;
     Eigen::Matrix3d expectedIdentity = Eigen::Matrix3d::Identity();
 
-    EXPECT_TRUE(identityCheck.isApprox(expectedIdentity, 1e-6));
-    EXPECT_TRUE(inverse.isApprox(inertia.inverse(), 1e-6));
+    EXPECT_NEAR((identityCheck - expectedIdentity).norm(), 0.0, 1e-6);
+    EXPECT_NEAR((inverse - inertia.inverse()).norm(), 0.0, 1e-6);
 }

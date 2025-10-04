@@ -34,7 +34,7 @@ AnimationProperties::AnimationProperties(const modeling::ModelProperties &modelP
 }
 
 
-Eigen::Matrix3f AnimationProperties::computeInertiaTensor(
+Eigen::Matrix3d AnimationProperties::computeInertiaTensor(
     const std::vector<Eigen::Vector3d> &vertices,
     const std::vector<unsigned int> &indices,
     const Eigen::Vector3d &com) const 
@@ -48,12 +48,12 @@ Eigen::Matrix3f AnimationProperties::computeInertiaTensor(
         const Eigen::Vector3d &v1 = vertices[indices[i + 1]];
         const Eigen::Vector3d &v2 = vertices[indices[i + 2]];
 
-        double vol = v0.dot(v1.cross(v2)) / 6.0;
-        totalVolume += vol;
-
         Eigen::Vector3d r0 = v0 - com;
         Eigen::Vector3d r1 = v1 - com;
         Eigen::Vector3d r2 = v2 - com;
+
+        double vol = r0.dot(r1.cross(r2)) / 6.0;
+        totalVolume += vol;
 
         Eigen::Matrix3d C = (r0 * r0.transpose() +
                              r1 * r1.transpose() +
@@ -75,7 +75,7 @@ Eigen::Matrix3f AnimationProperties::computeInertiaTensor(
     inertiaTensor(1,2) = inertiaTensor(2,1) = -inertia(1,2);
     inertiaTensor(0,2) = inertiaTensor(2,0) = -inertia(0,2);
 
-    return inertiaTensor.cast<float>();
+    return inertiaTensor;
 }
 
 Eigen::Matrix3d AnimationProperties::computeInverseInertiaTensor(
@@ -115,6 +115,6 @@ void AnimationProperties::update(double timestep) {
  * Returns the model matrix for this object.
  * A model matrix places the object in the correct point in world space
 */
-Eigen::Affine3d getModelMatrix() {
+Eigen::Affine3d AnimationProperties::getModelMatrix() {
     return Eigen::Affine3d::Identity();
 }
