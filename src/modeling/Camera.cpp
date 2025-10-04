@@ -28,3 +28,7 @@ void Camera::LookAt(float yaw, float pitch) {
         )
     );
 }
+
+void Camera::rotate(float radians, glm::vec3 axis) {
+    LookAt(glm::rotate(glm::mat4(1), radians, axis) * glm::vec4(getDirection(),0.f));
+}

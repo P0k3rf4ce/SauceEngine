@@ -22,6 +22,13 @@ class Camera {
 
         void setFOV(float fov) { this->fov=fov; }
 
+        /* rotate the camera facing direction about an axis */
+        void rotate(float radians, glm::vec3 axis);
+        /* rotate the camera facing direction about the vertical axis */
+        void rotateHori(float radians) { rotate(radians, getUp()); }
+        /* rotate the camera facing direction about a horizontal axis */
+        void rotateVert(float radians) { rotate(radians, getRight()); }
+
         glm::vec3 getPos() { return pos; }
         glm::vec3 getRight() { return right; }
         glm::vec3 getUp() { return up; }

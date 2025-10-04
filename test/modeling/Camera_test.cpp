@@ -45,3 +45,11 @@ TEST_F(CameraTest, Translation) {
     EXPECT_EQ(c.getPos(),glm::vec3(2.f,6.f,10.f));
     EXPECT_EQ(c.getRight(),glm::vec3(0.f,0.f,-1.f)); // make sure right direction doesnt get affected when translating
 }
+
+TEST_F(CameraTest, Rotation) {
+    auto c = Camera(glm::vec3(0.f,0.f,0.f), glm::vec3(1.f,0.f,0.f));
+    c.rotateHori(glm::radians(90.f));
+    EXPECT_NEAR(c.getDirection().x,0.f,0.00000005f);
+    EXPECT_NEAR(c.getDirection().y,0.f,0.00000005f);
+    EXPECT_NEAR(c.getDirection().z,-1.f,0.00000005f);
+}
