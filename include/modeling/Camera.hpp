@@ -1,53 +1,58 @@
-#include <glm/glm.hpp>
+#include <Eigen/Core>
+#include <Eigen/Dense>
+
+using namespace Eigen;
 
 class Camera {
     public:
         /* move the camera to a target point */
-        void setPos(glm::vec3 pos) {
+        void setPos(Vector3f pos) {
             this->pos=pos;
             updateView();
         }
         /* add an offset vector to camera position */
-        void translate(glm::vec3 offs) {
+        void translate(Vector3f offs) {
             this->pos+=offs;
             updateView();
         }
         void translate(float x, float y, float z) {
-            this->pos.x+=x; this->pos.y+=y; this->pos.z+=z;
+            this->pos(0)+=x; this->pos(1)+=y; this->pos(2)+=z;
             updateView();
         }
-    
-        void LookAt(glm::vec3 front);
+
+        void LookAt(Vector3f front);
         void LookAt(float yaw, float pitch);
 
         void setFOV(float fov) { this->fov=fov; }
 
         /* rotate the camera facing direction about an axis */
-        void rotate(float radians, glm::vec3 axis);
+        void rotate(float radians, Vector3f axis);
         /* rotate the camera facing direction about the vertical axis */
         void rotateHori(float radians) { rotate(radians, getUp()); }
         /* rotate the camera facing direction about a horizontal axis */
         void rotateVert(float radians) { rotate(radians, getRight()); }
 
-        glm::vec3 getPos() { return pos; }
-        glm::vec3 getRight() { return right; }
-        glm::vec3 getUp() { return up; }
-        glm::vec3 getDirection() { return front; }
+        Vector3f getPos() { return pos; }
+        Vector3f getRight() { return right; }
+        Vector3f getUp() { return up; }
+        Vector3f getDirection() { return front; }
+		Matrix4f getView() { return view; }
 
         float getFOV() { return fov; }
 
-        Camera(glm::vec3 pos, glm::vec3 front);
+        Camera(Vector3f pos, Vector3f front);
+
     private:
         /* coordinates where the camera is */
-        glm::vec3 pos;
+        Vector3f pos;
         /* direction vector the camera is pointing */
-        glm::vec3 front;
+        Vector3f front;
         /* which way is up? can be fixed for now since we probably don't need a flight-style camera */
-        glm::vec3 up;
+        Vector3f up;
         /* which way is to the right? calculated from direction */
-        glm::vec3 right;
+        Vector3f right;
         /* view matrix */
-        glm::mat4 view;
+        Matrix4f view;
 
         float fov;
 
@@ -56,4 +61,9 @@ class Camera {
          * this to sync view, right, and up
          */
         void updateView();
+
+		/*
+		 * helper. LookAt matrix implementation
+		 */
+		static Matrix4f lookat(Vector3f right, Vector3f up, Vector3f direction, Vector3f pos);
 };
