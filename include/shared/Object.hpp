@@ -24,7 +24,7 @@ public:
     void load();
     void unload();
 
-    void updateAnimation();
+    void updateAnimation(double DELTA_STEP);
     void updateModeling();
     void updateRendering();
 };

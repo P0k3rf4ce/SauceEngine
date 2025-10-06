@@ -4,6 +4,8 @@
 #include <GLFW/glfw3.h>
 #include <stb_image.h>
 
+#include <chrono>
+
 #include <iostream>
 
 #include "shared/Scene.hpp"
@@ -16,7 +18,9 @@ void processInput(GLFWwindow* window);
 
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
-const double TIMESTEP = 0.1;
+
+const double TICKRATE = 128.0;
+const double DELTA_STEP = 1.0 / TICKRATE;
 
 int main()
 {
@@ -34,10 +38,15 @@ int main()
 
     Scene scene;
 
-    while (!glfwWindowShouldClose(window)){
+    double deltatime = 0.0;
+
+    while (!glfwWindowShouldClose(window)) {
         processInput(window);
 
-        scene.update(TIMESTEP);
+        auto now = std::chrono::system_clock::now();
+        deltatime += std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+
+        deltatime = scene.update(deltatime, DELTA_STEP);
         
         glfwSwapBuffers(window);
         glfwPollEvents();
