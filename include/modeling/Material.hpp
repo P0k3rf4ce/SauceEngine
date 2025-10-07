@@ -5,14 +5,14 @@
 #include <memory>
 #include <vector>
 struct Texture {
-    const std::unique_ptr<const uint8_t> data;
+    const std::unique_ptr<const uint8_t[]> data;
     const uint32_t width;
     const uint32_t height;
     const uint32_t n_channels;
     const uint32_t id;
 
     Texture(
-        std::unique_ptr<const uint8_t> data,
+        std::unique_ptr<const uint8_t[]> data,
         uint32_t width,
         uint32_t height,
         uint32_t n_channels,
@@ -61,8 +61,8 @@ struct Material {
         Texture &base_color,
         Texture &normal,
         Texture &albedo,
-        Texture &metalness,
-        Texture &diffuse_roughness,
+        Texture &metallic,
+        Texture &roughness,
         Texture &ambient_occlusion
     ):
         name(std::move(name)),
@@ -121,7 +121,7 @@ public:
     MaterialManager& operator=(MaterialManager&&) = default;
 
     // constructor from a scene
-    static MaterialManager from_aiScene(aiScene scene);
+    static MaterialManager from_aiScene(aiScene *scene);
 
     // returns a material from its unique handle
     const Material& get(MaterialHandle handle) const noexcept;
@@ -130,6 +130,7 @@ public:
     // throws std::out_of_range the material is not found.
     const Material& find(std::string name) const;
 
+    const Texture& get_texture(int idx);
 
 private:
     // list of all materials in a scene 

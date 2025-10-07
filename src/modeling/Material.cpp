@@ -19,6 +19,10 @@ const Material& MaterialManager::get(MaterialHandle handle) const noexcept {
     return this->materials[handle.id];
 }
 
+const Texture& MaterialManager::get_texture(int id) {
+    return this->textures[id];
+}
+
 const Material& MaterialManager::find(std::string name) const {
     for (auto it = this->materials.begin(); it != this->materials.end(); ++it) {
         if (it->name == name) {
