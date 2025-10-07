@@ -1,4 +1,4 @@
-#version 330 core
+#version 430 core
 out vec4 FragColor;
 in vec2 TexCoord;
 in vec3 FragPos;
@@ -17,20 +17,16 @@ uniform samplerCube prefilterMap;
 uniform sampler2D brdfLUT;
 
 // lights
-#define MAX_LIGHTS 2048
-
 struct Light
 {
-    vec3 Position;
-    vec3 Color;
+    vec4 Position;
+    vec4 Color;
 };
 
-layout(std140) uniform Lights
+layout(std430, binding = 10) readonly buffer lightData
 {
-    Light lights[MAX_LIGHTS];
+    Light lights[];
 };
-// -- How many lights we're actually using
-uniform int numLights;
 
 uniform vec3 camPos;
 
@@ -109,15 +105,15 @@ void main()
 
     // reflectance equation
     vec3 Lo = vec3(0.0);
-    for(int i = 0; i < numLights; i++) 
+    for(int i = 0; i < lights.length(); i++) 
     {
         // calculate radiance
-        vec3 L = normalize(lights[i].Position - FragPos);
+        vec3 L = normalize(lights[i].Position.xyz - FragPos);
         vec3 H = normalize(V + L);
 
-        float distance = length(lights[i].Position - FragPos);
+        float distance = length(lights[i].Position.xyz - FragPos);
         float attenuation = 1.0 / (distance * distance);
-        vec3 radiance = lights[i].Color * attenuation;
+        vec3 radiance = lights[i].Color.rgb * attenuation;
 
         // calculate brdf
         float D   = distributionGGX(N, H, roughness);   
