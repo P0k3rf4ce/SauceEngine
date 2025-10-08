@@ -1,5 +1,4 @@
 #include "modeling/ModelProperties.hpp"
-#include "modeling/ModelLoader.hpp"  
 
 using namespace modeling;
 
@@ -12,13 +11,10 @@ ModelProperties::~ModelProperties() {
 
 }
 
-/**
- * This function is meant to load these 
- * Model properties back into use
-*/
 void ModelProperties::load() {
-    ModelLoader::load(s_modelPath);
+
 }
+
 
 /**
  * This function is meant to remove these 
