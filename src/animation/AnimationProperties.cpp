@@ -1,4 +1,5 @@
 #include "animation/AnimationProperties.hpp"
+#include "AnimationProperties.hpp"
 
 using namespace animation;
 
@@ -80,8 +81,7 @@ Eigen::Matrix3d AnimationProperties::computeInertiaTensor(
 
 Eigen::Matrix3d AnimationProperties::computeInverseInertiaTensor(
     const Eigen::Matrix3d &inertia)
-{
-    return inertia.inverse();
+{    return inertia.inverse();
 }
 
 
@@ -118,3 +118,22 @@ void AnimationProperties::update(double timestep) {
 Eigen::Affine3d AnimationProperties::getModelMatrix() {
     return Eigen::Affine3d::Identity();
 }
+
+/**
+ * Returns true if the bounding box of the vectors do not overlap.
+ * If they do overlap, return false.
+ */
+bool AnimationProperties::BoundingBox(std::vector<Eigen::Vector3d> vectors) {
+    txmin = (xmin − xe)/xd
+    txmax = (xmax − xe)/xd
+    tymin = (ymin − ye)/yd
+    tymax = (ymax − ye)/yd
+    if (txmin > tymax) or (tymin > txmax) then
+        return false
+    else
+        return true
+
+    // Main Source for this is 7.2 in the pixar paper 
+    // and 12.3 in https://github.com/t4world/Computer-Graphics/blob/master/Fundamentals-of-Computer-Graphics-Fourth-Edition.pdf
+}
+

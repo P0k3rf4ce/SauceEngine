@@ -59,6 +59,8 @@ public:
     */
     Eigen::Affine3d getModelMatrix();
 
+    bool BoundingBox(std::vector<Eigen::Vector3d> vectors);
+
     Eigen::Matrix3d computeInertiaTensor(
         const std::vector<Eigen::Vector3d> &vertices,
         const std::vector<unsigned int> &indices,
