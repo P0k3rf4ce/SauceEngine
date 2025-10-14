@@ -2,6 +2,9 @@
 #include "shared/Logger.hpp"
 #include <filesystem>
 #include <iostream>
+// commented out to avoid compile errors
+// [    (bool ModelLoader::processMesh(aiMesh* mesh, std::vector<Vertex>& vertices, std::vector<unsigned int>& indices)).
+// (std::shared_ptr<Material> ModelLoader::processMaterial(aiMaterial* aiMat, const aiScene* scene))]
 
 namespace modeling {
 
@@ -225,10 +228,56 @@ namespace modeling {
     }
 
     // TODO: Material Loading
-    std::vector<std::shared_ptr<Material>> ModelLoader::loadMaterials(const aiScene* scene) {
-        // TODO: Implement material loading
-        LOG_DEBUG_F("TODO: Implement loadMaterials for %d materials", scene->mNumMaterials);
-        
+    
+    // Helper defaults for non-null Material refs
+    namespace {
+        Texture& default_texture() {
+            static Texture* tex = []{
+                auto p = std::unique_ptr<const uint8_t>(new uint8_t(255));
+                return new Texture(std::move(p), /*width*/1, /*height*/1, /*n_channels*/4, /*id*/0);
+            }();
+            return *tex;
+        }
+
+        std::shared_ptr<Material> make_default_material(const std::string& name_hint) {
+            Texture& t = default_texture();
+            return std::shared_ptr<Material>(new Material(
+                name_hint.empty() ? std::string("material") : name_hint,
+                t, t, t, t, t, t
+            ));
+        }
+    }
+    
+    static Texture* loadTextureFromMaterial(aiMaterial* aiMat, const aiScene* scene, aiTextureType type, Texture& defaultTex) {
+        /*
+        // Helper to load one texture type from aiMaterial
+        */
+        if (!aiMat){ 
+            return &defaultTex;
+        }
+        if (aiMat->GetTextureCount(type) == 0){
+            return &defaultTex;
+        }
+        aiString path;
+        if (aiMat->GetTexture(type, 0, &path) != AI_SUCCESS){
+            return &defaultTex;
+        }
+        // Embedded texture
+        if (path.length > 0 && path.C_Str()[0] == '*') {
+            int idx = std::atoi(path.C_Str() + 1);
+            if (scene && idx >= 0 && static_cast<unsigned>(idx) < scene->mNumTextures) {
+                const aiTexture* emb = scene->mTextures[idx];
+                // TODO: decode embedded texture bytes to image
+                return &defaultTex;
+            }
+            return &defaultTex;
+        }
+        // External file path case
+        // TODO: implement file-based texture loading later
+        return &defaultTex;
+    }
+
+    std::vector<std::shared_ptr<Material>> ModelLoader::loadMaterials(const aiScene* scene) {  
         /*
         * 
         * 1. Loop through all materials in scene->mMaterials
@@ -236,26 +285,24 @@ namespace modeling {
         * 3. Handle cases where material loading fails
         * 4. Return vector of successfully loaded materials
         */
-        
         std::vector<std::shared_ptr<Material>> materials;
-        
+        if (!scene || scene->mNumMaterials == 0) {
+            materials.push_back(make_default_material("default"));
+            return materials;
+        }
+
+        materials.reserve(scene->mNumMaterials);
         for (unsigned int i = 0; i < scene->mNumMaterials; i++) {
             auto material = processMaterial(scene->mMaterials[i], scene);
-            if (material) {
-                materials.push_back(material);
-            } else {
-                // Add null for now - implement proper default material handling
-                materials.push_back(nullptr);
-                LOG_WARN_F("Failed to load material %d, using null material", i);
+            if (!material) {
+                material = make_default_material("fallback");
             }
+            materials.push_back(std::move(material));
         }
-        
         return materials;
     }
 
     std::shared_ptr<Material> ModelLoader::processMaterial(aiMaterial* aiMat, const aiScene* scene) {
-        LOG_DEBUG("TODO: Implement processMaterial");
-        
         /*
         * 
         * 1. Extract material name:
@@ -284,11 +331,55 @@ namespace modeling {
         * 
         */
         
-        // Placeholder implementation - replace with actual implementation
-        LOG_WARN("Using placeholder material processing - implement proper material loading!");
-        
-        // Return nullptr for now - implement proper material creation
-        return nullptr;
+        if (!aiMat) {
+            return make_default_material("material");
+        }
+
+        aiString ainame; std::string name = "material";
+        if (aiMat->Get(AI_MATKEY_NAME, ainame) == AI_SUCCESS && ainame.length > 0){ 
+            name = ainame.C_Str();
+        }
+
+        auto& def_tex = default_texture();
+
+        auto load_tex = [&](aiTextureType t)->Texture* {
+            if (aiMat->GetTextureCount(t) == 0) {
+                return &def_tex;
+            }
+
+            aiString path;
+            if (aiMat->GetTexture(t, 0, &path) != AI_SUCCESS){
+                return &def_tex;
+            }
+            // Embedded?
+            if (path.length > 0 && path.C_Str()[0] == '*') {
+                int idx = std::atoi(path.C_Str() + 1);
+                if (scene && idx >= 0 && static_cast<unsigned>(idx) < scene->mNumTextures) {
+                    const aiTexture* emb = scene->mTextures[idx];
+                    // these TODOs can be implemented later and were generated from GPT
+                    // TODO: decode emb->pcData / mWidth,mHeight or compressed blob
+                    // TODO: create Texture with decoded pixels and GL id
+                    return &def_tex; // fallback until implemented
+                }
+                return &def_tex;
+            }
+
+            // External file
+            // TODO: resolve path against model directory, load pixels, create GL texture id
+            return &def_tex; // fallback until implemented
+        };
+
+        Texture* base   = loadTextureFromMaterial(aiMat, scene, aiTextureType_DIFFUSE, def_tex);
+        Texture* normal = loadTextureFromMaterial(aiMat, scene, aiTextureType_NORMALS, def_tex);
+        Texture* metal  = loadTextureFromMaterial(aiMat, scene, aiTextureType_METALNESS, def_tex);
+        Texture* rough  = loadTextureFromMaterial(aiMat, scene, aiTextureType_DIFFUSE_ROUGHNESS, def_tex);
+        Texture* ao     = loadTextureFromMaterial(aiMat, scene, aiTextureType_AMBIENT_OCCLUSION, def_tex);
+        Texture* albedo = base;
+
+        return std::shared_ptr<Material>(new Material(
+            name, *base, *normal, *albedo, *metal, *rough, *ao
+        ));
+
     }
 
     // todo: Tag Extraction
