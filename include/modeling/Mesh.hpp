@@ -6,7 +6,7 @@
 
 #include <glm/glm.hpp>
 
-#include "shared/Shader.hpp"
+#include "utils/Shader.hpp"
 
 using namespace std;
 
