@@ -50,7 +50,12 @@ void RenderProperties::update(const modeling::ModelProperties &modelProps, const
 }
 
 void RenderProperties::initShadowResourcesIfEmitter(const modeling::ModelProperties &modelProps) {
-    // TODO: Early return if modelProps is not emitter -- property does not exist yet
+    try {
+        if (!modelProps.getProperty<bool>("isEmitter"))
+            return;
+    } catch (const std::exception&) {
+        return;
+    }
 
     if (depthMapFBO != 0 || depthMapTex != 0)
         return;
