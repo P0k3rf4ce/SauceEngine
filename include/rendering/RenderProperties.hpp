@@ -2,6 +2,7 @@
 #define RENDER_PROPERTIES_HPP
 
 #include "modeling/ModelProperties.hpp"
+#include <glad/glad.h>
 
 namespace rendering {
 
@@ -12,6 +13,9 @@ class RenderProperties {
 public:
     RenderProperties(const modeling::ModelProperties &modelProps);
     ~RenderProperties();
+
+    GLuint getShadowDepthTexture() const {return depthMapTex;}
+    GLuint getShadowFrameBuffer() const {return depthMapFBO;}
 
     /**
      * This function is meant to load these 
@@ -30,6 +34,15 @@ public:
      * Run shaders for this object
     */
     void update(const modeling::ModelProperties &modelProps, const animation::AnimationProperties &animProps);
+
+private:
+    // Shadow Mapping
+    GLuint depthMapFBO = 0;
+    GLuint depthMapTex = 0;
+    int shadowWidth = 1024;
+    int shadowHeight = 1024;
+
+    void initShadowResourcesIfEmitter(const modeling::ModelProperties &modelProps);
 };
 
 }
