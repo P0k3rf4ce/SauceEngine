@@ -15,56 +15,13 @@ namespace modeling {
 namespace animation {
 
 /**
- * Axis-Aligned Bounding Box (AABB) representation
- */
-struct AABB {
-    Eigen::Vector3d min;
-    Eigen::Vector3d max;
-    bool empty;
-
-    AABB()
-        : min(Eigen::Vector3d::Zero()), max(Eigen::Vector3d::Zero()), empty(true) {}
-
-    AABB(const Eigen::Vector3d &min_, const Eigen::Vector3d &max_)
-        : min(min_), max(max_), empty(false) {}
-
-    // Expand this bounding box to include another
-    void expand(const AABB &other) {
-        if (other.empty) return;
-        if (empty) { *this = other; return; }
-        min = min.cwiseMin(other.min);
-        max = max.cwiseMax(other.max);
-        empty = false;
-    }
-
-    // Check if two bounding boxes overlap
-    bool overlaps(const AABB &other) const {
-        if (empty || other.empty) return false;
-        return (min.x() <= other.max.x()) && (max.x() >= other.min.x()) &&
-               (min.y() <= other.max.y()) && (max.y() >= other.min.y()) &&
-               (min.z() <= other.max.z()) && (max.z() >= other.min.z());
-    }
-};
-
-/**
- * Node for a hierarchical AABB tree.
- */
-struct AABBNode {
-    AABB box;
-    std::unique_ptr<AABBNode> left;
-    std::unique_ptr<AABBNode> right;
-    std::vector<unsigned int> triangleIndices;
-
-    bool isLeaf() const { return !left && !right; }
-};
-
-/**
  * Stores all animation related properties of an object
 */
 class AnimationProperties {
 private:
     Eigen::Vector3d com;
     double volume;
+    std::vector<Eigen::AlignedBox3d> boundingBoxes;
 
 public:
     /**
@@ -116,30 +73,17 @@ public:
     static Eigen::Matrix3d computeInverseInertiaTensor(
         const Eigen::Matrix3d &inertia);
 
-      /**
-     * Compute the AABB (min/max representation) of a point set.
-     */
-    static AABB BoundingBoxRepresentation(const std::vector<Eigen::Vector3d> &vectors);
 
     /**
      * Returns true if two bounding boxes overlap.
      */
-    static bool BoundingBoxOverlap(
-        const std::vector<Eigen::Vector3d> &points_one,
-        const std::vector<Eigen::Vector3d> &points_two
-    );
+    bool boxesOverlap(const Eigen::AlignedBox3d &a, const Eigen::AlignedBox3d &b) const;
 
-    // === Hierarchical AABB tree ===
-
-    /**
-     * Recursively builds an AABB tree from a triangle mesh.
-     */
-    static std::unique_ptr<AABBNode> BuildAABBTree(
+    void computeBoundingBoxHierarchy(
         const std::vector<Eigen::Vector3d> &vertices,
-        const std::vector<unsigned int> &indices,
-        int depth = 0
+        const std::vector<unsigned int> &indices
     );
-    
+
 };
 
 }

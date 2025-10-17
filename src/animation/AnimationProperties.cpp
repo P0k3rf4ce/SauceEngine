@@ -118,81 +118,25 @@ Eigen::Affine3d AnimationProperties::getModelMatrix() {
     return Eigen::Affine3d::Identity();
 }
 
-// ---------------------------
-// Everything below is for bouding boxes
-// ---------------------------
-
-AABB AnimationProperties::BoundingBoxRepresentation(const std::vector<Eigen::Vector3d> &vectors) {
-    if (vectors.empty()) return AABB();
-
-    Eigen::Vector3d min = vectors[0];
-    Eigen::Vector3d max = vectors[0];
-
-    for (const auto &v : vectors) {
-        min = min.cwiseMin(v);
-        max = max.cwiseMax(v);
-    }
-
-    return AABB(min, max);
-}
-
-bool AnimationProperties::BoundingBoxOverlap(const std::vector<Eigen::Vector3d> &points_one,
-                                             const std::vector<Eigen::Vector3d> &points_two) 
-{
-    AABB bbox1 = BoundingBoxRepresentation(points_one);
-    AABB bbox2 = BoundingBoxRepresentation(points_two);
-    return bbox1.overlaps(bbox2);
-}
-
-std::unique_ptr<AABBNode> AnimationProperties::BuildAABBTree(
+void AnimationProperties::computeBoundingBoxHierarchy(
     const std::vector<Eigen::Vector3d> &vertices,
-    const std::vector<unsigned int> &indices,
-    int depth)
-{
-    auto node = std::make_unique<AABBNode>();
+    const std::vector<unsigned int> &indices
+) {
+    boundingBoxes.clear();
 
-    std::vector<Eigen::Vector3d> triPoints;
-    triPoints.reserve(indices.size());
-    for (auto i : indices)
-        triPoints.push_back(vertices[i]);
-
-    node->box = BoundingBoxRepresentation(triPoints);
-
-    if (indices.size() <= 6 || depth > 16) {
-        node->triangleIndices = indices;
-        return node;
-    }
-
-    Eigen::Vector3d extents = node->box.max - node->box.min;
-    int axis;
-    extents.maxCoeff(&axis);
-
-    std::vector<std::pair<double, unsigned int>> centroidPairs;
     for (size_t i = 0; i < indices.size(); i += 3) {
-        Eigen::Vector3d centroid = (
-            vertices[indices[i]] +
-            vertices[indices[i+1]] +
-            vertices[indices[i+2]]) / 3.0;
-        centroidPairs.push_back({centroid[axis], static_cast<unsigned int>(i)});
+        Eigen::AlignedBox3d box;
+        box.setEmpty();
+        box.extend(vertices[indices[i]]);
+        box.extend(vertices[indices[i + 1]]);
+        box.extend(vertices[indices[i + 2]]);
+        boundingBoxes.push_back(box);
     }
+}
 
-    std::sort(centroidPairs.begin(), centroidPairs.end(),
-              [](auto &a, auto &b){ return a.first < b.first; });
-
-    size_t mid = centroidPairs.size() / 2;
-    std::vector<unsigned int> leftIndices, rightIndices;
-    for (size_t i = 0; i < centroidPairs.size(); ++i) {
-        for (int j = 0; j < 3; ++j) {
-            unsigned int idx = indices[centroidPairs[i].second + j];
-            if (i < mid)
-                leftIndices.push_back(idx);
-            else
-                rightIndices.push_back(idx);
-        }
-    }
-
-    node->left = BuildAABBTree(vertices, leftIndices, depth + 1);
-    node->right = BuildAABBTree(vertices, rightIndices, depth + 1);
-
-    return node;
+bool AnimationProperties::boxesOverlap(
+    const Eigen::AlignedBox3d &a,
+    const Eigen::AlignedBox3d &b
+) const {
+    return a.intersects(b);
 }
