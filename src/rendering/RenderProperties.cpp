@@ -46,7 +46,7 @@ void RenderProperties::unload() {
  * Run shaders for this object
 */
 void RenderProperties::update(const modeling::ModelProperties &modelProps, const animation::AnimationProperties &animProps) {
-    initShadowResourcesIfEmitter(modelProps);
+
 }
 
 void RenderProperties::initShadowResourcesIfEmitter(const modeling::ModelProperties &modelProps) {
@@ -77,6 +77,19 @@ void RenderProperties::initShadowResourcesIfEmitter(const modeling::ModelPropert
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMapTex, 0);
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
+
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        LOG_ERROR("Shadow FBO incomplete: " + status);
+        
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glDeleteTextures(1, &depthMapTex);
+        depthMapTex = 0;
+        glDeleteFramebuffers(1, &depthMapFBO);
+        depthMapFBO = 0;
+        return;
+    }
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     LOG_INFO("Shadow map initialized.");
