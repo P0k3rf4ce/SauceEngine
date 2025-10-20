@@ -61,8 +61,8 @@ struct Material {
         Texture &base_color,
         Texture &normal,
         Texture &albedo,
-        Texture &metalness,
-        Texture &diffuse_roughness,
+        Texture &metallic,
+        Texture &roughness,
         Texture &ambient_occlusion
     ):
         name(std::move(name)),
