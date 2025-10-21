@@ -16,16 +16,23 @@ uniform samplerCube irradianceMap;
 uniform samplerCube prefilterMap;
 uniform sampler2D brdfLUT;
 
+// shadow maps
+// NOTE getting this to work requires some extra config on the opengl side
+// see https://wikis.khronos.org/opengl/Sampler_Object#Comparison_mode
+// Sampler arrays are limited by GL_MAX_ARRAY_TEXTURE_LAYERS which is at least 256
+uniform sampler2DArrayShadow shadowMaps;
+
 // lights
-struct Light
+struct DirectionalLight
 {
     vec4 Position;
     vec4 Color;
+    mat4 lightSpaceMatrix; // projection * view
 };
 
 layout(std430, binding = 10) readonly buffer lightData
 {
-    Light lights[];
+    DirectionalLight dirLights[];
 };
 
 uniform vec3 camPos;
@@ -88,6 +95,20 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
     return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
+// shadow test
+float shadowOcclusion(int lightIndex, vec4 fragPosLightSpace)
+{
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    projCoords = projCoords * 0.5 + 0.5; // transform from NDC to [0,1]
+    // shadow sampler does the depth comparison and PCF for us
+    // texture coordinate in this case includes:
+    //   1. xy coordinates of texel
+    //   2. layer index (i.e. which map we want to sample)
+    //   3. value to compare with retreived texel
+    // returns a float in [0,1]
+    return texture(shadowMaps, vec4(projCoords.xy, lightIndex, projCoords.z));
+}
+
 void main()
 {		
     vec3 albedo     = pow(texture(albedoMap, TexCoord).rgb, vec3(2.2));
@@ -105,15 +126,19 @@ void main()
 
     // reflectance equation
     vec3 Lo = vec3(0.0);
-    for(int i = 0; i < lights.length(); i++) 
+    for(int i = 0; i < dirLights.length(); i++) 
     {
+        // shadow check
+        vec4 fragPosLightSpace = dirLights[i].lightSpaceMatrix * vec4(FragPos, 1.0);
+        float shadow = shadowOcclusion(i, fragPosLightSpace);
+
         // calculate radiance
-        vec3 L = normalize(lights[i].Position.xyz - FragPos);
+        vec3 L = normalize(dirLights[i].Position.xyz - FragPos);
         vec3 H = normalize(V + L);
 
-        float distance = length(lights[i].Position.xyz - FragPos);
+        float distance = length(dirLights[i].Position.xyz - FragPos);
         float attenuation = 1.0 / (distance * distance);
-        vec3 radiance = lights[i].Color.rgb * attenuation;
+        vec3 radiance = dirLights[i].Color.rgb * attenuation;
 
         // calculate brdf
         float D   = distributionGGX(N, H, roughness);   
@@ -127,7 +152,7 @@ void main()
         vec3 kd = vec3(1.0) - F; // conservation of energy
         kd *= 1.0 - metallic;	  
 
-        Lo += (kd * albedo / PI + specular) * radiance * max(dot(N, L), 0.0);
+        Lo += (kd * albedo / PI + specular) * radiance * max(dot(N, L), 0.0) * (1.0 - shadow);
     }   
     
     // ambient lighting
