@@ -1,42 +1,6 @@
 [submodule "external/osqp"]
 	path = external/osqp
 	url = https://github.com/osqp/osqp.git
-[submodule "external/boost-config"]
-	path = external/boost-config
-	url = https://github.com/boostorg/config.git
-[submodule "external/boost-core"]
-	path = external/boost-core
-	url = https://github.com/boostorg/core.git
-[submodule "external/boost-preprocessor"]
-	path = external/boost-preprocessor
-	url = https://github.com/boostorg/preprocessor.git
-[submodule "external/boost-mpl"]
-	path = external/boost-mpl
-	url = https://github.com/boostorg/mpl.git
-[submodule "external/boost-fusion"]
-	path = external/boost-fusion
-	url = https://github.com/boostorg/fusion.git
-[submodule "external/boost-array"]
-	path = external/boost-array
-	url = https://github.com/boostorg/array.git
-[submodule "external/boost-typeof"]
-	path = external/boost-typeof
-	url = https://github.com/boostorg/typeof.git
-[submodule "external/boost-utility"]
-	path = external/boost-utility
-	url = https://github.com/boostorg/utility.git
-[submodule "external/boost-static_assert"]
-	path = external/boost-static_assert
-	url = https://github.com/boostorg/static_assert.git
-[submodule "external/boost-type_traits"]
-	path = external/boost-type_traits
-	url = https://github.com/boostorg/type_traits.git
-[submodule "external/boost-throw_exception"]
-	path = external/boost-throw_exception
-	url = https://github.com/boostorg/throw_exception.git
-[submodule "external/boost-assert"]
-	path = external/boost-assert
-	url = https://github.com/boostorg/assert.git
 [submodule "external/odeint-v2"]
 	path = external/odeint-v2
 	url = https://github.com/headmyshoulder/odeint-v2.git
