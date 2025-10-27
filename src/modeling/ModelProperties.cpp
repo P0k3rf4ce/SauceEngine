@@ -6,6 +6,7 @@ using namespace modeling;
 ModelProperties::ModelProperties(std::string gltfFilename) 
     : gltfFilename(gltfFilename), model(nullptr) {
     // Initialize with null model and empty properties map
+	this->cam=nullptr;
 }
 ModelProperties::~ModelProperties() {
     // Shared pointer will automatically clean up Model
@@ -37,12 +38,17 @@ void ModelProperties::update(const animation::AnimationProperties &animProps) {
     if (model) {
         // Setup the model for rendering (bind shader and vertex data)
         model->setupForRendering();
-        
+
         auto shader = model->getShader();
 
         // Set any modeling-specific uniforms
         if (shader && shader->is_bound()) {
-            
+			if (this->cam==nullptr) {
+				LOG_WARN("ModelProps update: Camera is null, not setting view matrix. Use Scene->set_camera()");
+			}
+			else {
+				shader->setUniform("vert", this->cam->getView());
+			}
         }
     }
 }

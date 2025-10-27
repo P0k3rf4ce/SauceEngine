@@ -38,6 +38,14 @@ public:
      * Update the Object <timestep> seconds into the future
     */
     void update(double timestep);
+
+	/*
+	 * Set the camera used by modelProps for rendering the object.
+	 * Will take effect on the next update()
+	 */
+	void set_camera(std::shared_ptr<Camera> cam) {
+		this->modelProps->set_camera(cam);
+	}
 };
 
 #endif

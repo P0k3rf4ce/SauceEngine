@@ -48,6 +48,9 @@ void Scene::set_camera(std::shared_ptr<Camera> cam) {
     }
     this->active_camera = cam;
 
+	for (auto object: this->objects) {
+		object.set_camera(cam);
+	}
 }
 
 std::shared_ptr<Camera> Scene::get_camera() {
