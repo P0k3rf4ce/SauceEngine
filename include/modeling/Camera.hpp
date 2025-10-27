@@ -1,3 +1,6 @@
+#ifndef CAMERA_HPP
+#define CAMERA_HPP
+
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
@@ -67,3 +70,5 @@ class Camera {
 		 */
 		static Matrix4f lookat(Vector3f right, Vector3f up, Vector3f direction, Vector3f pos);
 };
+
+#endif
