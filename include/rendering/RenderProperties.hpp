@@ -14,9 +14,6 @@ public:
     RenderProperties(const modeling::ModelProperties &modelProps);
     ~RenderProperties();
 
-    GLuint getShadowDepthTexture() const {return depthMapTex;}
-    GLuint getShadowFrameBuffer() const {return depthMapFBO;}
-
     /**
      * This function is meant to load these 
      * Render properties back into use
@@ -34,15 +31,6 @@ public:
      * Run shaders for this object
     */
     void update(const modeling::ModelProperties &modelProps, const animation::AnimationProperties &animProps);
-
-private:
-    // Shadow Mapping
-    GLuint depthMapFBO = 0;
-    GLuint depthMapTex = 0;
-    int shadowWidth = 1024;
-    int shadowHeight = 1024;
-
-    void initShadowResourcesIfEmitter(const modeling::ModelProperties &modelProps);
 };
 
 }
