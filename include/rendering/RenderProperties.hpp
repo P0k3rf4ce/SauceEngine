@@ -2,6 +2,8 @@
 #define RENDER_PROPERTIES_HPP
 
 #include "modeling/ModelProperties.hpp"
+#include "utils/Shader.hpp"
+#include <glad/glad.h>
 
 namespace rendering {
 
@@ -29,7 +31,15 @@ public:
     /**
      * Run shaders for this object
     */
-    void update(const modeling::ModelProperties &modelProps, const animation::AnimationProperties &animProps);
+    void update(const modeling::ModelProperties &modelProps, const animation::AnimationProperties &animProps, const bool shadow = false);
+
+    private:
+    Shader pbrShader;
+    Shader shadowShader;
+
+    GLuint irradianceMap;
+    GLuint prefilterMap;
+    GLuint brdfLUT;
 };
 
 }
