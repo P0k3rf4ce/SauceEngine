@@ -1,62 +1,61 @@
 #include "modeling/Manager.hpp"
+#include "modeling/ModelLoader.hpp"
 #include "stb_image.h"
-
+#include <ranges>
 
 void AssetManager::load_file(std::string GLTF_path) {
     for (auto &scene: this->scenes){
         if (scene.path == GLTF_path) {        // file found
-            if (!scene.contents.has_value()){ // value was unloaded
-                // load scene
-                throw std::runtime_error("TODO: depends on loading from GLTF");
+
+            // file is still loaded
+            if (!scene.was_marked_unloaded) {
+                return;
             }
+            scene.was_marked_unloaded = false;
+
+            // load file
+            auto loaded_models = modeling::ModelLoader::loadModels(GLTF_path, this->shaders);
+            
+            // check if changed
+            if (loaded_models.size() != scene.contents.size()) {
+                LOG_ERROR("Number of models have changed since this was last loaded");
+                return;
+            }
+
+            // replaced possibly unloaded models with loaded ones
+            for (int i = 0; i < loaded_models.size(); i++){
+                if (auto maybe_model = std::get_if<MaybeUnloadedModel>(&scene.contents[i])) {
+                    
+                    if (maybe_model->expired()) { 
+                        // was freed, replace with loaded models
+                        *maybe_model = loaded_models[i];
+                    } else { 
+                        // was not freed yet, inc ref count
+                        *maybe_model = maybe_model->lock();
+                    }
+                }
+            }
+
             return;
         }
     }
 }
 
-void AssetManager::unload_file(std::string GLTF_path) {
-    for (auto &scene: this->scenes){
-        if (scene.path == GLTF_path) {       // file found
-            if (scene.contents.has_value()){ // scene is loaded
-                scene.contents.reset();      // unload 
+void AssetManager::mark_unloadable(std::string GLTF_path) {
+    for (auto &scene: this->scenes) {
+        if (scene.path == GLTF_path) {// file found
+            scene.was_marked_unloaded = true;
+            
+            // for every loaded model, replace with a maybe loaded variant
+            for (auto &maybe_model: scene.contents) {               
+                if (auto loaded_model = std::get_if<LoadedModel>(&maybe_model)) {
+                    loaded_model->reset();
+                    maybe_model = MaybeUnloadedModel(*loaded_model);
+                }
             }
+
             return;
         }
     }
-}
-
-const modeling::Model& AssetManager::get_model(ModelKey key) {
-    auto& contents = this->scenes[key.scene].contents;
-    if (contents.has_value()) {
-        return contents->models[key.id];
-    }
-    throw std::runtime_error("should not happen");
-}
-
-const Material& AssetManager::get_material(MaterialKey key) {
-    auto& contents = this->scenes[key.scene].contents;
-    if (contents.has_value()) {
-        return contents->materials.get(key.id);
-    }
-
-    throw std::runtime_error("should not happen");
-}
-
-const Texture& AssetManager::get_texture(TextureKey key) {
-    auto& contents = this->scenes[key.scene].contents;
-    if (contents.has_value()) {
-        return contents->materials.get_texture(key.id);
-    }
-
-    throw std::runtime_error("should not happen");
-}
-
-const Mesh& AssetManager::get_mesh(MeshKey key) {
-    auto& contents = this->scenes[key.scene].contents;
-    if (contents.has_value()) {
-        return contents->loaded_meshes[key.id];
-    }
-
-    throw std::runtime_error("should not happen");
 }
 

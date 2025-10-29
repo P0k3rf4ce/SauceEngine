@@ -5,55 +5,23 @@
 #include <assimp/scene.h>
 #include <string>
 #include <optional>
+#include <variant>
 
-struct ModelKey{
-    int scene;
-    int id;
-};
+using LoadedModel = std::shared_ptr<modeling::Model>;
+using MaybeUnloadedModel = std::weak_ptr<modeling::Model>;
+using MaybeContents = std::vector<std::variant<LoadedModel, MaybeUnloadedModel>>;
 
-// temporary Key definition
-struct MeshKey{
-    int scene;
-    int id;
-};
-
-// temporary Key definition
-struct MaterialKey{
-    int scene;
-    MaterialHandle id;
-};
-
-// temporary Key definition
-struct TextureKey{
-    int scene;
-    int id;
-};
-
-// loaded GLTF file contents
-struct LoadedContents {
-    MaterialManager materials;
-
-    std::vector<modeling::Model> models;
-
-    std::vector<Mesh> &loaded_meshes;
-
-private:
-    // no copy
-    LoadedContents(const LoadedContents&) = delete;
-    LoadedContents& operator=(const LoadedContents&) = delete;
-    
-    // no move
-    LoadedContents(LoadedContents&&) = delete;
-    LoadedContents& operator=(LoadedContents&&) = delete;
-};
 
 // Possibly loaded GLTF file
 struct SceneObjects {
     // Path to GLTF file
     std::string path;
-    
+
+    // has this file been marked for garbage collection
+    bool was_marked_unloaded;
+
     // maybe loaded contents
-    std::optional<LoadedContents> contents;
+    MaybeContents contents;
 
 private:
     // no copy
@@ -67,8 +35,15 @@ private:
 
 // Manages all assets from all files
 class AssetManager {
+    
+    // all possibly loaded files 
     std::vector<SceneObjects> scenes;
+
+    // unused store for custom models
     std::vector<modeling::Model> custom_models;
+
+    // idk
+    std::shared_ptr<Shader> shaders;
 
 public:
     AssetManager() = default;
@@ -76,12 +51,7 @@ public:
 
     // loading and unloading files
     void load_file(std::string GLTF_path);
-    void unload_file(std::string GLTF_path);
-
-    const modeling::Model& get_model(ModelKey id);
-    const Material& get_material(MaterialKey id);
-    const Texture& get_texture(TextureKey id);
-    const Mesh& get_mesh(MeshKey id);
+    void mark_unloadable(std::string GLTF_path);
 
 private:
     // no copy
