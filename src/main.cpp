@@ -16,6 +16,9 @@ bool initGLAD();
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
 
+// Precision should be up to a millisecond
+inline double get_seconds_since_epoch();
+
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
@@ -40,11 +43,14 @@ int main()
 
     double deltatime = 0.0;
 
+    double prev_frame_time = get_seconds_since_epoch(), current_frame_time;
+
     while (!glfwWindowShouldClose(window)) {
         processInput(window);
 
-        auto now = std::chrono::system_clock::now();
-        deltatime += std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+        current_frame_time = get_seconds_since_epoch();
+        deltatime += current_frame_time - prev_frame_time;
+        prev_frame_time = current_frame_time;
 
         deltatime = scene.update(deltatime, DELTA_STEP);
         
@@ -96,4 +102,10 @@ void processInput(GLFWwindow* window)
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
+}
+
+// Precision should be up to a millisecond
+inline double get_seconds_since_epoch() {
+    auto now = std::chrono::system_clock::now();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() / 1000.0;
 }
