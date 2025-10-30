@@ -23,14 +23,14 @@ struct SceneObjects {
     // maybe loaded contents
     MaybeContents contents;
 
-private:
+
     // no copy
     SceneObjects(const SceneObjects&) = delete;
     SceneObjects& operator=(const SceneObjects&) = delete;
     
-    // no move
-    SceneObjects(SceneObjects&&) = delete;
-    SceneObjects& operator=(SceneObjects&&) = delete;
+    // allow move
+    SceneObjects(SceneObjects&&) = default;
+    SceneObjects& operator=(SceneObjects&&) = default;
 };
 
 // Manages all assets from all files
@@ -54,7 +54,7 @@ public:
     void mark_unloadable(std::string GLTF_path);
 
     // used for testing
-    std::vector<SceneObjects> get_scenes() { return this->scenes; }
+    std::vector<SceneObjects>& get_scenes() { return this->scenes; }
 
 private:
     // no copy
