@@ -18,7 +18,7 @@ struct SceneObjects {
     std::string path;
 
     // has this file been marked for garbage collection
-    bool was_marked_unloaded;
+    bool is_marked_unloaded;
 
     // maybe loaded contents
     MaybeContents contents;
@@ -47,11 +47,14 @@ class AssetManager {
 
 public:
     AssetManager() = default;
-    ~AssetManager() = delete;
+    ~AssetManager() = default;
 
     // loading and unloading files
     void load_file(std::string GLTF_path);
     void mark_unloadable(std::string GLTF_path);
+
+    // used for testing
+    std::vector<SceneObjects> get_scenes() { return this->scenes; }
 
 private:
     // no copy
