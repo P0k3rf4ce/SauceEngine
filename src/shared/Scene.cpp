@@ -1,7 +1,7 @@
 #include "shared/Scene.hpp"
 
 Scene::Scene() {
-    Scene::instance = this;
+    
 }
 
 Scene::Scene(std::string &filename) {
@@ -38,18 +38,4 @@ void Scene::update(double timestep) {
     for (auto object: this->objects) {
         object.update(timestep);
     }
-}
-
-/**
- * Getter for the light emitters in the scene
-*/
-std::vector<Object> Scene::getLights() {
-    return this->lights;
-}
-
-/**
- * Adds a light to the list of emitters
- */
-void Scene::addLight(const Object &light) {
-    this->lights.push_back(light);
 }
