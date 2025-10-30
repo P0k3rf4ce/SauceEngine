@@ -12,6 +12,7 @@ GLenum Shader::getGLShaderType(SHADER_TYPE type) {
         case GEOMETRY: return GL_GEOMETRY_SHADER;
         case COMPUTE: return GL_COMPUTE_SHADER;
     }
+    return -1; // Invalid type
 }
 
 /*
@@ -329,6 +330,9 @@ void Shader::setUniform(const std::string& name, float x, float y, float z, floa
     }
 }
 
+
+
+
 /* Mat4f uniform */
 void Shader::setUniform(const std::string& name, const Eigen::Matrix4f& mat4) {
     GLint location = getUniformLocation(name);
@@ -338,6 +342,7 @@ void Shader::setUniform(const std::string& name, const Eigen::Matrix4f& mat4) {
         });
     }
 }
+
 
 /*
  * Actually use the shader

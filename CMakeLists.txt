@@ -36,6 +36,9 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/src/shared)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE sharedLib animationLib modelingLib renderingLib)
 
+find_package(assimp CONFIG REQUIRED)
+target_link_libraries(modelingLib PRIVATE assimp::assimp)
+
 if (BUILD_TESTS)
     add_subdirectory(${PROJECT_SOURCE_DIR}/test)
 endif()
