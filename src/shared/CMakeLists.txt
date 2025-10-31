@@ -15,4 +15,4 @@ target_link_libraries(sharedLib PUBLIC glfw)
 find_package(Eigen3 CONFIG REQUIRED NO_MODULE)
 target_link_libraries(sharedLib PUBLIC Eigen3::Eigen)
 
-target_link_libraries(sharedLib PUBLIC animationLib modelingLib renderingLib)
+target_link_libraries(sharedLib PUBLIC animationLib modelingLib renderingLib utilsLib)
