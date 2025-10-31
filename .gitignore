@@ -10,3 +10,5 @@ build.sh
 .idea/
 .cmake/
 test_coverage.sh
+coverage*
+*.log
