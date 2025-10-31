@@ -43,6 +43,11 @@ add_subdirectory(external/osqp)
 add_library(odeint INTERFACE)
 target_include_directories(odeint INTERFACE external/odeint-v2/include)
 target_link_libraries(${PROJECT_NAME} PRIVATE sharedLib animationLib modelingLib renderingLib)
+target_link_libraries(${PROJECT_NAME} PRIVATE sharedLib animationLib modelingLib renderingLib)
 
-# Add test subdirectory. Everything for tests is loaded there
-add_subdirectory(test)
+find_package(assimp CONFIG REQUIRED)
+target_link_libraries(modelingLib PRIVATE assimp::assimp)
+
+if (BUILD_TESTS)
+    add_subdirectory(${PROJECT_SOURCE_DIR}/test)
+endif()

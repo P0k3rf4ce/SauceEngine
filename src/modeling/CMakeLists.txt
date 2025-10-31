@@ -1,6 +1,6 @@
 file(GLOB MODELING_SRC_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/*.cpp")
 
-add_library(modelingLib SHARED ${MODELING_SRC_FILES})
+add_library(modelingLib STATIC ${MODELING_SRC_FILES})
 
 target_include_directories(modelingLib PRIVATE
   ${PROJECT_SOURCE_DIR}/include

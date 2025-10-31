@@ -2,20 +2,19 @@
 
 using namespace modeling;
 
-ModelProperties::ModelProperties(std::string gltfFilename) {
+static std::string s_modelPath;
 
+ModelProperties::ModelProperties(std::string gltfFilename) {
+    s_modelPath = std::move(gltfFilename);
 }
 ModelProperties::~ModelProperties() {
 
 }
 
-/**
- * This function is meant to load these 
- * Model properties back into use
-*/
 void ModelProperties::load() {
 
 }
+
 
 /**
  * This function is meant to remove these 

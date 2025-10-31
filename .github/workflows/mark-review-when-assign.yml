@@ -1,0 +1,61 @@
+
+name: Mark issue as In Review on PR Ready
+
+on:
+  pull_request:
+    types: [review_requested]
+
+jobs:
+  mark_ipr:
+    if: contains("su-ah P0k3rf4ce NoahFreelove", ${{ github.event.pull_request.requested_reviewer.login }})
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.head_ref }}
+
+    - name: Set up Git
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+
+    - name: mark pr as ready
+      id: make_ready
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh pr ready
+
+    - name: get issue number
+      id: get_issue_num
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        TITLE="${{ github.event.pull_request.title }}"
+        [[ $TITLE =~ \#([0-9]+) ]]
+        NUM=${BASH_REMATCH[1]}
+        echo "ISSUE_NUM=$NUM" >> $GITHUB_ENV
+
+    - name: get issue item id
+      id: get_issue_item_id
+      env:
+        GH_TOKEN: ${{ secrets.EMMY_TOKEN }}
+      run: |
+
+        # get issue item id
+        ID=$(gh project item-list 1 --owner "su-ah" --format json | jq -r \
+                              '.items[] | select(.content.number == ${{ env.ISSUE_NUM }}) | .id')
+        echo "ITEM_ID=$ID" >> $GITHUB_ENV
+
+    - name: move to review
+      id: move_to_review
+      env:
+        GH_TOKEN: ${{ secrets.EMMY_TOKEN }}
+      run: |
+        gh project item-edit \
+          --project-id "PVT_kwHOBKGPPs4BDYld" \
+          --field-id "PVTSSF_lAHOBKGPPs4BDYldzg1UalY" \
+          --single-select-option-id "304c8ca4" \
+          --id "${{ env.ITEM_ID }}"

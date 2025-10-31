@@ -2,10 +2,7 @@
 #define OBJECT_HPP
 
 #include <string>
-
-#ifdef __linux__
-    #include <memory>
-#endif
+#include <memory>
 
 #include "animation/AnimationProperties.hpp"
 #include "modeling/ModelProperties.hpp"
@@ -21,21 +18,12 @@ public:
     Object(std::string gltfFilename);
     ~Object();
 
-    /**
-     * This function is meant to load this Object back into use
-    */
     void load();
-
-    /**
-     * This function is meant to remove this Object from use with the
-     * intention that they will be used in the future.
-    */
     void unload();
 
-    /**
-     * Update the Object <timestep> seconds into the future
-    */
-    void update(double timestep);
+    void updateAnimation(double DELTA_STEP);
+    void updateModeling();
+    void updateRendering();
 };
 
 #endif
