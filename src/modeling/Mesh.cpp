@@ -1,7 +1,7 @@
 #include <glad/glad.h>
 
 #include "modeling/Mesh.hpp"
-#include "utils/Logger.hpp"
+#include "shared/Logger.hpp"
 
 using namespace std;
 

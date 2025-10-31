@@ -1,5 +1,5 @@
-#include "utils/Shader.hpp"
-#include "utils/Logger.hpp"
+#include "shared/Shader.hpp"
+#include "shared/Logger.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -7,7 +7,6 @@
 // Converts our SHADER TYPE to GL name
 GLenum Shader::getGLShaderType(SHADER_TYPE type) {
     switch (type) {
-        case UNINITIALIZED: return UNINITIALIZED;
         case VERTEX: return GL_VERTEX_SHADER;
         case FRAGMENT: return GL_FRAGMENT_SHADER;
         case GEOMETRY: return GL_GEOMETRY_SHADER;
@@ -331,15 +330,19 @@ void Shader::setUniform(const std::string& name, float x, float y, float z, floa
     }
 }
 
+
+
+
 /* Mat4f uniform */
-void Shader::setUniform(const std::string& name, const Eigen::Affine3d& mat) {
+void Shader::setUniform(const std::string& name, const Eigen::Matrix4f& mat4) {
     GLint location = getUniformLocation(name);
     if (location != -1) {
         ensureShaderActive([&]() {
-            glUniformMatrix4dv(location, 1, GL_FALSE, mat.data());
+            glUniformMatrix4fv(location, 1, GL_FALSE, mat4.data());
         });
     }
 }
+
 
 /*
  * Actually use the shader

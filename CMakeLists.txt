@@ -33,9 +33,8 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/src/animation)
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/modeling)
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/rendering)
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/shared)
-add_subdirectory(${PROJECT_SOURCE_DIR}/src/utils)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE sharedLib animationLib modelingLib renderingLib utilsLib)
+target_link_libraries(${PROJECT_NAME} PRIVATE sharedLib animationLib modelingLib renderingLib)
 
 find_package(assimp CONFIG REQUIRED)
 target_link_libraries(modelingLib PRIVATE assimp::assimp)
