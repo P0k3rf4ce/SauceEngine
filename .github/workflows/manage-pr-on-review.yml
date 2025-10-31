@@ -1,0 +1,102 @@
+
+name: Manage issue/PR on review submission
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  merge:
+    if: github.event.review.state == 'approved'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.head_ref }}
+
+    - name: Set up Git
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+
+    - name: merge pr
+      id: merge_pr
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh pr merge --squash ${{ github.event.pull_request.number }}
+
+    - name: close issue
+      id: close_issue
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+
+        # get issue num
+        TITLE="${{ github.event.pull_request.title }}"
+        [[ $TITLE =~ \#([0-9]+) ]]
+        NUM=${BASH_REMATCH[1]}
+
+        # close issue
+        gh issue close $NUM \
+        --reason 'completed' \
+        --comment "Implemented by PR \#${{ github.event.pull_request.number }}"
+
+
+  set_ipr:
+    if: github.event.review.state == 'changes_requested'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.head_ref }}
+
+    - name: Set up Git
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+
+    - name: mark pr as draft
+      id: make_draft
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh pr ready --undo ${{ github.event.pull_request.number }}
+
+    - name: get issue number
+      id: get_issue_num
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        TITLE="${{ github.event.pull_request.title }}"
+        [[ $TITLE =~ \#([0-9]+) ]]
+        NUM=${BASH_REMATCH[1]}
+        echo "ISSUE_NUM=$NUM" >> $GITHUB_ENV
+
+    - name: get issue item id
+      id: get_issue_item_id
+      env:
+        GH_TOKEN: ${{ secrets.EMMY_TOKEN }}
+      run: |
+
+        # get issue item id
+        ID=$(gh project item-list 1 --owner "su-ah" --format json | jq -r \
+                              '.items[] | select(.content.number == ${{ env.ISSUE_NUM }}) | .id')
+        echo "ITEM_ID=$ID" >> $GITHUB_ENV
+
+    - name: move to ipr
+      id: move_to_ipr
+      env:
+        GH_TOKEN: ${{ secrets.EMMY_TOKEN }}
+      run: |
+        gh project item-edit \
+          --project-id "PVT_kwHOBKGPPs4BDYld" \
+          --field-id "PVTSSF_lAHOBKGPPs4BDYldzg1UalY" \
+          --single-select-option-id "47fc9ee4" \
+          --id "${{ env.ITEM_ID }}"
+
+
