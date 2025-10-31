@@ -1,9 +1,10 @@
 #include "rendering/RenderProperties.hpp"
+#include "utils/Logger.hpp"
 
 using namespace rendering;
 
 RenderProperties::RenderProperties(const modeling::ModelProperties &modelProps) {
-
+    initShadowResourcesIfEmitter(modelProps);
 }
 
 RenderProperties::~RenderProperties() {
@@ -31,5 +32,5 @@ void RenderProperties::unload() {
  * Run shaders for this object
 */
 void RenderProperties::update(const modeling::ModelProperties &modelProps, const animation::AnimationProperties &animProps) {
-    
+
 }

@@ -2,6 +2,7 @@
 #define RENDER_PROPERTIES_HPP
 
 #include "modeling/ModelProperties.hpp"
+#include <glad/glad.h>
 
 namespace rendering {
 
