@@ -2,10 +2,7 @@
 #define OBJECT_HPP
 
 #include <string>
-
-#ifdef __linux__
-    #include <memory>
-#endif
+#include <memory>
 
 #include "animation/AnimationProperties.hpp"
 #include "modeling/ModelProperties.hpp"

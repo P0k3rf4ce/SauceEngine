@@ -36,6 +36,6 @@ void AnimationProperties::update(double timestep) {
  * Returns the model matrix for this object.
  * A model matrix places the object in the correct point in world space
 */
-Eigen::Affine3d getModelMatrix() {
+Eigen::Affine3d AnimationProperties::getModelMatrix() const {
     return Eigen::Affine3d::Identity();
 }
