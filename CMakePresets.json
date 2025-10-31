@@ -4,9 +4,10 @@
     {
       "name": "vcpkg",
       "binaryDir": "${sourceDir}/build",
+      "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
-        "BUILD_TESTS": "ON"      
+        "BUILD_TESTS": "ON"
       }
     }
   ]

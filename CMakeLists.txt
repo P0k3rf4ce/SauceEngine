@@ -7,6 +7,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 project(SauceEngine)
 
+# Add coverage flags for Apple builds
+if(APPLE)
+    add_compile_options(-g -fprofile-instr-generate -fcoverage-mapping)
+    add_link_options(-fprofile-instr-generate -g)
+endif()
+
 if(WIN32)
   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
@@ -33,7 +39,10 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/src/animation)
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/modeling)
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/rendering)
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/shared)
-
+add_subdirectory(external/osqp)
+add_library(odeint INTERFACE)
+target_include_directories(odeint INTERFACE external/odeint-v2/include)
+target_link_libraries(${PROJECT_NAME} PRIVATE sharedLib animationLib modelingLib renderingLib)
 target_link_libraries(${PROJECT_NAME} PRIVATE sharedLib animationLib modelingLib renderingLib)
 
 find_package(assimp CONFIG REQUIRED)
