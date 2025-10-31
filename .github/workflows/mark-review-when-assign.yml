@@ -45,7 +45,7 @@ jobs:
       run: |
 
         # get issue item id
-        ID=$(gh project item-list 1 --owner "su-ah" --format json | jq -r \
+        ID=$(gh project item-list 5 --owner "P0k3rf4ce" --format json | jq -r \
                               '.items[] | select(.content.number == ${{ env.ISSUE_NUM }}) | .id')
         echo "ITEM_ID=$ID" >> $GITHUB_ENV
 
