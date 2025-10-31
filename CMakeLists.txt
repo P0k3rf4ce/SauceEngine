@@ -43,7 +43,6 @@ add_subdirectory(external/osqp)
 add_library(odeint INTERFACE)
 target_include_directories(odeint INTERFACE external/odeint-v2/include)
 target_link_libraries(${PROJECT_NAME} PRIVATE sharedLib animationLib modelingLib renderingLib)
-target_link_libraries(${PROJECT_NAME} PRIVATE sharedLib animationLib modelingLib renderingLib)
 
 find_package(assimp CONFIG REQUIRED)
 target_link_libraries(modelingLib PRIVATE assimp::assimp)
