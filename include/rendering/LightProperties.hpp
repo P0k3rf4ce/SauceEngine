@@ -17,10 +17,11 @@ public:
     const glm::vec3 &getColour() const noexcept;
     void setColour(const glm::vec3 &colour) noexcept;
 
-    // lifecycle methods that derived classes must implement
-    virtual void load() = 0;
-    virtual void unload() = 0;
-    virtual void useBuffer() = 0;
+    // lifecycle update method that derived classes must implement
+    virtual void update() = 0;
+
+    // configure shadow map parameters (abstract)
+    virtual void confShadowMap() = 0;
 
 protected:
     glm::vec3 m_colour;
