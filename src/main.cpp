@@ -1,27 +1,34 @@
 #define STB_IMAGE_IMPLEMENTATION
 
+#include <unistd.h>
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <stb_image.h>
 
 #include <iostream>
 
+#include "launcher/optionParser.hpp"
 #include "shared/Scene.hpp"
 
 void initGLFW();
-GLFWwindow* initWindow();
+GLFWwindow* initWindow(unsigned int scr_width, unsigned int scr_height);
 bool initGLAD();
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
 
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
-const double TIMESTEP = 0.1;
 
-int main()
-{
+int main(int argc, char **argv) {
+    const AppOptions ops(argc, argv);
+
+    if (ops.help) {
+        std::cout << "Usage: " << argv[0] << " <options> [scene_file]" << std::endl;
+        std::cout << ops.getHelpMessage() << std::endl;
+        exit(1);
+    }
+
     initGLFW();
-    GLFWwindow *window = initWindow();
+    GLFWwindow *window = initWindow(ops.scr_width, ops.scr_height);
     if (window == NULL) {
         return 1;
     }
@@ -36,8 +43,6 @@ int main()
 
     while (!glfwWindowShouldClose(window)){
         processInput(window);
-
-        scene.update(TIMESTEP);
         
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -58,8 +63,8 @@ void initGLFW() {
 #endif
 }
 
-GLFWwindow *initWindow() {
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+GLFWwindow *initWindow(unsigned int scr_width, unsigned int scr_height) {
+    GLFWwindow* window = glfwCreateWindow(scr_width, scr_height, "Sauce Engine", NULL, NULL);
     if (window == NULL)
     {
         std::cerr << "Failed to create GLFW window" << std::endl;
