@@ -8,10 +8,11 @@
 
 #include <iostream>
 
+#include "launcher/optionParser.hpp"
 #include "shared/Scene.hpp"
 
 void initGLFW();
-GLFWwindow* initWindow();
+GLFWwindow* initWindow(unsigned int scr_width, unsigned int scr_height);
 bool initGLAD();
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
@@ -19,16 +20,17 @@ void processInput(GLFWwindow* window);
 // Precision should be up to a millisecond
 inline double get_seconds_since_epoch();
 
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+int main(int argc, const char *argv[]) {
+    const AppOptions ops(argc, argv);
 
-const double TICKRATE = 128.0;
-const double DELTA_STEP = 1.0 / TICKRATE;
+    if (ops.help) {
+        std::cout << "Usage: " << argv[0] << " <options> [scene_file]" << std::endl;
+        std::cout << ops.getHelpMessage() << std::endl;
+        exit(1);
+    }
 
-int main()
-{
     initGLFW();
-    GLFWwindow *window = initWindow();
+    GLFWwindow *window = initWindow(ops.scr_width, ops.scr_height);
     if (window == NULL) {
         return 1;
     }
@@ -45,6 +47,8 @@ int main()
 
     double prev_frame_time = get_seconds_since_epoch(), current_frame_time;
 
+    const double delta_step = 1.0/ops.tickrate;
+
     while (!glfwWindowShouldClose(window)) {
         processInput(window);
 
@@ -52,7 +56,7 @@ int main()
         deltatime += current_frame_time - prev_frame_time;
         prev_frame_time = current_frame_time;
 
-        deltatime = scene.update(deltatime, DELTA_STEP);
+        deltatime = scene.update(deltatime, delta_step);
         
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -73,8 +77,8 @@ void initGLFW() {
 #endif
 }
 
-GLFWwindow *initWindow() {
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+GLFWwindow *initWindow(unsigned int scr_width, unsigned int scr_height) {
+    GLFWwindow* window = glfwCreateWindow(scr_width, scr_height, "Sauce Engine", NULL, NULL);
     if (window == NULL)
     {
         std::cerr << "Failed to create GLFW window" << std::endl;
