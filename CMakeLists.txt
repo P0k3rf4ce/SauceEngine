@@ -32,6 +32,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE Eigen3::Eigen)
 find_package(Boost REQUIRED COMPONENTS program_options)
 target_link_libraries(${PROJECT_NAME} PRIVATE Boost::program_options)
 
+find_package(Qt6Widgets CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Widgets Qt6::QModernWindowsStylePlugin)
+
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/animation)
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/modeling)
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/rendering)

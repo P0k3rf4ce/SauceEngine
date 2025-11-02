@@ -22,8 +22,13 @@ int main(int argc, const char *argv[]) {
     if (ops.help) {
         std::cout << "Usage: " << argv[0] << " <options> [scene_file]" << std::endl;
         std::cout << ops.getHelpMessage() << std::endl;
-        exit(1);
+        return 1;
     }
+
+    return engine_mainloop(ops);
+}
+
+int engine_mainloop(const AppOptions &ops) {
 
     initGLFW();
     GLFWwindow *window = initWindow(ops.scr_width, ops.scr_height);
