@@ -7,7 +7,7 @@ file(GLOB TEST_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/**/*_test.cp
 
 add_executable(unit_tests ${TEST_FILES})
 
-target_link_libraries(unit_tests PRIVATE sharedLib animationLib modelingLib renderingLib)
+target_link_libraries(unit_tests PRIVATE launcherLib sharedLib animationLib modelingLib renderingLib)
 
 target_include_directories(unit_tests
   PRIVATE
@@ -25,4 +25,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
 find_package(Eigen3 CONFIG REQUIRED NO_MODULE)
 target_link_libraries(${PROJECT_NAME} PRIVATE Eigen3::Eigen)
 
+find_package(Boost REQUIRED COMPONENTS program_options)
+target_link_libraries(${PROJECT_NAME} PRIVATE Boost::program_options)
+
 gtest_discover_tests(unit_tests)
+
+add_subdirectory(launcher)
