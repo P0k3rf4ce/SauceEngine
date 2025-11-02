@@ -19,7 +19,7 @@ struct AppOptions {
     std::string scene_file;
     bool help;
 
-    AppOptions(int argc, char **argv);
+    AppOptions(int argc, const char *argv[]);
     boost::program_options::options_description getHelpMessage() const;
 
 private:

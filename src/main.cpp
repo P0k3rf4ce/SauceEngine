@@ -18,7 +18,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
 
 
-int main(int argc, char **argv) {
+int main(int argc, const char *argv[]) {
     const AppOptions ops(argc, argv);
 
     if (ops.help) {

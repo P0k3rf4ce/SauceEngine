@@ -8,7 +8,7 @@
  * -t --tickrate        Tickrate
  * -f --input-file      Scene file
  */
-AppOptions::AppOptions(int argc, char **argv): desc("Allowed options") {
+AppOptions::AppOptions(int argc, char const **argv): desc("Allowed options") {
     namespace po = boost::program_options;
 
     desc.add_options()
