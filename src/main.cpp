@@ -1,5 +1,7 @@
 #include <QApplication>
 
+#include <chrono>
+
 #include <iostream>
 
 #include "launcher/optionParser.hpp"
