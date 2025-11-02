@@ -4,7 +4,7 @@
 using namespace rendering;
 
 RenderProperties::RenderProperties(const modeling::ModelProperties &modelProps) {
-    initShadowResourcesIfEmitter(modelProps);
+
 }
 
 RenderProperties::~RenderProperties() {

@@ -1,22 +1,17 @@
-#include "LightProperties.hpp"
+#include "rendering/LightProperties.hpp"
 #include "utils/Logger.hpp"
 
 namespace rendering
 {
 
     LightProperties::LightProperties(const glm::vec3 &colour)
-        : m_colour(colour) {}
-
-    LightProperties::LightProperties(const glm::vec3 &colour, const modeling::ModelProperties &modelProps)
         : m_colour(colour)
     {
         initShadowResources();
     }
 
-    LightProperties::~LightProperties()
-    {
-        destroyShadowResources();
-    }
+    // provide definition for pure-virtual destructor
+    LightProperties::~LightProperties() = default;
 
     const glm::vec3 &LightProperties::getColour() const noexcept
     {
@@ -67,20 +62,6 @@ namespace rendering
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         LOG_INFO("Shadow map initialized.");
-    }
-
-    void LightProperties::destroyShadowResources()
-    {
-        if (depthMapTex != 0)
-        {
-            glDeleteTextures(1, &depthMapTex);
-            depthMapTex = 0;
-        }
-        if (depthMapFBO != 0)
-        {
-            glDeleteFramebuffers(1, &depthMapFBO);
-            depthMapFBO = 0;
-        }
     }
 
 } // namespace rendering
