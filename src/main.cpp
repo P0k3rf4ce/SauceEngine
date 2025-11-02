@@ -47,6 +47,8 @@ int main(int argc, const char *argv[]) {
 
     double prev_frame_time = get_seconds_since_epoch(), current_frame_time;
 
+    const double delta_step = 1.0/ops.tickrate;
+
     while (!glfwWindowShouldClose(window)) {
         processInput(window);
 
@@ -54,7 +56,7 @@ int main(int argc, const char *argv[]) {
         deltatime += current_frame_time - prev_frame_time;
         prev_frame_time = current_frame_time;
 
-        deltatime = scene.update(deltatime, DELTA_STEP);
+        deltatime = scene.update(deltatime, delta_step);
         
         glfwSwapBuffers(window);
         glfwPollEvents();
