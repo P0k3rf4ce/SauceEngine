@@ -1,7 +1,5 @@
 #define STB_IMAGE_IMPLEMENTATION
 
-#include <unistd.h>
-
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <stb_image.h>
