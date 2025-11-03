@@ -1,6 +1,7 @@
 {
   "dependencies": [
     "assimp",
+    "boost-program-options",
     "eigen3",
     "glad",
     "glfw3",
@@ -8,7 +9,12 @@
     "gtest",
     "opengl",
     "opengl-registry",
-    "stb",
-    "boost-program-options"
+    {
+      "name": "qtbase",
+      "features": [
+        "widgets"
+      ]
+    },
+    "stb"
   ]
 }
