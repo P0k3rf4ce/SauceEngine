@@ -12,4 +12,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
 int engine_mainloop(const AppOptions &ops);
 
+// Precision should be up to a millisecond
+inline double get_seconds_since_epoch();
+
 #endif
