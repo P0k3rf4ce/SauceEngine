@@ -1,5 +1,6 @@
 #include "rendering/LightProperties.hpp"
 #include "utils/Logger.hpp"
+#include "utils/Shader.hpp"
 
 namespace rendering
 {
@@ -7,6 +8,10 @@ namespace rendering
     LightProperties::LightProperties(const glm::vec3 &colour)
         : m_colour(colour)
     {
+        std::unordered_map<SHADER_TYPE, std::string> shaderFiles = {
+            {SHADER_TYPE::FRAGMENT, "src/rendering/shaders/shadow/shadow_mapping_depth.frag"},
+            {SHADER_TYPE::VERTEX, "src/rendering/shaders/shadow/shadow_mapping_depth.vert"}};
+        bool success = this->shadowMapShader.loadFromFiles(shaderFiles);
         initShadowResources();
     }
 
@@ -62,6 +67,14 @@ namespace rendering
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         LOG_INFO("Shadow map initialized.");
+    }
+
+    // Get everything ready for rendering a shadow map
+    void LightProperties::confShadowMap()
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, this->depthMapFBO);
+        this->shadowMapShader.bind();
+        this->shadowMapShader.setUniform("lightSpaceMatrix", this->projection * this->view);
     }
 
 } // namespace rendering
