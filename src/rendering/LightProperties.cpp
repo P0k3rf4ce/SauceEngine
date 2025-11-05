@@ -1,3 +1,5 @@
+#include <glad/glad.h>
+#include <Eigen/Geometry>
 #include "rendering/LightProperties.hpp"
 #include "utils/Logger.hpp"
 #include "utils/Shader.hpp"
@@ -70,7 +72,7 @@ namespace rendering
     }
 
     // Get everything ready for rendering a shadow map
-    void LightProperties::confShadowMap()
+    void LightProperties::confShadowMap(const animation::AnimationProperties &animProps)
     {
         glBindFramebuffer(GL_FRAMEBUFFER, this->depthMapFBO);
         this->shadowMapShader.bind();

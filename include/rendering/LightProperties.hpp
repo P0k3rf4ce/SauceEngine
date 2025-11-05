@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <glad/glad.h>
 #include <Eigen/Geometry>
+#include "animation/AnimationProperties.hpp"
 #include "utils/Shader.hpp"
 
 namespace rendering
@@ -26,7 +27,7 @@ namespace rendering
         virtual void update() = 0;
 
         // configure shadow map parameters (abstract)
-        virtual void confShadowMap();
+        virtual void confShadowMap(const animation::AnimationProperties &animProps);
 
     protected:
         glm::vec3 m_colour;
