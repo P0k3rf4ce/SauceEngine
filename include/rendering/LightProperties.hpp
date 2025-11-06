@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 #include <glad/glad.h>
+#include "utils/Shader.hpp"
 
 namespace rendering
 {
@@ -24,7 +25,7 @@ namespace rendering
         virtual void update() = 0;
 
         // configure shadow map parameters (abstract)
-        virtual void confShadowMap() = 0;
+        virtual void confShadowMap(Shader& shader) = 0;
 
     protected:
         glm::vec3 m_colour;

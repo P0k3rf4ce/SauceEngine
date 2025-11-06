@@ -9,6 +9,7 @@
 #include <Eigen/Geometry>
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
 #include "utils/Logger.hpp"
 
 enum SHADER_TYPE {
@@ -56,6 +57,7 @@ void setUniform(const std::string& name, bool value);
 void setUniform(const std::string& name, float x, float y, float z);
 void setUniform(const std::string& name, float x, float y, float z, float w);
 void setUniform(const std::string& name, const Eigen::Affine3d& mat);
+void setUniform(const std::string& name, const glm::mat4& mat);
 
 void setUniform(const std::string& name, const Eigen::Matrix4f& mat4);
 
