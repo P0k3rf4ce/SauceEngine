@@ -11,6 +11,11 @@
 #include "modeling/ModelProperties.hpp"
 #include "rendering/RenderProperties.hpp"
 
+namespace modeling{
+    class ModelingProperties;
+}
+
+
 class Object {
 private:
     std::string gltfFilename;

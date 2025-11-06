@@ -22,11 +22,11 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/src/rendering)
 
 add_executable(SauceEngine src/main.cpp)
 
-target_include_directories(SauceEngine PRIVATE
+target_include_directories(SauceEngine PUBLIC
   ${PROJECT_SOURCE_DIR}/include
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE utilsLib animationLib modelingLib renderingLib sharedLib)
+target_link_libraries(${PROJECT_NAME} PUBLIC utilsLib animationLib modelingLib renderingLib sharedLib)
 
 if (BUILD_TESTS)
     add_subdirectory(${PROJECT_SOURCE_DIR}/test)
