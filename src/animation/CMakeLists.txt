@@ -1,6 +1,6 @@
 file(GLOB ANIMATION_SRC_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/*.cpp")
 
-add_library(animationLib SHARED ${ANIMATION_SRC_FILES})
+add_library(animationLib STATIC ${ANIMATION_SRC_FILES})
 
 target_include_directories(animationLib PRIVATE
   ${PROJECT_SOURCE_DIR}/include
