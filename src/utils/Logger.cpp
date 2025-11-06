@@ -1,4 +1,4 @@
-#include "shared/Logger.hpp"
+#include "utils/Logger.hpp"
 
 // Initialize static instance
 Logger* Logger::instance = nullptr;

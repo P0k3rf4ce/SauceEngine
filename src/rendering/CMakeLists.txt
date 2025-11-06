@@ -14,3 +14,5 @@ target_link_libraries(renderingLib PUBLIC glfw)
 
 find_package(Eigen3 CONFIG REQUIRED NO_MODULE)
 target_link_libraries(renderingLib PUBLIC Eigen3::Eigen)
+
+target_link_libraries(renderingLib PUBLIC utilsLib)

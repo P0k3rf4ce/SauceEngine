@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include "shared/Shader.hpp"
+#include "utils/Shader.hpp"
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
 

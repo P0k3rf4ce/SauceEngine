@@ -14,27 +14,19 @@ if(WIN32)
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 endif()
 
+add_subdirectory(${PROJECT_SOURCE_DIR}/src/utils)
+add_subdirectory(${PROJECT_SOURCE_DIR}/src/shared)
+add_subdirectory(${PROJECT_SOURCE_DIR}/src/animation)
+add_subdirectory(${PROJECT_SOURCE_DIR}/src/modeling)
+add_subdirectory(${PROJECT_SOURCE_DIR}/src/rendering)
+
 add_executable(SauceEngine src/main.cpp)
 
 target_include_directories(SauceEngine PRIVATE
   ${PROJECT_SOURCE_DIR}/include
 )
 
-find_package(glad CONFIG REQUIRED)
-target_link_libraries(${PROJECT_NAME} PRIVATE glad::glad)
-
-find_package(glfw3 CONFIG REQUIRED)
-target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
-
-find_package(Eigen3 CONFIG REQUIRED NO_MODULE)
-target_link_libraries(${PROJECT_NAME} PRIVATE Eigen3::Eigen)
-
-add_subdirectory(${PROJECT_SOURCE_DIR}/src/shared)
-add_subdirectory(${PROJECT_SOURCE_DIR}/src/animation)
-add_subdirectory(${PROJECT_SOURCE_DIR}/src/modeling)
-add_subdirectory(${PROJECT_SOURCE_DIR}/src/rendering)
-
-target_link_libraries(${PROJECT_NAME} PRIVATE animationLib modelingLib renderingLib sharedLib)
+target_link_libraries(${PROJECT_NAME} PRIVATE utilsLib animationLib modelingLib renderingLib sharedLib)
 
 if (BUILD_TESTS)
     add_subdirectory(${PROJECT_SOURCE_DIR}/test)

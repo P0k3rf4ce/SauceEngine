@@ -12,7 +12,7 @@
 
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
-#include "shared/Logger.hpp"
+#include "utils/Logger.hpp"
 
 enum SHADER_TYPE {
   UNINITIALIZED,
