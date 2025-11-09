@@ -27,13 +27,12 @@ namespace rendering
         virtual void update() = 0;
 
         // configure shadow map parameters (abstract)
-        virtual void confShadowMap(const animation::AnimationProperties &animProps);
+        virtual void confShadowMap(const animation::AnimationProperties &animProps, Shader &shader);
 
     protected:
         glm::vec3 m_colour;
 
         // shadow map resources
-        Shader shadowMapShader;
         GLuint depthMapFBO = 0;
         GLuint depthMapTex = 0;
         const unsigned int shadowWidth = 1024;
@@ -41,7 +40,6 @@ namespace rendering
 
         // view transforms
         Eigen::Matrix4f projection;
-        Eigen::Matrix4f view;
 
     private:
         void initShadowResources();

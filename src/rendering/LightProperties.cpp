@@ -1,8 +1,11 @@
 #include <glad/glad.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <Eigen/Geometry>
 #include "rendering/LightProperties.hpp"
 #include "utils/Logger.hpp"
 #include "utils/Shader.hpp"
+#include "utils/EigenToGLM.hpp"
 
 namespace rendering
 {
@@ -10,10 +13,6 @@ namespace rendering
     LightProperties::LightProperties(const glm::vec3 &colour)
         : m_colour(colour)
     {
-        std::unordered_map<SHADER_TYPE, std::string> shaderFiles = {
-            {SHADER_TYPE::FRAGMENT, "src/rendering/shaders/shadow/shadow_mapping_depth.frag"},
-            {SHADER_TYPE::VERTEX, "src/rendering/shaders/shadow/shadow_mapping_depth.vert"}};
-        bool success = this->shadowMapShader.loadFromFiles(shaderFiles);
         initShadowResources();
     }
 
@@ -72,11 +71,18 @@ namespace rendering
     }
 
     // Get everything ready for rendering a shadow map
-    void LightProperties::confShadowMap(const animation::AnimationProperties &animProps)
+    void LightProperties::confShadowMap(const animation::AnimationProperties &animProps, Shader &shader)
     {
+        glViewport(0, 0, this->shadowWidth, this->shadowHeight);
         glBindFramebuffer(GL_FRAMEBUFFER, this->depthMapFBO);
-        this->shadowMapShader.bind();
-        this->shadowMapShader.setUniform("lightSpaceMatrix", this->projection * this->view);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        shader.bind();
+        // get position from model matrix
+        glm::vec3 position = E2GLM(animProps.getModelMatrix()) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+        // assume light faces towards origin
+        glm::mat4 view = glm::lookAt(position, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        Eigen::Matrix4f lightSpaceMatrix = this->projection * GLM2E(view);
+        shader.setUniform("lightSpaceMatrix", lightSpaceMatrix);
     }
 
 } // namespace rendering
