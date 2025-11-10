@@ -359,7 +359,7 @@ void Shader::bind() {
         bound = true;
         LOG_DEBUG("Shader bound and activated successfully");
     } else {
-        LOG_WARN_F("Shader %d is already unbound", shaderProgram);
+        // LOG_WARN_F("Shader %d is already unbound", shaderProgram);
     }
 }
 
@@ -369,6 +369,6 @@ void Shader::unbind() {
         bound = false;
         LOG_DEBUG_F("Shader %d unbound successfully", shaderProgram);
     } else {
-        LOG_WARN_F("Shader %d is already unbound", shaderProgram);
+        // LOG_WARN_F("Shader %d is already unbound", shaderProgram);
     }
 }

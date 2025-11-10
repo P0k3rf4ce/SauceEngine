@@ -4,12 +4,15 @@
 #include "assimp/material.h"
 #include <memory>
 #include <vector>
+#include <string>
+#include <unordered_map>
+
 struct Texture {
-    const std::unique_ptr<const uint8_t[]> data;
-    const uint32_t width;
-    const uint32_t height;
-    const uint32_t n_channels;
-    const uint32_t id;
+    std::unique_ptr<const uint8_t[]> data;
+    uint32_t width;
+    uint32_t height;
+    uint32_t n_channels;
+    uint32_t id;
 
     Texture(
         std::unique_ptr<const uint8_t[]> data,
@@ -17,7 +20,7 @@ struct Texture {
         uint32_t height,
         uint32_t n_channels,
         uint32_t id
-    ): 
+    ):
         data(std::move(data)),
         width(width),
         height(height),
@@ -26,67 +29,59 @@ struct Texture {
 
     Texture() = delete;
     ~Texture() = default;
-    
+
+    // Allow move operations (needed for vectors and shared_ptr)
+    Texture(Texture&& other) noexcept = default;
+    Texture& operator=(Texture&& other) noexcept = default;
+
 private:
-    // no copy
+    // Prevent copying (unique ownership of data)
     Texture(const Texture&) = delete;
     Texture& operator=(const Texture&) = delete;
-    
-    // no move
-    Texture(Texture&&) = delete;
-    Texture& operator=(Texture&&) = delete;
 };
 
-// A Material 
+// A Material
 struct Material {
     // name of the material
-    const std::string name;
+    std::string name;
 
-    const Texture &base_color;
+    std::shared_ptr<Texture> base_color;
+    std::shared_ptr<Texture> normal;
+    std::shared_ptr<Texture> albedo;
+    std::shared_ptr<Texture> metallic;
+    std::shared_ptr<Texture> roughness;
+    std::shared_ptr<Texture> ambient_occlusion;
 
-    const Texture &normal;
-
-    const Texture &albedo;
-
-    const Texture &metallic;
-
-    const Texture &roughness;
-
-    // aiTextureType_AMBIENT_OCCLUSION
-    const Texture &ambient_occlusion;
-    
-    
     Material(
         std::string name,
-        Texture &base_color,
-        Texture &normal,
-        Texture &albedo,
-        Texture &metallic,
-        Texture &roughness,
-        Texture &ambient_occlusion
+        std::shared_ptr<Texture> base_color,
+        std::shared_ptr<Texture> normal,
+        std::shared_ptr<Texture> albedo,
+        std::shared_ptr<Texture> metallic,
+        std::shared_ptr<Texture> roughness,
+        std::shared_ptr<Texture> ambient_occlusion
     ):
         name(std::move(name)),
-        base_color(base_color),
-        normal(normal),
-        albedo(albedo),
-        metallic(metallic),
-        roughness(roughness),
-        ambient_occlusion(ambient_occlusion)
-    {};
+        base_color(std::move(base_color)),
+        normal(std::move(normal)),
+        albedo(std::move(albedo)),
+        metallic(std::move(metallic)),
+        roughness(std::move(roughness)),
+        ambient_occlusion(std::move(ambient_occlusion))
+    {}
+
     ~Material() = default;
+
+    // Allow copying (shared_ptr can be copied)
+    Material(const Material&) = default;
+    Material& operator=(const Material&) = default;
+
+    // Allow moving
+    Material(Material&&) noexcept = default;
+    Material& operator=(Material&&) noexcept = default;
 
     // constructs a `Material` from an imported aiMaterial
     static Material from_aiMaterial(aiMaterial *material);
-
-private:
-    // prevent copies
-    Material(const Material&) = delete;
-    Material& operator=(const Material&) = delete;
-
-    // prevent moving
-    Material(Material&&) = delete;
-    Material& operator=(Material&&) = delete;
-
 };
 
 // A unique index into `MaterialManager` 
@@ -103,6 +98,26 @@ private:
     MaterialHandle(size_t id): id(id) {}
 };
 
+// Texture cache for sharing textures across materials
+class TextureCache {
+public:
+    // Get or load a texture from file path
+    std::shared_ptr<Texture> getTexture(const std::string& path);
+
+    // Get or load an embedded texture
+    std::shared_ptr<Texture> getEmbeddedTexture(const aiTexture* aiTex);
+
+    // Get the default white texture
+    std::shared_ptr<Texture> getDefaultTexture();
+
+    // Clear the cache
+    void clear();
+
+private:
+    std::unordered_map<std::string, std::shared_ptr<Texture>> textureCache;
+    std::shared_ptr<Texture> defaultTexture;
+};
+
 // A Context managing all imported `Material`s
 // that exist within a scene
 class MaterialManager {
@@ -115,7 +130,7 @@ public:
     // prevent copies
     MaterialManager(const MaterialManager&) = delete;
     MaterialManager& operator=(const MaterialManager&) = delete;
-    
+
     // allow moves
     MaterialManager(MaterialManager&&) = default;
     MaterialManager& operator=(MaterialManager&&) = default;
@@ -124,18 +139,18 @@ public:
     static MaterialManager from_aiScene(aiScene *scene);
 
     // returns a material from its unique handle
-    const Material& get(MaterialHandle handle) const noexcept;
+    const std::shared_ptr<Material> get(MaterialHandle handle) const noexcept;
 
-    // returns a reference to a material given its name
+    // returns a shared_ptr to a material given its name
     // throws std::out_of_range the material is not found.
-    const Material& find(std::string name) const;
+    std::shared_ptr<Material> find(std::string name) const;
 
-    const Texture& get_texture(int idx);
+    std::shared_ptr<Texture> get_texture(int idx);
 
 private:
-    // list of all materials in a scene 
-    std::vector<Material> materials;
+    // list of all materials in a scene
+    std::vector<std::shared_ptr<Material>> materials;
 
-    // list of all textures in a scene
-    std::vector<Texture> textures;
+    // Texture cache for this scene
+    TextureCache textureCache;
 };

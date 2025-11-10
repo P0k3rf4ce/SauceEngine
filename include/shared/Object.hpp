@@ -28,15 +28,6 @@ public:
     void load();
     void unload();
 
-
-	/*
-	 * Set the camera used by modelProps for rendering the object.
-	 * Will take effect on the next update()
-	 */
-	inline void set_camera(std::shared_ptr<Camera> cam) {
-		this->modelProps->set_camera(cam);
-	}
-
     void updateAnimation(double DELTA_STEP);
     void updateModeling();
     void updateRendering();

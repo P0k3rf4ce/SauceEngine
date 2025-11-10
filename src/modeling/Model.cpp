@@ -37,11 +37,19 @@ void Model::setupForRendering() {
     if (shader) {
         shader->bind();
     }
-    
+
     // Bind vertex data for all meshes (rendering team will handle drawing)
     for (size_t i = 0; i < meshes.size(); ++i) {
         if (meshes[i]) {
             meshes[i]->bind();
         }
     }
+}
+
+void Model::setMetadata(const std::unordered_map<std::string, PropertyValue>& data) {
+    metadata = data;
+}
+
+const std::unordered_map<std::string, PropertyValue>& Model::getMetadata() const {
+    return metadata;
 }

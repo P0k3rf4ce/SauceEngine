@@ -46,12 +46,6 @@ namespace modeling {
         */
         void update(const animation::AnimationProperties &animProps);
 
-		/*
-		 * Set the camera used to render this model.
-		 * Will take effect on the next update()
-		 */
-		void set_camera(std::shared_ptr<Camera> cam) {this->cam=cam;}
-
         // Property management methods
         template<typename T>
         void setProperty(const std::string& tag, const T& value);
@@ -70,7 +64,6 @@ namespace modeling {
         std::shared_ptr<Model> model;
         std::unordered_map<std::string, PropertyValue> properties;
         std::string gltfFilename;
-		std::shared_ptr<Camera> cam;
     };
 
     // Template method implementations

@@ -39,11 +39,13 @@ private:
      * @brief Process the entire scene and extract all models
      * @param scene Assimp scene object
      * @param shader Shader to assign to models
+     * @param filePath Path to the model file (for texture loading)
      * @return Vector of loaded models
      */
     static std::vector<std::shared_ptr<Model>> processScene(
-        const aiScene* scene, 
-        std::shared_ptr<Shader> shader
+        const aiScene* scene,
+        std::shared_ptr<Shader> shader,
+        const std::string& filePath
     );
     
     /**
@@ -53,13 +55,15 @@ private:
      * @param models Output vector to add models to
      * @param materials Vector of loaded materials
      * @param shader Shader to assign to models
+     * @param nodeData Map to store node metadata (names, transforms)
      */
     static void processNode(
-        aiNode* node, 
+        aiNode* node,
         const aiScene* scene,
         std::vector<std::shared_ptr<Model>>& models,
         const std::vector<std::shared_ptr<Material>>& materials,
-        std::shared_ptr<Shader> shader
+        std::shared_ptr<Shader> shader,
+        std::unordered_map<std::shared_ptr<Model>, std::unordered_map<std::string, PropertyValue>>& nodeData
     );
 
   
@@ -96,28 +100,41 @@ private:
     /**
      * @brief Load all materials from the scene
      * @param scene Assimp scene object
+     * @param cache Texture cache for loading and caching textures
+     * @param modelDir Directory containing the model file
      * @return Vector of loaded materials
-     * 
+     *
      * IMPLEMENTATION NOTES:
      * - Process all materials in scene->mMaterials
      * - Extract textures for each material type (diffuse, normal, metallic, etc.)
      * - Handle missing textures with default values
      * - Create Material objects using the existing Material::from_aiMaterial method or similar
      */
-    static std::vector<std::shared_ptr<Material>> loadMaterials(const aiScene* scene);
-    
+    static std::vector<std::shared_ptr<Material>> loadMaterials(
+        const aiScene* scene,
+        TextureCache& cache,
+        const std::string& modelDir
+    );
+
     /**
      * @brief Process a single material from Assimp data
      * @param aiMat Assimp material object
      * @param scene Assimp scene object (for texture loading)
+     * @param cache Texture cache for loading textures
+     * @param modelDir Directory containing the model file
      * @return Shared pointer to the loaded Material object
-     * 
+     *
      * IMPLEMENTATION NOTES:
      * - Extract material properties (colors, factors, etc.)
      * - Load and process embedded or referenced textures
      * - Handle different material models (PBR, Phong, etc.)
      */
-    static std::shared_ptr<Material> processMaterial(aiMaterial* aiMat, const aiScene* scene);
+    static std::shared_ptr<Material> processMaterial(
+        aiMaterial* aiMat,
+        const aiScene* scene,
+        TextureCache& cache,
+        const std::string& modelDir
+    );
 
     // TODO: Implement these functions for GLTF extension loading
     

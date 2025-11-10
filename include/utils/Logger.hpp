@@ -6,6 +6,7 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <vector>
 
 // ANSI color codes for console output
 #define RESET_COLOR   "\033[0m"
@@ -64,74 +65,67 @@ public:
     void warn(const std::string& message);
     void error(const std::string& message);
     
-    // Template methods for formatted logging
-    template<typename... Args>
-    void debug(const std::string& format, Args&&... args) {
+    // Template methods for formatted logging (printf-style)
+    // Only enabled when at least one argument is provided
+    template<typename Arg1, typename... Args>
+    void debug(const char* format, Arg1&& arg1, Args&&... args) {
         if (currentLogLevel <= LogLevel::DEBUG) {
-            std::string formatted = formatString(format, std::forward<Args>(args)...);
+            std::string formatted = formatPrintf(format, std::forward<Arg1>(arg1), std::forward<Args>(args)...);
             logMessage(LogLevel::DEBUG, formatted);
         }
     }
-    
-    template<typename... Args>
-    void info(const std::string& format, Args&&... args) {
+
+    template<typename Arg1, typename... Args>
+    void info(const char* format, Arg1&& arg1, Args&&... args) {
         if (currentLogLevel <= LogLevel::INFO) {
-            std::string formatted = formatString(format, std::forward<Args>(args)...);
+            std::string formatted = formatPrintf(format, std::forward<Arg1>(arg1), std::forward<Args>(args)...);
             logMessage(LogLevel::INFO, formatted);
         }
     }
-    
-    template<typename... Args>
-    void warn(const std::string& format, Args&&... args) {
+
+    template<typename Arg1, typename... Args>
+    void warn(const char* format, Arg1&& arg1, Args&&... args) {
         if (currentLogLevel <= LogLevel::WARN) {
-            std::string formatted = formatString(format, std::forward<Args>(args)...);
+            std::string formatted = formatPrintf(format, std::forward<Arg1>(arg1), std::forward<Args>(args)...);
             logMessage(LogLevel::WARN, formatted);
         }
     }
-    
-    template<typename... Args>
-    void error(const std::string& format, Args&&... args) {
+
+    template<typename Arg1, typename... Args>
+    void error(const char* format, Arg1&& arg1, Args&&... args) {
         if (currentLogLevel <= LogLevel::ERROR) {
-            std::string formatted = formatString(format, std::forward<Args>(args)...);
+            std::string formatted = formatPrintf(format, std::forward<Arg1>(arg1), std::forward<Args>(args)...);
             logMessage(LogLevel::ERROR, formatted);
         }
     }
 
 private:
-    // Helper template for string formatting
+    // Helper for printf-style formatting
     template<typename... Args>
-    std::string formatString(const std::string& format, Args&&... args) {
-        std::ostringstream oss;
-        formatStringHelper(oss, format, std::forward<Args>(args)...);
-        return oss.str();
-    }
-    
-    template<typename T, typename... Args>
-    void formatStringHelper(std::ostringstream& oss, const std::string& format, T&& value, Args&&... args) {
-        size_t pos = format.find("{}");
-        if (pos != std::string::npos) {
-            oss << format.substr(0, pos) << std::forward<T>(value);
-            formatStringHelper(oss, format.substr(pos + 2), std::forward<Args>(args)...);
-        } else {
-            oss << format;
+    std::string formatPrintf(const char* format, Args&&... args) {
+        // Calculate required buffer size
+        int size = std::snprintf(nullptr, 0, format, std::forward<Args>(args)...);
+        if (size <= 0) {
+            return std::string(format);
         }
-    }
-    
-    void formatStringHelper(std::ostringstream& oss, const std::string& format) {
-        oss << format;
+
+        // Allocate buffer and format
+        std::vector<char> buffer(size + 1);
+        std::snprintf(buffer.data(), buffer.size(), format, std::forward<Args>(args)...);
+        return std::string(buffer.data());
     }
 };
 
-// Convenience macros for global logging with null safety
-#define LOG_DEBUG(msg) do { auto* logger = Logger::getInstanceSafe(); if (logger) logger->debug(msg); } while(0)
-#define LOG_INFO(msg) do { auto* logger = Logger::getInstanceSafe(); if (logger) logger->info(msg); } while(0)
-#define LOG_WARN(msg) do { auto* logger = Logger::getInstanceSafe(); if (logger) logger->warn(msg); } while(0)
-#define LOG_ERROR(msg) do { auto* logger = Logger::getInstanceSafe(); if (logger) logger->error(msg); } while(0)
+// Convenience macros for global logging - auto-initializes logger on first use
+#define LOG_DEBUG(msg) do { Logger::getInstance().debug(msg); } while(0)
+#define LOG_INFO(msg) do { Logger::getInstance().info(msg); } while(0)
+#define LOG_WARN(msg) do { Logger::getInstance().warn(msg); } while(0)
+#define LOG_ERROR(msg) do { Logger::getInstance().error(msg); } while(0)
 
-// Formatted logging macros with null safety
-#define LOG_DEBUG_F(format, ...) do { auto* logger = Logger::getInstanceSafe(); if (logger) logger->debug(format, __VA_ARGS__); } while(0)
-#define LOG_INFO_F(format, ...) do { auto* logger = Logger::getInstanceSafe(); if (logger) logger->info(format, __VA_ARGS__); } while(0)
-#define LOG_WARN_F(format, ...) do { auto* logger = Logger::getInstanceSafe(); if (logger) logger->warn(format, __VA_ARGS__); } while(0)
-#define LOG_ERROR_F(format, ...) do { auto* logger = Logger::getInstanceSafe(); if (logger) logger->error(format, __VA_ARGS__); } while(0)
+// Formatted logging macros - auto-initializes logger on first use
+#define LOG_DEBUG_F(format, ...) do { Logger::getInstance().debug(format, __VA_ARGS__); } while(0)
+#define LOG_INFO_F(format, ...) do { Logger::getInstance().info(format, __VA_ARGS__); } while(0)
+#define LOG_WARN_F(format, ...) do { Logger::getInstance().warn(format, __VA_ARGS__); } while(0)
+#define LOG_ERROR_F(format, ...) do { Logger::getInstance().error(format, __VA_ARGS__); } while(0)
 
 #endif // LOGGER_HPP

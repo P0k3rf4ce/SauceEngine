@@ -43,92 +43,140 @@ namespace modeling {
             return {};
         }
         
-        LOG_INFO_F("Successfully loaded scene with %d meshes, %d materials", 
+        LOG_INFO_F("Successfully loaded scene with %d meshes, %d materials",
                 scene->mNumMeshes, scene->mNumMaterials);
-        
+
         // Process the scene and return models
-        return processScene(scene, shader);
+        return processScene(scene, shader, filePath);
     }
 
     std::vector<std::shared_ptr<Model>> ModelLoader::processScene(
-        const aiScene* scene, 
-        std::shared_ptr<Shader> shader
+        const aiScene* scene,
+        std::shared_ptr<Shader> shader,
+        const std::string& filePath
     ) {
         LOG_DEBUG("Processing scene...");
-        
+
         std::vector<std::shared_ptr<Model>> models;
-        
+
+        // Get the directory containing the model file for texture loading
+        std::string modelDir = getDirectoryPath(filePath);
+        LOG_DEBUG_F("Model directory: %s", modelDir.c_str());
+
+        // Create texture cache for this scene
+        TextureCache textureCache;
+
         // Load all materials first
-        std::vector<std::shared_ptr<Material>> materials = loadMaterials(scene);
+        std::vector<std::shared_ptr<Material>> materials = loadMaterials(scene, textureCache, modelDir);
         LOG_INFO_F("Loaded %d materials", static_cast<int>(materials.size()));
-        
+
         // Load GLTF extensions
         std::unordered_map<std::string, PropertyValue> gltfExtensions = loadGLTFExtensions(scene);
         LOG_INFO_F("Loaded %d GLTF extensions", static_cast<int>(gltfExtensions.size()));
-        
+
+        // Map to store node metadata for each model
+        std::unordered_map<std::shared_ptr<Model>, std::unordered_map<std::string, PropertyValue>> nodeData;
+
         // Process the root node recursively
         if (scene->mRootNode) {
-            processNode(scene->mRootNode, scene, models, materials, shader);
+            processNode(scene->mRootNode, scene, models, materials, shader, nodeData);
         }
-        
+
         // Apply GLTF extensions to all models
         for (auto& model : models) {
             applyGLTFExtensions(model, gltfExtensions);
         }
-        
+
         LOG_INFO_F("Successfully processed scene into %d models", static_cast<int>(models.size()));
         return models;
     }
 
     void ModelLoader::processNode(
-        aiNode* node, 
+        aiNode* node,
         const aiScene* scene,
         std::vector<std::shared_ptr<Model>>& models,
         const std::vector<std::shared_ptr<Material>>& materials,
-        std::shared_ptr<Shader> shader
+        std::shared_ptr<Shader> shader,
+        std::unordered_map<std::shared_ptr<Model>, std::unordered_map<std::string, PropertyValue>>& nodeData
     ) {
-        LOG_DEBUG_F("Processing node: %s (meshes: %d, children: %d)", 
+        LOG_DEBUG_F("Processing node: %s (meshes: %d, children: %d)",
                     node->mName.C_Str(), node->mNumMeshes, node->mNumChildren);
-        
-        // Process GLTF node-specific data
+
+        // Store node metadata
+        std::unordered_map<std::string, PropertyValue> metadata;
+
+        // Store node name
+        metadata["node_name"] = std::string(node->mName.C_Str());
+
+        // Store node transformation matrix components
+        aiVector3D position, scaling;
+        aiQuaternion rotation;
+        node->mTransformation.Decompose(scaling, rotation, position);
+
+        metadata["pos_x"] = static_cast<double>(position.x);
+        metadata["pos_y"] = static_cast<double>(position.y);
+        metadata["pos_z"] = static_cast<double>(position.z);
+
+        metadata["rot_x"] = static_cast<double>(rotation.x);
+        metadata["rot_y"] = static_cast<double>(rotation.y);
+        metadata["rot_z"] = static_cast<double>(rotation.z);
+        metadata["rot_w"] = static_cast<double>(rotation.w);
+
+        metadata["scale_x"] = static_cast<double>(scaling.x);
+        metadata["scale_y"] = static_cast<double>(scaling.y);
+        metadata["scale_z"] = static_cast<double>(scaling.z);
+
+        // Process GLTF node-specific extensions
         std::unordered_map<std::string, PropertyValue> nodeExtensions;
         processGLTFNode(node, scene, nodeExtensions);
-        
+
+        // Merge extensions into metadata
+        for (const auto& [key, value] : nodeExtensions) {
+            metadata[key] = value;
+        }
+
         // Process all meshes in this node
         for (unsigned int i = 0; i < node->mNumMeshes; i++) {
             unsigned int meshIndex = node->mMeshes[i];
             aiMesh* assimpMesh = scene->mMeshes[meshIndex];
-            
-            // Load mesh data 
+
+            // Load mesh data
             std::shared_ptr<Mesh> mesh = loadMeshFromNode(assimpMesh, scene, shader);
-            
+
             if (mesh) {
                 // Get the material for this mesh
                 std::shared_ptr<Material> material = nullptr;
                 if (assimpMesh->mMaterialIndex < materials.size()) {
                     material = materials[assimpMesh->mMaterialIndex];
                 }
-                
+
                 // Create a new model for this mesh
                 std::vector<std::shared_ptr<Mesh>> meshes = { mesh };
                 std::vector<std::shared_ptr<Material>> modelMaterials = { material };
-                
+
                 auto model = std::make_shared<Model>(meshes, modelMaterials, shader);
-                
+
+                // Set metadata on the model
+                model->setMetadata(metadata);
+
+                // Store metadata for this model (for Scene integration later)
+                nodeData[model] = metadata;
+
                 // Apply node-specific GLTF extensions
                 applyGLTFExtensions(model, nodeExtensions);
-                
+
                 models.push_back(model);
-                
-                LOG_DEBUG_F("Created model from mesh: %s", assimpMesh->mName.C_Str());
+
+                LOG_DEBUG_F("Created model from node '%s', mesh '%s'",
+                           node->mName.C_Str(), assimpMesh->mName.C_Str());
             } else {
                 LOG_WARN_F("Failed to load mesh: %s", assimpMesh->mName.C_Str());
             }
         }
-        
+
         // Recursively process child nodes
         for (unsigned int i = 0; i < node->mNumChildren; i++) {
-            processNode(node->mChildren[i], scene, models, materials, shader);
+            processNode(node->mChildren[i], scene, models, materials, shader, nodeData);
         }
     }
 
@@ -311,90 +359,108 @@ namespace modeling {
     }
 
     namespace {
-        Texture& default_texture() {
-            static Texture* tex = []{
-                auto p = std::unique_ptr<const uint8_t[]>(new uint8_t[1]{255});
-                return new Texture(std::move(p), 1, 1, 4, 0);
-            }();
-            return *tex;
-        }
-
-        std::shared_ptr<Material> make_default_material(const std::string& name_hint) {
-            Texture& t = default_texture();
-            return std::shared_ptr<Material>(new Material(
+        std::shared_ptr<Material> make_default_material(const std::string& name_hint, TextureCache& cache) {
+            auto defaultTex = cache.getDefaultTexture();
+            return std::make_shared<Material>(
                 name_hint.empty() ? std::string("material") : name_hint,
-                t, t, t, t, t, t
-            ));
+                defaultTex, defaultTex, defaultTex, defaultTex, defaultTex, defaultTex
+            );
         }
 
-        Texture* loadTextureFromMaterial(aiMaterial* aiMat, const aiScene* scene, aiTextureType type, Texture& defaultTex) {
-            if (!aiMat){ 
-                return &defaultTex;
+        std::shared_ptr<Texture> loadTextureFromMaterial(
+            aiMaterial* aiMat,
+            const aiScene* scene,
+            aiTextureType type,
+            TextureCache& cache,
+            const std::string& modelDir
+        ) {
+            if (!aiMat || aiMat->GetTextureCount(type) == 0) {
+                return cache.getDefaultTexture();
             }
-            if (aiMat->GetTextureCount(type) == 0){
-                return &defaultTex;
-            }
+
             aiString path;
-            if (aiMat->GetTexture(type, 0, &path) != AI_SUCCESS){
-                return &defaultTex;
+            if (aiMat->GetTexture(type, 0, &path) != AI_SUCCESS) {
+                return cache.getDefaultTexture();
             }
-            
+
+            // Check if it's an embedded texture
             if (path.length > 0 && path.C_Str()[0] == '*') {
                 int idx = std::atoi(path.C_Str() + 1);
                 if (scene && idx >= 0 && static_cast<unsigned>(idx) < scene->mNumTextures) {
-                    const aiTexture* emb = scene->mTextures[idx];
-                    return &defaultTex;
+                    const aiTexture* embeddedTex = scene->mTextures[idx];
+                    return cache.getEmbeddedTexture(embeddedTex);
                 }
-                return &defaultTex;
+                LOG_WARN_F("Invalid embedded texture index: %d", idx);
+                return cache.getDefaultTexture();
             }
-            
-            return &defaultTex;
+
+            // External texture file - resolve path relative to model directory
+            std::filesystem::path texturePath = std::filesystem::path(modelDir) / path.C_Str();
+            std::string texturePathStr = texturePath.string();
+
+            if (!std::filesystem::exists(texturePath)) {
+                LOG_WARN_F("Texture file not found: %s", texturePathStr.c_str());
+                return cache.getDefaultTexture();
+            }
+
+            return cache.getTexture(texturePathStr);
         }
     }
     
-    std::vector<std::shared_ptr<Material>> ModelLoader::loadMaterials(const aiScene* scene) {
+    std::vector<std::shared_ptr<Material>> ModelLoader::loadMaterials(
+        const aiScene* scene,
+        TextureCache& cache,
+        const std::string& modelDir
+    ) {
         std::vector<std::shared_ptr<Material>> materials;
         if (!scene || scene->mNumMaterials == 0) {
-            materials.push_back(make_default_material("default"));
+            materials.push_back(make_default_material("default", cache));
             return materials;
         }
 
         materials.reserve(scene->mNumMaterials);
         for (unsigned int i = 0; i < scene->mNumMaterials; i++) {
-            auto material = processMaterial(scene->mMaterials[i], scene);
+            auto material = processMaterial(scene->mMaterials[i], scene, cache, modelDir);
             if (!material) {
                 LOG_WARN_F("Failed to process material %d, using fallback", i);
-                material = make_default_material("fallback");
+                material = make_default_material("fallback", cache);
             }
             materials.push_back(std::move(material));
         }
         return materials;
     }
 
-    std::shared_ptr<Material> ModelLoader::processMaterial(aiMaterial* aiMat, const aiScene* scene) {
+    std::shared_ptr<Material> ModelLoader::processMaterial(
+        aiMaterial* aiMat,
+        const aiScene* scene,
+        TextureCache& cache,
+        const std::string& modelDir
+    ) {
         if (!aiMat) {
             LOG_WARN("Null aiMaterial, using default material");
-            return make_default_material("material");
+            return make_default_material("material", cache);
         }
 
-        aiString ainame; std::string name = "material";
-        if (aiMat->Get(AI_MATKEY_NAME, ainame) == AI_SUCCESS && ainame.length > 0){ 
+        // Get material name
+        aiString ainame;
+        std::string name = "material";
+        if (aiMat->Get(AI_MATKEY_NAME, ainame) == AI_SUCCESS && ainame.length > 0) {
             name = ainame.C_Str();
         }
 
-        auto& def_tex = default_texture();
+        LOG_DEBUG_F("Processing material: %s", name.c_str());
 
-        Texture* base   = loadTextureFromMaterial(aiMat, scene, aiTextureType_DIFFUSE, def_tex);
-        Texture* normal = loadTextureFromMaterial(aiMat, scene, aiTextureType_NORMALS, def_tex);
-        Texture* metal  = loadTextureFromMaterial(aiMat, scene, aiTextureType_METALNESS, def_tex);
-        Texture* rough  = loadTextureFromMaterial(aiMat, scene, aiTextureType_DIFFUSE_ROUGHNESS, def_tex);
-        Texture* ao     = loadTextureFromMaterial(aiMat, scene, aiTextureType_AMBIENT_OCCLUSION, def_tex);
-        Texture* albedo = base;
+        // Load textures for PBR workflow
+        auto base   = loadTextureFromMaterial(aiMat, scene, aiTextureType_DIFFUSE, cache, modelDir);
+        auto normal = loadTextureFromMaterial(aiMat, scene, aiTextureType_NORMALS, cache, modelDir);
+        auto metal  = loadTextureFromMaterial(aiMat, scene, aiTextureType_METALNESS, cache, modelDir);
+        auto rough  = loadTextureFromMaterial(aiMat, scene, aiTextureType_DIFFUSE_ROUGHNESS, cache, modelDir);
+        auto ao     = loadTextureFromMaterial(aiMat, scene, aiTextureType_AMBIENT_OCCLUSION, cache, modelDir);
+        auto albedo = base; // Albedo is typically the same as base color
 
-        return std::shared_ptr<Material>(new Material(
-            name, *base, *normal, *albedo, *metal, *rough, *ao
-        ));
-
+        return std::make_shared<Material>(
+            name, base, normal, albedo, metal, rough, ao
+        );
     }
 
     std::unordered_map<std::string, PropertyValue> ModelLoader::loadGLTFExtensions(const aiScene* scene) {

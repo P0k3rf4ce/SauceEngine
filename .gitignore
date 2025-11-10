@@ -10,3 +10,4 @@ build.sh
 .idea/
 .cmake/
 test_coverage.sh
+CLAUDE.md
