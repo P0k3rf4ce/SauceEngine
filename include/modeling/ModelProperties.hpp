@@ -7,7 +7,7 @@
 #include <variant>
 
 #include "animation/AnimationProperties.hpp"
-#include "modeling/Camera.hpp"
+#include "utils/Camera.hpp"
 
 namespace animation {
     class AnimationProperties;
