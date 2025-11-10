@@ -12,3 +12,6 @@ build.sh
 test_coverage.sh
 coverage*
 *.log
+src/.DS_Store
+include/.DS_Store
+.DS_Store
