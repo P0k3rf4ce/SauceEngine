@@ -3,7 +3,7 @@
 #include <sstream>
 #include <iostream>
 
-#include "shared/Logger.hpp"
+#include "utils/Logger.hpp"
 
 // Test fixture for Logger tests
 class LoggerTest : public ::testing::Test {

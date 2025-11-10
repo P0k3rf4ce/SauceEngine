@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include "modeling/Camera.hpp"
+#include "utils/Camera.hpp"
 
 using namespace std;
 using namespace Eigen;

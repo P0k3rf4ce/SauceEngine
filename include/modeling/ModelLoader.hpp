@@ -15,7 +15,7 @@
 #include "modeling/Mesh.hpp"
 #include "modeling/Material.hpp"
 #include "modeling/ModelProperties.hpp"
-#include "shared/Shader.hpp"
+#include "utils/Shader.hpp"
 
 namespace modeling {
 
