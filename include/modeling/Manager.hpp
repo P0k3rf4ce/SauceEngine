@@ -23,6 +23,9 @@ struct SceneObjects {
     // maybe loaded contents
     MaybeContents contents;
 
+    // explicit default constructor
+    SceneObjects(const std::string &path, bool is_marked_unloaded, const MaybeContents &contents) :
+    path(path), is_marked_unloaded(is_marked_unloaded), contents(contents) {}
 
     // no copy
     SceneObjects(const SceneObjects&) = delete;

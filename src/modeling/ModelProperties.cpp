@@ -84,7 +84,9 @@ ModelProperties::ModelProperties(std::string gltfFilename)
     // Print metadata/tags from properties map
     if (!properties.empty()) {
         LOG_INFO_F("Metadata/Properties (%zu):", properties.size());
-        for (const auto& [key, value] : properties) {
+        for (const auto &map_pair : properties) {
+            auto key = map_pair.first;
+            auto value = map_pair.second;
             std::visit([&key](auto&& arg) {
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (std::is_same_v<T, std::string>) {

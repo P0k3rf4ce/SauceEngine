@@ -7,6 +7,8 @@
 #include <iomanip>
 #include <sstream>
 #include <vector>
+#include <tuple>
+#include <type_traits>
 
 // ANSI color codes for console output
 #define RESET_COLOR   "\033[0m"
@@ -100,18 +102,31 @@ public:
     }
 
 private:
+    // Helper to convert arguments to printf-compatible types
+    // For std::string, return c_str()
+    static const char* toPrintfArg(const std::string& arg) {
+        return arg.c_str();
+    }
+    
+    // For all other types, return by value
+    template<typename T, 
+             typename = std::enable_if_t<!std::is_same_v<std::decay_t<T>, std::string>>>
+    static T toPrintfArg(T arg) {
+        return arg;
+    }
+
     // Helper for printf-style formatting
     template<typename... Args>
     std::string formatPrintf(const char* format, Args&&... args) {
         // Calculate required buffer size
-        int size = std::snprintf(nullptr, 0, format, std::forward<Args>(args)...);
+        int size = std::snprintf(nullptr, 0, format, toPrintfArg(std::forward<Args>(args))...);
         if (size <= 0) {
             return std::string(format);
         }
 
         // Allocate buffer and format
         std::vector<char> buffer(size + 1);
-        std::snprintf(buffer.data(), buffer.size(), format, std::forward<Args>(args)...);
+        std::snprintf(buffer.data(), buffer.size(), format, toPrintfArg(std::forward<Args>(args))...);
         return std::string(buffer.data());
     }
 };
