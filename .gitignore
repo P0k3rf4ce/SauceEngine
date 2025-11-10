@@ -9,3 +9,9 @@ build_and_run.sh
 build.sh
 .idea/
 .cmake/
+test_coverage.sh
+coverage*
+*.log
+src/.DS_Store
+include/.DS_Store
+.DS_Store
