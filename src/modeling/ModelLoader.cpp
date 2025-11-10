@@ -1,5 +1,5 @@
 #include "modeling/ModelLoader.hpp"
-#include "shared/Logger.hpp"
+#include "utils/Logger.hpp"
 #include <filesystem>
 #include <iostream>
 // commented out to avoid compile errors

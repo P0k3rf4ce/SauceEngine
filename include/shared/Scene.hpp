@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "shared/Object.hpp"
-#include "modeling/Camera.hpp"
+#include "utils/Camera.hpp"
 
 class Scene {
 private:
