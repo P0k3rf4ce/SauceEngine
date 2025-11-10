@@ -33,15 +33,15 @@ public:
     void unload();
 
     /**
-     * Update the Animation properties <timestep> seconds into the future
+     * Update the Animation properties <deltastep> seconds into the future
     */
-    void update(double timestep);
+    void update(double deltastep);
 
     /**
      * Returns the model matrix for this object.
      * A model matrix places the object in the correct point in world space
     */
-    Eigen::Affine3d getModelMatrix();
+    Eigen::Affine3d getModelMatrix() const;
 };
 
 }

@@ -7,6 +7,7 @@ using namespace std;
 
 Mesh::Mesh(vector<Vertex> vertices, vector<unsigned int> indices, bool setupGL)
 	: glSetup(setupGL)
+
 {
 	this->vertices = vertices;
 	this->indices = indices;
@@ -14,10 +15,10 @@ Mesh::Mesh(vector<Vertex> vertices, vector<unsigned int> indices, bool setupGL)
 	if (!this->validate()) {
 		throw std::runtime_error("Bad mesh loaded");
 	}
-
 	if (glSetup) {
 		setupMesh();
 	}
+
 }
 
 void Mesh::setupMesh()

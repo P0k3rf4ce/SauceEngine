@@ -3,23 +3,21 @@
 
 using namespace modeling;
 
+
+// Initialize with null model and empty properties map
 ModelProperties::ModelProperties(std::string gltfFilename) 
     : gltfFilename(gltfFilename), model(nullptr) {
-    // Initialize with null model and empty properties map
-	this->cam=nullptr;
 }
+
 ModelProperties::~ModelProperties() {
     // Shared pointer will automatically clean up Model
     // Properties map will clean up automatically
 }
 
-/**
- * This function is meant to load these 
- * Model properties back into use
-*/
 void ModelProperties::load() {
 
 }
+
 
 /**
  * This function is meant to remove these 

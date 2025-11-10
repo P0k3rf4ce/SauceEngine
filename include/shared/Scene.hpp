@@ -19,10 +19,10 @@ public:
 
     void load();
     void unload();
-    void update(double timestep);
 
     std::shared_ptr<Camera> get_camera();
     void set_camera(std::shared_ptr<Camera> cam);
+    double update(double deltatime, double DELTA_STEP);
 };
 
 #endif

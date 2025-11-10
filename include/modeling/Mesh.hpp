@@ -29,11 +29,13 @@ class Mesh {
 
 			// Rendering methods
 		void bind() const;        // Bind VAO for rendering
+		void Draw(Shader &shader);
 
 	private:
 		// render data
 		unsigned int VAO, VBO, EBO;
 		bool glSetup;
+
 		void setupMesh();
 
 		/*
