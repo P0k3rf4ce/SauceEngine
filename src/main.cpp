@@ -1,10 +1,12 @@
 #include <QApplication>
 
+#include <chrono>
+
 #include <iostream>
 
 #include "launcher/optionParser.hpp"
 #include "launcher/launcherWindow.hpp"
-#include "launcher/engineMainLoop.hpp"
+#include "launcher/engineMainloop.hpp"
 
 int main(int argc, const char *argv[]) {
     const AppOptions ops(argc, argv);

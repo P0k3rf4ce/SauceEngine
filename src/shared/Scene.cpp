@@ -47,7 +47,6 @@ double Scene::update(double deltatime, double DELTA_STEP) {
     }
 
     for (auto object: this->objects) {
-        object.update(timestep);
         object.updateRendering();
     }
 

@@ -5,6 +5,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <stb_image.h>
+#include <chrono>
 
 #include <iostream>
 
@@ -26,8 +27,18 @@ int engine_mainloop(const AppOptions &ops) {
 
     Scene scene;
 
+    double prev_frame_time = get_seconds_since_epoch(), current_frame_time, deltatime;
+
+    const double delta_step = 1.0/ops.tickrate;
+
     while (!glfwWindowShouldClose(window)){
         processInput(window);
+
+        current_frame_time = get_seconds_since_epoch();
+        deltatime += current_frame_time - prev_frame_time;
+        prev_frame_time = current_frame_time;
+
+        deltatime = scene.update(deltatime, delta_step);
         
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -77,4 +88,10 @@ void processInput(GLFWwindow* window)
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
+}
+
+// Precision should be up to a millisecond
+inline double get_seconds_since_epoch() {
+    auto now = std::chrono::system_clock::now();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() / 1000.0;
 }

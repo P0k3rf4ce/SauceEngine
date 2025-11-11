@@ -1,4 +1,4 @@
-#include "LightProperties.hpp"
+#include "rendering/LightProperties.hpp"
 
 namespace rendering {
 
