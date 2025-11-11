@@ -10,6 +10,12 @@ namespace rendering
     PointLight::PointLight(const glm::vec3 &position, const glm::vec3 &colour)
         : LightProperties(colour), m_position(position), m_cubemapFBO(0), m_cubemapTex(0)
     {
+        // deallocate unused 2D shadow map resources from base class
+        glDeleteFramebuffers(1, &depthMapFBO);
+        glDeleteTextures(1, &depthMapTex);
+        depthMapFBO = 0;
+        depthMapTex = 0;
+
         initShadowCubemap();
     }
 

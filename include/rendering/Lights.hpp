@@ -10,7 +10,7 @@ namespace rendering
     {
     public:
         PointLight(const glm::vec3 &position, const glm::vec3 &colour = glm::vec3(1.0f));
-        ~PointLight() override;
+        ~PointLight();
 
         void update() override;
         void confShadowMap(Shader& shader) override;
