@@ -17,6 +17,7 @@ public:
     void load();
     void unload();
     void update(double timestep);
+    void draw(rendering::Shader& shader);
 };
 
 #endif

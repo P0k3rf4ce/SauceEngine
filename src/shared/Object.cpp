@@ -39,3 +39,10 @@ void Object::update(double timestep) {
     this->modelProps->update(*(this->animProps.get()));
     this->renderProps->update(*(this->modelProps.get()), *(this->animProps.get()));
 }
+
+/**
+ * Draw the object using the given shader
+*/
+void Object::draw(rendering::Shader& shader) {
+    
+}

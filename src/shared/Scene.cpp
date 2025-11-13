@@ -39,3 +39,9 @@ void Scene::update(double timestep) {
         object.update(timestep);
     }
 }
+
+void Scene::draw(rendering::Shader& shader) {
+    for (auto object: this->objects) {
+        object.draw(shader);
+    }
+}

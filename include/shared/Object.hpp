@@ -33,6 +33,11 @@ public:
      * Update the Object <timestep> seconds into the future
     */
     void update(double timestep);
+
+    /**
+     * Draw the object using the given shader
+    */
+    void draw(rendering::Shader& shader);
 };
 
 #endif

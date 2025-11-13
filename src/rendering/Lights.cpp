@@ -1,5 +1,6 @@
 #include "rendering/Lights.hpp"
 #include "utils/Logger.hpp"
+#include "shared/Scene.hpp"
 #include <vector>
 #include <glm/gtc/matrix_transform.hpp>
 #include <string>
@@ -25,32 +26,33 @@ namespace rendering
         glDeleteTextures(1, &m_cubemapTex);
     }
 
-    void PointLight::update()
+    void PointLight::update(Scene& scene, animation::AnimationProperties& animProps)
     {
-        // Not sure if this is needed... 
-    }
+        m_position = animProps.getModelMatrix().translation();
 
-    void PointLight::confShadowMap(Shader& shader)
-    {
         float aspect = (float)shadowWidth / (float)shadowHeight;
         float near = 1.0f;
         float far = 25.0f;
         glm::mat4 shadowProj = glm::perspective(glm::radians(90.0f), aspect, near, far);
 
-        std::vector<glm::mat4> shadowTransforms;
-        shadowTransforms.push_back(shadowProj * glm::lookAt(m_position, m_position + glm::vec3(1.0, 0.0, 0.0), glm::vec3(0.0, -1.0, 0.0)));
-        shadowTransforms.push_back(shadowProj * glm::lookAt(m_position, m_position + glm::vec3(-1.0, 0.0, 0.0), glm::vec3(0.0, -1.0, 0.0)));
-        shadowTransforms.push_back(shadowProj * glm::lookAt(m_position, m_position + glm::vec3(0.0, 1.0, 0.0), glm::vec3(0.0, 0.0, 1.0)));
-        shadowTransforms.push_back(shadowProj * glm::lookAt(m_position, m_position + glm::vec3(0.0, -1.0, 0.0), glm::vec3(0.0, 0.0, -1.0)));
-        shadowTransforms.push_back(shadowProj * glm::lookAt(m_position, m_position + glm::vec3(0.0, 0.0, 1.0), glm::vec3(0.0, -1.0, 0.0)));
-        shadowTransforms.push_back(shadowProj * glm::lookAt(m_position, m_position + glm::vec3(0.0, 0.0, -1.0), glm::vec3(0.0, -1.0, 0.0)));
+        m_lightSpaceMatrices.clear();
+        m_lightSpaceMatrices.push_back(shadowProj * glm::lookAt(m_position, m_position + glm::vec3(1.0, 0.0, 0.0), glm::vec3(0.0, -1.0, 0.0)));
+        m_lightSpaceMatrices.push_back(shadowProj * glm::lookAt(m_position, m_position + glm::vec3(-1.0, 0.0, 0.0), glm::vec3(0.0, -1.0, 0.0)));
+        m_lightSpaceMatrices.push_back(shadowProj * glm::lookAt(m_position, m_position + glm::vec3(0.0, 1.0, 0.0), glm::vec3(0.0, 0.0, 1.0)));
+        m_lightSpaceMatrices.push_back(shadowProj * glm::lookAt(m_position, m_position + glm::vec3(0.0, -1.0, 0.0), glm::vec3(0.0, 0.0, -1.0)));
+        m_lightSpaceMatrices.push_back(shadowProj * glm::lookAt(m_position, m_position + glm::vec3(0.0, 0.0, 1.0), glm::vec3(0.0, -1.0, 0.0)));
+        m_lightSpaceMatrices.push_back(shadowProj * glm::lookAt(m_position, m_position + glm::vec3(0.0, 0.0, -1.0), glm::vec3(0.0, -1.0, 0.0)));
+    }
 
+    void PointLight::confShadowMap(Scene& scene, Shader& shader)
+    {
         for (unsigned int i = 0; i < 6; ++i)
-            shader.setUniform("shadowMatrices[" + std::to_string(i) + "]", shadowTransforms[i]);
+            shader.setUniform("shadowMatrices[" + std::to_string(i) + "]", m_lightSpaceMatrices[i]);
 
         glViewport(0, 0, shadowWidth, shadowHeight);
         glBindFramebuffer(GL_FRAMEBUFFER, m_cubemapFBO);
         glClear(GL_DEPTH_BUFFER_BIT);
+        scene.draw(shader);
     }
 
     const glm::vec3 &PointLight::getPosition() const noexcept
