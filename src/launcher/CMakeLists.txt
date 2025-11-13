@@ -25,3 +25,5 @@ target_link_libraries(launcherLib PRIVATE Boost::program_options)
 
 find_package(Qt6Widgets CONFIG REQUIRED)
 target_link_libraries(launcherLib PRIVATE Qt6::Widgets)
+
+target_link_libraries(launcherLib PRIVATE sharedLib)
