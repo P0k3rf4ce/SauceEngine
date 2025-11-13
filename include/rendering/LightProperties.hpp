@@ -27,7 +27,7 @@ namespace rendering
         virtual void update() = 0;
 
         // configure shadow map parameters (abstract)
-        virtual void confShadowMap(const animation::AnimationProperties &animProps, Shader &shader);
+        virtual void confShadowMap(const animation::AnimationProperties &animProps);
 
     protected:
         glm::vec3 m_colour;
@@ -40,6 +40,9 @@ namespace rendering
 
         // view transforms
         Eigen::Matrix4f projection;
+        static Shader *shader;
+        virtual void initShader();
+        virtual void loadLightSpaceMatrix(const animation::AnimationProperties &animProps);
 
     private:
         void initShadowResources();
