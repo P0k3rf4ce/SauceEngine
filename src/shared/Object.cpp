@@ -34,14 +34,21 @@ void Object::unload() {
 /**
  * Update the Object <timestep> seconds into the future
 */
-void Object::update(double timestep) {
-    this->animProps->update(timestep);
+void Object::updateAnimation(double deltastep) {
+    this->animProps->update(deltastep);
+}
+
+void Object::updateModeling() {
     this->modelProps->update(*(this->animProps.get()));
+}
+
+void Object::updateRendering() {
     this->renderProps->update(*(this->modelProps.get()), *(this->animProps.get()));
 }
 
 /**
  * Draw the object using the given shader
+ * self-note to emmy here
 */
 void Object::draw(rendering::Shader& shader) {
     

@@ -1,5 +1,6 @@
 {
   "dependencies": [
+    "boost-program-options",
     "glad",
     "glfw3",
     "glm",
@@ -8,6 +9,12 @@
     "stb",
     "eigen3",
     "gtest",
-    "assimp"
+    "assimp",
+    {
+        "name": "qtbase",
+        "features": [
+            "widgets"
+        ]
+    }
   ]
 }
