@@ -33,9 +33,9 @@ public:
     void unload();
 
     /**
-     * Update the Animation properties <timestep> seconds into the future
+     * Update the Animation properties <deltastep> seconds into the future
     */
-    void update(double timestep);
+    void update(double deltastep);
 
     /**
      * Returns the model matrix for this object.
