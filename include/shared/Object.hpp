@@ -21,9 +21,15 @@ public:
     void load();
     void unload();
 
+
     void updateAnimation(double DELTA_STEP);
     void updateModeling();
     void updateRendering();
+  
+    /**
+     * Draw the object using the given shader
+    */
+    void draw(rendering::Shader& shader); // self-note to emmy here
 };
 
 #endif

@@ -16,7 +16,9 @@ public:
 
     void load();
     void unload();
+
     double update(double deltatime, double DELTA_STEP);
+    void draw(rendering::Shader& shader); // self-note to emmy here
 };
 
 #endif

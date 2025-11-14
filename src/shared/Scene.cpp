@@ -52,3 +52,10 @@ double Scene::update(double deltatime, double DELTA_STEP) {
 
     return deltatime;
 }
+
+// self-note to emmy here
+void Scene::draw(rendering::Shader& shader) {
+    for (auto object: this->objects) {
+        object.draw(shader);
+    }
+}

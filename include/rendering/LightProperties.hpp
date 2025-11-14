@@ -2,6 +2,9 @@
 
 #include <glm/glm.hpp>
 #include <glad/glad.h>
+#include "utils/Shader.hpp"
+#include "shared/Scene.hpp"
+#include "animation/AnimationProperties.hpp"
 
 namespace rendering
 {
@@ -21,10 +24,10 @@ namespace rendering
         void setColour(const glm::vec3 &colour) noexcept;
 
         // lifecycle update method that derived classes must implement
-        virtual void update() = 0;
+        virtual void update(Scene& scene, animation::AnimationProperties& animProps) = 0;
 
         // configure shadow map parameters (abstract)
-        virtual void confShadowMap() = 0;
+        virtual void confShadowMap(Scene& scene, Shader& shader) = 0;
 
     protected:
         glm::vec3 m_colour;
