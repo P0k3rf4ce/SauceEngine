@@ -57,8 +57,6 @@ void setUniform(const std::string& name, float x, float y, float z);
 void setUniform(const std::string& name, float x, float y, float z, float w);
 void setUniform(const std::string& name, const Eigen::Affine3d& mat);
 
-void setUniform(const std::string& name, const Eigen::Matrix4f& mat4);
-
 void bind();
 void unbind();
 
