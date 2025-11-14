@@ -45,3 +45,11 @@ void Object::updateModeling() {
 void Object::updateRendering() {
     this->renderProps->update(*(this->modelProps.get()), *(this->animProps.get()));
 }
+
+/**
+ * Draw the object using the given shader
+ * self-note to emmy here
+*/
+void Object::draw(rendering::Shader& shader) {
+    
+}
