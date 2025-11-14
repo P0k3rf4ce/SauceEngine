@@ -2,7 +2,8 @@
 
 #include <glm/glm.hpp>
 #include <glad/glad.h>
-#include "utils/Shader.hpp"
+
+#include <Eigen/Geometry>
 #include "shared/Scene.hpp"
 #include "animation/AnimationProperties.hpp"
 
@@ -27,6 +28,8 @@ namespace rendering
         virtual void update(Scene& scene, animation::AnimationProperties& animProps) = 0;
 
         // configure shadow map parameters (abstract)
+        // self-note to emmy - merge this properly
+        virtual void confShadowMap(const animation::AnimationProperties &animProps);
         virtual void confShadowMap(Scene& scene, Shader& shader) = 0;
 
     protected:
@@ -37,6 +40,12 @@ namespace rendering
         GLuint depthMapTex = 0;
         const unsigned int shadowWidth = 1024;
         const unsigned int shadowHeight = 1024;
+
+        // view transforms
+        Eigen::Matrix4f projection;
+        static Shader *shader;
+        virtual void initShader();
+        virtual void loadLightSpaceMatrix(const animation::AnimationProperties &animProps);
 
     private:
         void initShadowResources();
