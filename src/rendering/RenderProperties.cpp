@@ -1,4 +1,5 @@
 #include "rendering/RenderProperties.hpp"
+#include "utils/Logger.hpp"
 
 using namespace rendering;
 
@@ -31,5 +32,5 @@ void RenderProperties::unload() {
  * Run shaders for this object
 */
 void RenderProperties::update(const modeling::ModelProperties &modelProps, const animation::AnimationProperties &animProps) {
-    
+
 }
