@@ -41,11 +41,21 @@ namespace rendering
         const unsigned int shadowWidth = 1024;
         const unsigned int shadowHeight = 1024;
 
+<<<<<<< HEAD
         // view transforms
         Eigen::Matrix4f projection;
         static Shader *shader;
         virtual void initShader();
         virtual void loadLightSpaceMatrix(const animation::AnimationProperties &animProps);
+=======
+        /**
+         * @brief Convert GLM mat4 to Eigen::Matrix4f.
+         *
+         * @param m GLM mat4 to convert.
+         * @return Eigen::Matrix4f Converted Eigen matrix.
+         */
+        Eigen::Matrix4f glmToEigen(const glm::mat4 &m);
+>>>>>>> 01acfa6 (refactor: move eigen conversion helper to lightprops)
 
     private:
         void initShadowResources();

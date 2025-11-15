@@ -3,7 +3,12 @@
 #include "shared/Scene.hpp"
 #include <vector>
 #include <glm/gtc/matrix_transform.hpp>
+<<<<<<< HEAD
 #include <string>
+=======
+#include <Eigen/Geometry>
+#include <glad/glad.h>
+>>>>>>> 01acfa6 (refactor: move eigen conversion helper to lightprops)
 
 namespace rendering
 {
@@ -104,7 +109,7 @@ namespace rendering
     void DirLight::confShadowMap(Shader &shader)
     {
         // Since shader.setUniform expects Eigen matrices
-        const Eigen::Matrix4f lightSpaceEigen = toEigen(m_lightSpaceMatrix);
+        const Eigen::Matrix4f lightSpaceEigen = glmToEigen(m_lightSpaceMatrix);
         shader.setUniform("lightSpaceMatrix", lightSpaceEigen);
 
         // Prepare the shadow map framebuffer
