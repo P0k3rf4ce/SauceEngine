@@ -64,4 +64,12 @@ namespace rendering
         LOG_INFO("Shadow map initialized.");
     }
 
+    Eigen::Matrix4f toEigen(const glm::mat4 &m)
+    {
+        Eigen::Matrix4f e;
+        for (int r = 0; r < 4; ++r)
+            for (int c = 0; c < 4; ++c)
+                e(r, c) = m[c][r]; // glm is indexed [column][row]
+        return e;
+    }
 } // namespace rendering

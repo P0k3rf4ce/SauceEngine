@@ -37,6 +37,14 @@ namespace rendering
         const unsigned int shadowWidth = 1024;
         const unsigned int shadowHeight = 1024;
 
+        /**
+         * @brief Convert GLM mat4 to Eigen::Matrix4f.
+         *
+         * @param m GLM mat4 to convert.
+         * @return Eigen::Matrix4f Converted Eigen matrix.
+         */
+        Eigen::Matrix4f glmToEigen(const glm::mat4 &m);
+
     private:
         void initShadowResources();
     };

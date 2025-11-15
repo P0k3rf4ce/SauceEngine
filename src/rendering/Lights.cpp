@@ -5,24 +5,6 @@
 #include <Eigen/Geometry>
 #include <glad/glad.h>
 
-namespace
-{
-    /**
-     * @brief Convert GLM mat4 to Eigen::Matrix4f.
-     *
-     * @param m GLM mat4 to convert.
-     * @return Eigen::Matrix4f Converted Eigen matrix.
-     */
-    Eigen::Matrix4f toEigen(const glm::mat4 &m)
-    {
-        Eigen::Matrix4f e;
-        for (int r = 0; r < 4; ++r)
-            for (int c = 0; c < 4; ++c)
-                e(r, c) = m[c][r]; // glm is indexed [column][row]
-        return e;
-    }
-}
-
 namespace rendering
 {
 
@@ -39,7 +21,7 @@ namespace rendering
     void DirLight::confShadowMap(Shader &shader)
     {
         // Since shader.setUniform expects Eigen matrices
-        const Eigen::Matrix4f lightSpaceEigen = toEigen(m_lightSpaceMatrix);
+        const Eigen::Matrix4f lightSpaceEigen = glmToEigen(m_lightSpaceMatrix);
         shader.setUniform("lightSpaceMatrix", lightSpaceEigen);
 
         // Prepare the shadow map framebuffer
