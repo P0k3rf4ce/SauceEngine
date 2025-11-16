@@ -1,15 +1,21 @@
 #include "shared/Scene.hpp"
 
+// define static active scene pointer
+Scene *Scene::s_activeScene = nullptr;
+
 Scene::Scene() {
-    
+    // set this scene as the active scene
+    s_activeScene = this;
 }
 
 Scene::Scene(std::string &filename) {
-    
+    s_activeScene = this;
 }
 
 Scene::~Scene() {
-
+    if (s_activeScene == this) {
+        s_activeScene = nullptr;
+    }
 }
 
 /**
@@ -51,6 +57,14 @@ double Scene::update(double deltatime, double DELTA_STEP) {
     }
 
     return deltatime;
+}
+
+const std::vector<std::shared_ptr<rendering::LightProperties>> &Scene::getLights() const noexcept {
+    return lights;
+}
+
+Scene *Scene::getActiveScene() noexcept {
+    return s_activeScene;
 }
 
 // self-note to emmy here
