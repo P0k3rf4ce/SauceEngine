@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <glm/gtc/type_ptr.hpp>
 
 // Converts our SHADER TYPE to GL name
 GLenum Shader::getGLShaderType(SHADER_TYPE type) {
@@ -341,6 +342,15 @@ void Shader::setUniform(const std::string& name, const Eigen::Affine3d& mat) {
     }
 }
 
+void Shader::setUniform(const std::string& name, const glm::mat4& mat) {
+    GLint location = getUniformLocation(name);
+    if (location != -1) {
+        ensureShaderActive([&]() {
+            glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(mat));
+        });
+    }
+}
+
 /*
  * Actually use the shader
  * Must be called before you render!
@@ -369,3 +379,5 @@ void Shader::unbind() {
         LOG_WARN_F("Shader %d is already unbound", shaderProgram);
     }
 }
+
+

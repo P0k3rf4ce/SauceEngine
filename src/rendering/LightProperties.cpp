@@ -1,13 +1,22 @@
+#include <glad/glad.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <Eigen/Geometry>
 #include "rendering/LightProperties.hpp"
 #include "utils/Logger.hpp"
+#include "utils/Shader.hpp"
+#include "utils/EigenToGLM.hpp"
 
 namespace rendering
 {
+
+    Shader *LightProperties::shader = nullptr;
 
     LightProperties::LightProperties(const glm::vec3 &colour)
         : m_colour(colour)
     {
         initShadowResources();
+        this->initShader();
     }
 
     // provide definition for pure-virtual destructor
@@ -21,6 +30,18 @@ namespace rendering
     void LightProperties::setColour(const glm::vec3 &colour) noexcept
     {
         m_colour = colour;
+    }
+
+    void LightProperties::initShader()
+    {
+        if (this->shader == nullptr)
+        {
+            std::unordered_map<SHADER_TYPE, std::string> shaderFiles = {
+                {FRAGMENT, "src/rendering/shaders/shadow/shadow_mapping_depth.frag"},
+                {VERTEX, "src/rendering/shaders/shadow/shadow_mapping_depth.vert"}};
+            this->shader = new Shader();
+            this->shader->loadFromFiles(shaderFiles);
+        }
     }
 
     void LightProperties::initShadowResources()
@@ -62,6 +83,26 @@ namespace rendering
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         LOG_INFO("Shadow map initialized.");
+    }
+
+    void LightProperties::loadLightSpaceMatrix(const animation::AnimationProperties &animProps)
+    {
+        // get position from model matrix
+        glm::vec3 position = E2GLM(animProps.getModelMatrix()) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+        // assume light faces towards origin
+        glm::mat4 view = glm::lookAt(position, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        Eigen::Matrix4f lightSpaceMatrix = this->projection * GLM2E(view);
+        this->shader->setUniform("lightSpaceMatrix", lightSpaceMatrix);
+    }
+
+    // Get everything ready for rendering a shadow map
+    void LightProperties::confShadowMap(const animation::AnimationProperties &animProps)
+    {
+        glViewport(0, 0, this->shadowWidth, this->shadowHeight);
+        glBindFramebuffer(GL_FRAMEBUFFER, this->depthMapFBO);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        this->shader->bind();
+        this->loadLightSpaceMatrix(animProps);
     }
 
 } // namespace rendering
