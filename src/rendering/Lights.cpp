@@ -3,12 +3,7 @@
 #include "shared/Scene.hpp"
 #include <vector>
 #include <glm/gtc/matrix_transform.hpp>
-<<<<<<< HEAD
 #include <string>
-=======
-#include <Eigen/Geometry>
-#include <glad/glad.h>
->>>>>>> 01acfa6 (refactor: move eigen conversion helper to lightprops)
 
 namespace rendering
 {
