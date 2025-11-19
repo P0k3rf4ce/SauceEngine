@@ -25,12 +25,17 @@ public:
     // getters
     const std::vector<std::shared_ptr<rendering::LightProperties>> &getLights() const noexcept;
     static Scene *getActiveScene() noexcept;
+    void addLight(std::shared_ptr<rendering::LightProperties> light);
 
     void load();
     void unload();
 
     double update(double deltatime, double DELTA_STEP);
     void draw(rendering::Shader& shader); // self-note to emmy here
+
+private:
+    void uploadSpotLightsBuffer();
+    unsigned int m_spotLightSSBO = 0;
 };
 
 #endif
