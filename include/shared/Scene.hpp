@@ -35,7 +35,7 @@ public:
 
 private:
     void uploadSpotLightsBuffer();
-    unsigned int m_spotLightSSBO = 0;
+    unsigned int m_spotLightSSBO = 0; // note to emmy
 };
 
 #endif
