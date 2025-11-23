@@ -42,6 +42,7 @@ namespace rendering
         const unsigned int shadowHeight = 1024;
 
         // view transforms
+        // note to emmy - double check
         Eigen::Matrix4f projection;
         static Shader *shader;
         virtual void initShader();
