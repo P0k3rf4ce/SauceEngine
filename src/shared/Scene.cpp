@@ -9,6 +9,7 @@
 
 #include "rendering/SpotLightProperties.hpp"
 
+// note to emmy
 namespace
 {
     struct SpotLightGpuData
@@ -106,6 +107,7 @@ void Scene::draw(rendering::Shader& shader) {
     }
 }
 
+// note to emmy
 void Scene::uploadSpotLightsBuffer() {
     if (m_spotLightSSBO == 0) {
         glGenBuffers(1, &m_spotLightSSBO);
