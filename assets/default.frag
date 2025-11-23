@@ -39,6 +39,16 @@ struct PointLight
     vec4 Color;
 };
 
+struct SpotLightProperties
+{
+    vec4 Position;
+    vec4 Direction;
+    vec4 Color;
+    mat4 lightSpaceMatrix;
+    float cutOff;
+    float outerCutOff;
+};
+
 layout(std430) readonly buffer dirLightData
 {
     DirectionalLight dirLights[];
@@ -47,6 +57,11 @@ layout(std430) readonly buffer dirLightData
 layout(std430) readonly buffer pointLightData
 {
     PointLight pointLights[];
+};
+
+layout(std430) readonly buffer spotLightData
+{
+    SpotLightProperties spotLights[];
 };
 
 uniform vec3 camPos;
@@ -136,6 +151,14 @@ float posLightShadowOcclusion(int lightIndex) {
     return texture(pointMaps, vec4(sampleDir.xyz, lightIndex), fragDepth);
 }
 
+// shadow test - spot
+float spotLightShadowOcclusion(int lightIndex, vec4 fragPosLightSpace)
+{
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    projCoords = projCoords * 0.5 + 0.5;
+    return texture(shadowMaps, vec4(projCoords.xy, lightIndex, projCoords.z));
+}
+
 void main()
 {		
     vec3 albedo     = pow(texture(albedoMap, TexCoord).rgb, vec3(2.2));
@@ -208,6 +231,40 @@ void main()
         kd *= 1.0 - metallic;	  
 
         Lo += (kd * albedo / PI + specular) * radiance * max(dot(N, L), 0.0) * (1.0 - shadow);
+    }
+
+    // spot lights
+    for (int i = 0; i < spotLights.length(); i++) {
+        vec3 L = normalize(spotLights[i].Position.xyz - FragPos);
+        float theta = dot(L, normalize(-spotLights[i].Direction.xyz));
+        float epsilon = spotLights[i].cutOff - spotLights[i].outerCutOff;
+        float intensity = clamp((theta - spotLights[i].outerCutOff) / epsilon, 0.0, 1.0);
+
+        if(intensity > 0.0) {
+            vec4 fragPosLightSpace = spotLights[i].lightSpaceMatrix * vec4(FragPos, 1.0);
+            float shadow = spotLightShadowOcclusion(i, fragPosLightSpace);
+
+            // calculate radiance
+            vec3 H = normalize(V + L);
+
+            float distance = length(spotLights[i].Position.xyz - FragPos);
+            float attenuation = 1.0 / (distance * distance);
+            vec3 radiance = spotLights[i].Color.rgb * attenuation * intensity;
+
+            // calculate brdf
+            float D   = distributionGGX(N, H, roughness);   
+            float G   = geometrySmith(N, V, L, roughness);      
+            vec3 F    = fresnelSchlick(clamp(dot(H, V), 0.0, 1.0), F0);
+               
+            vec3 num      = D * G * F; 
+            float denom   = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0);
+            vec3 specular = num / max(denom, 0.001); // prevent divide by zero
+            
+            vec3 kd = vec3(1.0) - F; // conservation of energy
+            kd *= 1.0 - metallic;	  
+
+            Lo += (kd * albedo / PI + specular) * radiance * max(dot(N, L), 0.0) * (1.0 - shadow);
+        }
     }
     
     // ambient lighting

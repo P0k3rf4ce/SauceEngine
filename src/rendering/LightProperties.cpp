@@ -10,6 +10,7 @@
 namespace rendering
 {
 
+    // self note to emmy
     Shader *LightProperties::shader = nullptr;
 
     LightProperties::LightProperties(const glm::vec3 &colour)
@@ -34,7 +35,7 @@ namespace rendering
 
     void LightProperties::initShader()
     {
-        if (this->shader == nullptr)
+        if (this->shader == nullptr) // note to emmy
         {
             std::unordered_map<SHADER_TYPE, std::string> shaderFiles = {
                 {FRAGMENT, "src/rendering/shaders/shadow/shadow_mapping_depth.frag"},
@@ -44,6 +45,7 @@ namespace rendering
         }
     }
 
+    // note to emmy
     void LightProperties::initShadowResources()
     {
         if (depthMapFBO != 0 || depthMapTex != 0)
@@ -85,6 +87,7 @@ namespace rendering
         LOG_INFO("Shadow map initialized.");
     }
 
+    // note to emmy
     void LightProperties::loadLightSpaceMatrix(const animation::AnimationProperties &animProps)
     {
         // get position from model matrix
