@@ -25,7 +25,7 @@ public:
     // getters
     const std::vector<std::shared_ptr<rendering::LightProperties>> &getLights() const noexcept;
     static Scene *getActiveScene() noexcept;
-    void addLight(std::shared_ptr<rendering::LightProperties> light);
+    void addLight(std::shared_ptr<rendering::LightProperties> light); // note to emmy...?
 
     void load();
     void unload();

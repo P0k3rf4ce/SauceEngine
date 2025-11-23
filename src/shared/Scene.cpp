@@ -1,5 +1,6 @@
 #include "shared/Scene.hpp"
 
+// from here
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 
@@ -24,6 +25,7 @@ namespace
     constexpr unsigned int SPOT_LIGHT_SSBO_BINDING = 2;
 }
 
+// to here
 // define static active scene pointer
 Scene *Scene::s_activeScene = nullptr;
 
@@ -40,6 +42,7 @@ Scene::~Scene() {
     if (s_activeScene == this) {
         s_activeScene = nullptr;
     }
+    // here
     if (m_spotLightSSBO != 0) {
         glDeleteBuffers(1, &m_spotLightSSBO);
         m_spotLightSSBO = 0;
@@ -95,6 +98,7 @@ Scene *Scene::getActiveScene() noexcept {
     return s_activeScene;
 }
 
+// here
 void Scene::addLight(std::shared_ptr<rendering::LightProperties> light) {
     lights.push_back(std::move(light));
 }
