@@ -342,6 +342,7 @@ void Shader::setUniform(const std::string& name, const Eigen::Affine3d& mat) {
     }
 }
 
+// note for emmy
 void Shader::setUniform(const std::string& name, const glm::mat4& mat) {
     GLint location = getUniformLocation(name);
     if (location != -1) {
