@@ -1,6 +1,6 @@
-file(GLOB SHARED_SRC_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/*.cpp")
+file(GLOB UTILS_SRC_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/*.cpp")
 
-add_library(utilsLib SHARED ${SHARED_SRC_FILES})
+add_library(utilsLib STATIC ${UTILS_SRC_FILES})
 
 target_include_directories(utilsLib PRIVATE
   ${PROJECT_SOURCE_DIR}/include

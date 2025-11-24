@@ -3,6 +3,7 @@
 /**
  * Options:
  * --help               Help
+ * --skip-launcher      Start the engine immediately
  * -w --width           Screen width
  * -h --height          Screen height
  * -t --tickrate        Tickrate
@@ -13,6 +14,7 @@ AppOptions::AppOptions(int argc, char const **argv): desc("Allowed options") {
 
     desc.add_options()
     ("help", "produce help message")
+    ("skip-launcher", "start the engine immediately")
     ("width,w", po::value<unsigned int>(&(this->scr_width))->default_value(DEFAULT_SCR_WIDTH), "screen width")
     ("height,h", po::value<unsigned int>(&(this->scr_height))->default_value(DEFAULT_SCR_HEIGHT), "screen height")
     ("tickrate,t", po::value<double>(&(this->tickrate))->default_value(DEFAULT_TICKRATE), "animation tickrate")
@@ -26,6 +28,7 @@ AppOptions::AppOptions(int argc, char const **argv): desc("Allowed options") {
     po::notify(vm);
 
     this->help = vm.count("help") > 0;
+    this->skip_launcher = vm.count("skip-launcher") > 0;
 }
 
 boost::program_options::options_description AppOptions::getHelpMessage() const {

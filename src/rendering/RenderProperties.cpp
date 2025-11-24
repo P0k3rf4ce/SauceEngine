@@ -10,19 +10,10 @@ RenderProperties::~RenderProperties() {
 
 }
 
-/**
- * This function is meant to load these 
- * Render properties back into use
-*/
 void RenderProperties::load() {
-    
+
 }
 
-/**
- * This function is meant to remove these 
- * Render properties from use with the
- * intention that they will be used in the future.
-*/
 void RenderProperties::unload() {
 
 }

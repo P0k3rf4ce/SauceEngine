@@ -1,5 +1,14 @@
 #include "shared/Object.hpp"
 
+
+Object::Object() 
+    : gltfFilename(""), animProps(nullptr), modelProps(nullptr), renderProps(nullptr) {
+}
+
+Object::Object(std::shared_ptr<animation::AnimationProperties> animProps, std::shared_ptr<modeling::ModelProperties> modelProps, std::shared_ptr<rendering::RenderProperties> renderProps)
+    : gltfFilename(""), animProps(animProps), modelProps(modelProps), renderProps(renderProps) {
+}
+
 Object::Object(std::string gltfFilename) {
     this->modelProps = std::shared_ptr<modeling::ModelProperties>(new modeling::ModelProperties(gltfFilename));
     this->animProps = std::shared_ptr<animation::AnimationProperties>(new animation::AnimationProperties(*(this->modelProps.get())));
@@ -34,8 +43,14 @@ void Object::unload() {
 /**
  * Update the Object <timestep> seconds into the future
 */
-void Object::update(double timestep) {
-    this->animProps->update(timestep);
+void Object::updateAnimation(double deltastep) {
+    this->animProps->update(deltastep);
+}
+
+void Object::updateModeling() {
     this->modelProps->update(*(this->animProps.get()));
+}
+
+void Object::updateRendering() {
     this->renderProps->update(*(this->modelProps.get()), *(this->animProps.get()));
 }

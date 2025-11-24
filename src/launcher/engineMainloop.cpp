@@ -6,6 +6,7 @@
 #include <GLFW/glfw3.h>
 #include <stb_image.h>
 #include <chrono>
+#include <memory>
 
 #include <iostream>
 
@@ -25,7 +26,18 @@ int engine_mainloop(const AppOptions &ops) {
         return 1;
     }
 
-    Scene scene;
+    // Create scene - load from file if provided, otherwise create empty scene
+    auto scene = std::make_shared<Scene>();
+    if (!ops.scene_file.empty()) {
+        std::cout << "Loading scene from file: " << ops.scene_file << std::endl;
+        std::string sceneFilePath = ops.scene_file;
+        *scene = Scene(sceneFilePath);
+    } else {
+        std::cout << "No scene file provided, creating empty scene" << std::endl;
+    }
+
+    // Set this scene as the active scene
+    Scene::set_active_scene(scene);
 
     double prev_frame_time = get_seconds_since_epoch(), current_frame_time, deltatime;
 
@@ -38,7 +50,7 @@ int engine_mainloop(const AppOptions &ops) {
         deltatime += current_frame_time - prev_frame_time;
         prev_frame_time = current_frame_time;
 
-        deltatime = scene.update(deltatime, delta_step);
+        deltatime = scene->update(deltatime, delta_step);
         
         glfwSwapBuffers(window);
         glfwPollEvents();

@@ -10,6 +10,7 @@ TEST(OptionParserTest, ShouldHandleNoOptions) {
     EXPECT_EQ(ops.scr_width, ops.DEFAULT_SCR_WIDTH);
     EXPECT_EQ(ops.scr_height, ops.DEFAULT_SCR_HEIGHT);
     EXPECT_FALSE(ops.help);
+    EXPECT_FALSE(ops.skip_launcher);
     EXPECT_FLOAT_EQ(ops.tickrate, ops.DEFAULT_TICKRATE);
 }
 
@@ -19,6 +20,14 @@ TEST(OptionParserTest, ShouldHandleHelp) {
     AppOptions ops{argc, argv};
 
     EXPECT_TRUE(ops.help);
+}
+
+TEST(OptionParserTest, ShouldHandleSkipLauncher) {
+    const int argc = 2;
+    const char *argv[argc] = {"./exec", "--skip-launcher"};
+    AppOptions ops{argc, argv};
+
+    EXPECT_TRUE(ops.skip_launcher);
 }
 
 TEST(OptionParserTest, ShouldHandleWidth) {

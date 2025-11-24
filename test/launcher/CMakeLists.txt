@@ -7,6 +7,10 @@ file(GLOB TEST_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*_test.cpp")
 
 add_executable(launcher_unit_tests ${TEST_FILES})
 
+set_target_properties(launcher_unit_tests PROPERTIES
+  AUTOMOC ON
+)
+
 target_link_libraries(launcher_unit_tests PRIVATE launcherLib)
 
 target_include_directories(launcher_unit_tests

@@ -12,8 +12,8 @@ GLenum Shader::getGLShaderType(SHADER_TYPE type) {
         case FRAGMENT: return GL_FRAGMENT_SHADER;
         case GEOMETRY: return GL_GEOMETRY_SHADER;
         case COMPUTE: return GL_COMPUTE_SHADER;
+        default: return -1;
     }
-    return -1; // Invalid type
 }
 
 /*
@@ -341,6 +341,16 @@ void Shader::setUniform(const std::string& name, const Eigen::Affine3d& mat) {
     }
 }
 
+/* Mat4f uniform */
+void Shader::setUniform(const std::string& name, const Eigen::Matrix4f& mat4) {
+    GLint location = getUniformLocation(name);
+    if (location != -1) {
+        ensureShaderActive([&]() {
+            glUniformMatrix4fv(location, 1, GL_FALSE, mat4.data());
+        });
+    }
+}
+
 /*
  * Actually use the shader
  * Must be called before you render!
@@ -356,7 +366,7 @@ void Shader::bind() {
         bound = true;
         LOG_DEBUG("Shader bound and activated successfully");
     } else {
-        LOG_WARN_F("Shader %d is already unbound", shaderProgram);
+        // LOG_WARN_F("Shader %d is already unbound", shaderProgram);
     }
 }
 
@@ -366,6 +376,6 @@ void Shader::unbind() {
         bound = false;
         LOG_DEBUG_F("Shader %d unbound successfully", shaderProgram);
     } else {
-        LOG_WARN_F("Shader %d is already unbound", shaderProgram);
+        // LOG_WARN_F("Shader %d is already unbound", shaderProgram);
     }
 }

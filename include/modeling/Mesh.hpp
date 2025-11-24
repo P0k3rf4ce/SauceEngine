@@ -25,11 +25,16 @@ class Mesh {
 		// mesh data
 		vector<Vertex> vertices;
 		vector<unsigned int> indices;
-		Mesh(vector<Vertex> vertices, vector<unsigned int> indices);
+		Mesh(vector<Vertex> vertices, vector<unsigned int> indices, bool setupGL = true);
+
+                    // Rendering methods
+                void bind() const;      // Bind VAO for rendering
 		void Draw(Shader &shader);
 	private:
 		// render data
 		unsigned int VAO, VBO, EBO;
+                bool glSetup;
+
 		void setupMesh();
 
 		/*
