@@ -1,6 +1,7 @@
 #include "rendering/Lights.hpp"
 #include "utils/Logger.hpp"
 #include "shared/Scene.hpp"
+#include "utils/EigenToGLM.hpp"
 #include <vector>
 #include <glm/gtc/matrix_transform.hpp>
 #include <string>
@@ -26,7 +27,7 @@ namespace rendering
         glDeleteTextures(1, &m_cubemapTex);
     }
 
-    void PointLight::update(Scene& scene, animation::AnimationProperties& animProps)
+    void PointLight::update(Scene &scene, animation::AnimationProperties &animProps)
     {
         m_position = animProps.getModelMatrix().translation();
 
@@ -44,7 +45,7 @@ namespace rendering
         m_lightSpaceMatrices.push_back(shadowProj * glm::lookAt(m_position, m_position + glm::vec3(0.0, 0.0, -1.0), glm::vec3(0.0, -1.0, 0.0)));
     }
 
-    void PointLight::confShadowMap(Scene& scene, Shader& shader)
+    void PointLight::confShadowMap(Scene &scene, Shader &shader)
     {
         for (unsigned int i = 0; i < 6; ++i)
             shader.setUniform("shadowMatrices[" + std::to_string(i) + "]", m_lightSpaceMatrices[i]);
@@ -91,4 +92,54 @@ namespace rendering
         LOG_INFO("Shadow cubemap initialized.");
     }
 
-} // namespace rendering
+    DirLight::DirLight(const glm::vec3 &lightPos,
+                 const glm::vec3 &colour = glm::vec3(1.0f))
+        : LightProperties(colour), m_lightPos(lightPos)
+    {
+        // Defer building 'projection' until first use.
+        m_projectionNeedsRebuild = true;
+    }
+
+    DirLight::~DirLight() = default;
+
+    void DirLight::update(Scene & scene, animation::AnimationProperties & animProps)
+    {
+        rebuildProjectionIfNeeded();
+    }
+
+    void DirLight::confShadowMap(Scene & scene, Shader &shader)
+    {
+        rebuildProjectionIfNeeded();
+
+        glViewport(0, 0, this->shadowWidth, this->shadowHeight);
+        glBindFramebuffer(GL_FRAMEBUFFER, this->depthMapFBO);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        shader.bind();
+    }
+
+    void DirLight::setOrtho(float orthoSize, float nearPlane, float farPlane)
+    {
+        m_orthoSize = orthoSize;
+        m_nearPlane = nearPlane;
+        m_farPlane = farPlane;
+        m_projectionNeedsRebuild = true;
+    }
+
+    // note to emmy: can be combined with below
+    void DirLight::rebuildProjectionIfNeeded()
+    {
+        if (!m_projectionNeedsRebuild)
+            return;
+        rebuildProjection();
+        m_projectionNeedsRebuild = false;
+    }
+
+    void DirLight::rebuildProjection()
+    {
+        const glm::mat4 proj = glm::ortho(
+            -m_orthoSize, m_orthoSize,
+            -m_orthoSize, m_orthoSize,
+            m_nearPlane, m_farPlane);
+        this->projection = GLM2E(proj);
+    }
+}
