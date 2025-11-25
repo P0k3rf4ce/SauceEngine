@@ -82,6 +82,9 @@ GLFWwindow *initWindow(unsigned int scr_width, unsigned int scr_height) {
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
+    Scene::scr_width = scr_width;
+    Scene::scr_height = scr_height;
+
     return window;
 }
 

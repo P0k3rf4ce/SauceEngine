@@ -5,6 +5,8 @@
 
 // Initialize static member
 std::shared_ptr<Scene> Scene::active_scene = nullptr;
+unsigned int Scene::scr_width = 0;
+unsigned int Scene::scr_height = 0;
 
 Scene::Scene() {
     active_camera = std::make_shared<Camera>(Vector3f(0, 0, 0), Vector3f(0, 0, 1));
