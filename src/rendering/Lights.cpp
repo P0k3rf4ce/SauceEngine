@@ -125,6 +125,7 @@ namespace rendering
         m_projectionNeedsRebuild = true;
     }
 
+    // note to emmy: can be combined with below
     void DirLight::rebuildProjectionIfNeeded()
     {
         if (!m_projectionNeedsRebuild)
