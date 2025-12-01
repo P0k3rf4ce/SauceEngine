@@ -11,3 +11,6 @@ build.sh
 .cmake/
 test_coverage.sh
 CLAUDE.md
+
+scripts
+coverage

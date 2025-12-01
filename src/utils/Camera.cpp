@@ -3,6 +3,10 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
+#ifndef M_PI
+    #define M_PI 3.14159265358979323846
+#endif
+
 #include <Eigen/Geometry>
 
 using namespace Eigen;
@@ -25,6 +29,7 @@ void Camera::LookAt(Vector3f front) {
 }
 
 float radians(float degrees) {
+    
 	return degrees * (M_PI / 180.f);
 }
 

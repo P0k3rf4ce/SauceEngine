@@ -39,7 +39,7 @@ int engine_mainloop(const AppOptions &ops) {
     // Set this scene as the active scene
     Scene::set_active_scene(scene);
 
-    double prev_frame_time = get_seconds_since_epoch(), current_frame_time, deltatime;
+    double prev_frame_time = get_seconds_since_epoch(), current_frame_time, deltatime = 0.0;
 
     const double delta_step = 1.0/ops.tickrate;
 
