@@ -7,6 +7,7 @@
 #include <limits>  
 
 #include "modeling/ModelProperties.hpp"
+#include "modeling/Mesh.hpp"
 
 namespace modeling {
     class ModelProperties;
@@ -28,9 +29,8 @@ public:
      * Computes the center of mass and volume for the given vertices and indices
      * and stores them in the provided parameters.
      */
-    static void computeCenreOfMassAndVolume(
-        const std::vector<Eigen::Vector3d> &vertices, 
-        const std::vector<unsigned int> &indices, 
+    static void computeCentreOfMassAndVolume(
+        const std::vector<std::shared_ptr<Mesh>>& meshes,
         Eigen::Vector3d &com, 
         double &volume
     );
@@ -64,8 +64,7 @@ public:
     Eigen::Affine3d getModelMatrix() const;
 
     Eigen::Matrix3d computeInertiaTensor(
-        const std::vector<Eigen::Vector3d> &vertices,
-        const std::vector<unsigned int> &indices,
+        const std::vector<std::shared_ptr<Mesh>>& meshes,
         const Eigen::Vector3d &com) const;
     /**
      * Compute inverse inertia tensor (direct inversion)
