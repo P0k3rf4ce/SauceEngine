@@ -50,7 +50,8 @@ void RenderProperties::update(const modeling::ModelProperties &modelProps, const
     );
     model->getShader()->setUniform("projection", projection);
 
-    // set textures - TODO
+    // get textures - TODO
+    //std::vector<modeling::MeshMaterialPair> mats = model->getMeshMaterialPairs();
     
     // draw each mesh
     for (const auto& [mesh, material] : model->getMeshMaterialPairs()) {
