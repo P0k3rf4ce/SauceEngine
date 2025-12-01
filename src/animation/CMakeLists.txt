@@ -16,3 +16,4 @@ find_package(Eigen3 CONFIG REQUIRED NO_MODULE)
 target_link_libraries(animationLib PUBLIC Eigen3::Eigen)
 
 target_link_libraries(animationLib PUBLIC utilsLib)
+target_link_libraries(animationLib PUBLIC osqp)
