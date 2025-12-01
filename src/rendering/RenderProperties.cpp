@@ -53,9 +53,10 @@ void RenderProperties::update(const modeling::ModelProperties &modelProps, const
     // set textures - TODO
     
     // draw each mesh
-    std::vector<std::shared_ptr<Mesh>> meshes = model->getMeshes();
-    for (const std::shared_ptr<Mesh>& mesh : meshes) {
-        glDrawArrays(GL_TRIANGLES, 0, mesh->vertices.size());
+    for (const auto& [mesh, material] : model->getMeshMaterialPairs()) {
+        if (mesh) {
+            glDrawArrays(GL_TRIANGLES, 0, mesh->vertices.size());
+        }
     }
 
 }

@@ -116,11 +116,11 @@ TEST_F(MeshLoadTest, UnitCube) {
 	};
 
 	for (int i=0; i<v.size(); i++) {
-		EXPECT_EQ(models[0]->getMeshes()[0]->vertices[i].Position,v[i].Position);
-		EXPECT_EQ(models[0]->getMeshes()[0]->vertices[i].Normal,v[i].Normal);
-		EXPECT_EQ(models[0]->getMeshes()[0]->vertices[i].TexCoords,v[i].TexCoords);
+		EXPECT_EQ(models[0]->getMeshMaterialPairs()[0].first->vertices[i].Position,v[i].Position);
+		EXPECT_EQ(models[0]->getMeshMaterialPairs()[0].first->vertices[i].Normal,v[i].Normal);
+		EXPECT_EQ(models[0]->getMeshMaterialPairs()[0].first->vertices[i].TexCoords,v[i].TexCoords);
 	}
 	for (int i=0; i<ind.size(); i++) {
-		EXPECT_EQ(models[0]->getMeshes()[0]->indices[i],ind[i]);
+		EXPECT_EQ(models[0]->getMeshMaterialPairs()[0].first->indices[i],ind[i]);
 	}
 }

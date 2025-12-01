@@ -52,7 +52,7 @@ ModelProperties::ModelProperties(std::string gltfFilename)
     // Use the first model (could be extended to support multiple models)
     model = models[0];
     LOG_INFO_F("ModelProperties: Successfully loaded model with %d meshes",
-               static_cast<int>(model->getMeshes().size()));
+               static_cast<int>(model->getMeshMaterialPairs().size()));
 
     // Extract and store metadata from the model
     const auto& modelMetadata = model->getMetadata();
@@ -107,10 +107,10 @@ ModelProperties::ModelProperties(std::string gltfFilename)
     }
 
     // Print mesh information
-    const auto& meshes = model->getMeshes();
-    LOG_INFO_F("Meshes: %zu", meshes.size());
-    for (size_t i = 0; i < meshes.size(); i++) {
-        const auto& mesh = meshes[i];
+    const auto& meshMaterialPairs = model->getMeshMaterialPairs();
+    LOG_INFO_F("Meshes: %zu", meshMaterialPairs.size());
+    for (size_t i = 0; i < meshMaterialPairs.size(); i++) {
+        const auto& [mesh, material] = meshMaterialPairs[i];
         LOG_INFO_F("  Mesh %zu:", i);
         LOG_INFO_F("    Vertices: %zu", mesh->vertices.size());
         LOG_INFO_F("    Indices: %zu (triangles: %zu)",
@@ -132,13 +132,20 @@ ModelProperties::ModelProperties(std::string gltfFilename)
         if (mesh->vertices.size() > 5) {
             LOG_INFO_F("      ... and %zu more vertices", mesh->vertices.size() - 5);
         }
+
+        // Print associated material
+        if (material) {
+            LOG_INFO_F("    Material: \"%s\"", material->name.c_str());
+        } else {
+            LOG_INFO("    Material: (null)");
+        }
     }
 
-    // Print material information
-    const auto& materials = model->getMaterials();
-    LOG_INFO_F("Materials: %zu", materials.size());
-    for (size_t i = 0; i < materials.size(); i++) {
-        const auto& mat = materials[i];
+    // Print material summary
+    LOG_INFO_F("Materials: %zu", meshMaterialPairs.size());
+    for (size_t i = 0; i < meshMaterialPairs.size(); i++) {
+        const auto& mat = meshMaterialPairs[i].second;
+        if (!mat) continue;
         LOG_INFO_F("  Material %zu: \"%s\"", i, mat->name.c_str());
 
         auto printTexture = [](const char* name, const std::shared_ptr<Texture>& tex) {
