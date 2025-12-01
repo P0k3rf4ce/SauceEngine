@@ -30,6 +30,8 @@ public:
     static std::shared_ptr<Scene> get_active_scene();
     static void set_active_scene(std::shared_ptr<Scene> s);
 
+    static unsigned int scr_width;
+    static unsigned int scr_height;
 };
 
 #endif

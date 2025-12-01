@@ -34,7 +34,7 @@ class Mesh {
 	private:
 		// render data
 		unsigned int VAO, VBO, EBO;
-		bool glSetup;
+                bool glSetup;
 
 		void setupMesh();
 

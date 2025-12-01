@@ -9,10 +9,6 @@
     "gtest",
     "opengl",
     "opengl-registry",
-    "stb",
-    "assimp",
-    "eigen3",
-    "gtest",
     {
       "name": "qtbase",
       "features": [

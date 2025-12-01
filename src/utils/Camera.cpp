@@ -29,7 +29,6 @@ void Camera::LookAt(Vector3f front) {
 }
 
 float radians(float degrees) {
-    
 	return degrees * (M_PI / 180.f);
 }
 

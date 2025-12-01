@@ -150,11 +150,10 @@ namespace modeling {
                     material = materials[assimpMesh->mMaterialIndex];
                 }
 
-                // Create a new model for this mesh
-                std::vector<std::shared_ptr<Mesh>> meshes = { mesh };
-                std::vector<std::shared_ptr<Material>> modelMaterials = { material };
+                // Create a new model for this mesh with mesh-material pair
+                std::vector<MeshMaterialPair> meshMaterialPairs = { {mesh, material} };
 
-                auto model = std::make_shared<Model>(meshes, modelMaterials, shader);
+                auto model = std::make_shared<Model>(meshMaterialPairs, shader);
 
                 // Set metadata on the model
                 model->setMetadata(metadata);

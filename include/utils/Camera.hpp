@@ -39,7 +39,7 @@ class Camera {
         Vector3f getRight() { return right; }
         Vector3f getUp() { return up; }
         Vector3f getDirection() { return front; }
-		Matrix4f getView() { return view; }
+	Matrix4f getView() { return view; }
 
         float getFOV() { return fov; }
 
@@ -55,7 +55,7 @@ class Camera {
         /* which way is to the right? calculated from direction */
         Vector3f right;
         /* view matrix */
-        Matrix4f view;
+        Matrix4f view; // is there a reason this is a Matrix4f over an Affine3d
 
         float fov;
 

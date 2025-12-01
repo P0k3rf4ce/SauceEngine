@@ -2,8 +2,6 @@
 
 #include <chrono>
 
-#include <chrono>
-
 #include <iostream>
 
 #include "launcher/optionParser.hpp"

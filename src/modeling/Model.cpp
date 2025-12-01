@@ -3,30 +3,25 @@
 using namespace modeling;
 
 Model::Model() {
-    // Initialize empty vectors - they're already default constructed
+    // Initialize empty vector - it's already default constructed
 }
 
-Model::Model(std::vector<std::shared_ptr<Mesh>> meshes, std::vector<std::shared_ptr<Material>> mats, std::shared_ptr<Shader> shader)
-    : meshes(meshes), materials(mats), shader(shader) {
+Model::Model(std::vector<MeshMaterialPair> meshMaterials, std::shared_ptr<Shader> shader)
+    : meshMaterials(std::move(meshMaterials)), shader(shader) {
     // All members initialized in initializer list
 }
 
 Model::~Model() {
-    // Vectors will automatically clean up their contents
+    // Vector will automatically clean up its contents
     // No explicit cleanup needed for Mesh and Material objects
 }
 
-std::vector<std::shared_ptr<Mesh>> Model::getMeshes() const {
-    return meshes;
-}
-
-std::vector<std::shared_ptr<Material>> Model::getMaterials() const {
-    return materials;
+const std::vector<MeshMaterialPair>& Model::getMeshMaterialPairs() const {
+    return meshMaterials;
 }
 
 void Model::addMesh(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material) {
-    meshes.push_back(mesh);
-    materials.push_back(material);
+    meshMaterials.emplace_back(std::move(mesh), std::move(material));
 }
 
 std::shared_ptr<Shader> Model::getShader() {
@@ -39,9 +34,9 @@ void Model::setupForRendering() {
     }
 
     // Bind vertex data for all meshes (rendering team will handle drawing)
-    for (size_t i = 0; i < meshes.size(); ++i) {
-        if (meshes[i]) {
-            meshes[i]->bind();
+    for (const auto& [mesh, material] : meshMaterials) {
+        if (mesh) {
+            mesh->bind();
         }
     }
 }

@@ -8,22 +8,28 @@
 #include <unordered_map>
 #include <variant>
 #include <string>
+#include <utility>
 
 namespace modeling {
 
 // PropertyValue type for storing metadata
 using PropertyValue = std::variant<int, bool, float, double, std::string>;
 
+// A mesh paired with its associated material
+using MeshMaterialPair = std::pair<std::shared_ptr<Mesh>, std::shared_ptr<Material>>;
+
 class Model {
 public:
     Model();
 
-    Model(std::vector<std::shared_ptr<Mesh>> meshes, std::vector<std::shared_ptr<Material>> mats, std::shared_ptr<Shader> shader);
+    Model(std::vector<MeshMaterialPair> meshMaterials, std::shared_ptr<Shader> shader);
 
-    // We need a list of meshes and a list of materials, one material per mesh
     ~Model();
-    std::vector<std::shared_ptr<Mesh>> getMeshes() const;
-    std::vector<std::shared_ptr<Material>> getMaterials() const;
+
+    // Get all mesh-material pairs
+    const std::vector<MeshMaterialPair>& getMeshMaterialPairs() const;
+
+    // Add a mesh with its associated material
     void addMesh(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material);
 
     std::shared_ptr<Shader> getShader();
@@ -54,8 +60,7 @@ public:
     void setupForRendering();  // Prepare all meshes and bind shader
 
 private:
-    std::vector<std::shared_ptr<Mesh>> meshes;
-    std::vector<std::shared_ptr<Material>> materials;
+    std::vector<MeshMaterialPair> meshMaterials;
     std::shared_ptr<Shader> shader;
     std::unordered_map<std::string, PropertyValue> metadata;
 };
