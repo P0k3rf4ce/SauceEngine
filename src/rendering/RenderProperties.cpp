@@ -41,7 +41,9 @@ void RenderProperties::update(const modeling::ModelProperties &modelProps, const
 
     // set model matrix
     Eigen::Vector3d push(0.0, -1.0, 0.0);
-    model->getShader()->setUniform("model", animProps.getModelMatrix().scale(0.5f).translate(push));
+    //model->getShader()->setUniform("model", animProps.getModelMatrix().scale(0.5f).translate(push));
+	glm::mat4 mat = glm::translate(glm::mat4(0.2f), glm::vec3(-1.0f, -0.2f, 0.0f));
+	model->getShader()->setUniform("model", mat);
 
     LOG_DEBUG("rendering: model uniform set");
 
