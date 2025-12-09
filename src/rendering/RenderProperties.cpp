@@ -8,6 +8,7 @@
 
 #include "modeling/Model.hpp"
 #include "shared/Scene.hpp"
+#include "utils/Logger.hpp"
 
 using namespace rendering;
 
@@ -39,7 +40,10 @@ void RenderProperties::update(const modeling::ModelProperties &modelProps, const
     // set shadow stuff - currently not a thing
 
     // set model matrix
-    model->getShader()->setUniform("model", animProps.getModelMatrix());
+    Eigen::Vector3d push(0.0, -1.0, 0.0);
+    model->getShader()->setUniform("model", animProps.getModelMatrix().scale(0.5f).translate(push));
+
+    LOG_DEBUG("rendering: model uniform set");
 
     // set projection matrix(?)
     glm::mat4 projection = glm::perspective(
@@ -48,7 +52,10 @@ void RenderProperties::update(const modeling::ModelProperties &modelProps, const
             0.1f,
             100.0f
     );
+	LOG_DEBUG("rendering: binding proj matrix");
     model->getShader()->setUniform("projection", projection);
+
+    // LOG_DEBUG("proj uniform set (supposedly)");
 
     // get textures - TODO
     //std::vector<modeling::MeshMaterialPair> mats = model->getMeshMaterialPairs();
@@ -56,6 +63,7 @@ void RenderProperties::update(const modeling::ModelProperties &modelProps, const
     // draw each mesh
     for (const auto& [mesh, material] : model->getMeshMaterialPairs()) {
         if (mesh) {
+			LOG_DEBUG_F("attempting to draw %u vertices", mesh->vertices.size());
             glDrawArrays(GL_TRIANGLES, 0, mesh->vertices.size());
         }
     }

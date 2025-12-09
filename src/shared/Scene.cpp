@@ -15,6 +15,8 @@ Scene::Scene() {
 Scene::Scene(std::string &filename) {
     active_camera = std::make_shared<Camera>(Vector3f(0, 0, 0), Vector3f(0, 0, 1));
 
+    Logger::getInstance().setLogLevel(LogLevel::DEBUG);
+
     // Load the GLTF scene file
     if (filename.empty()) {
         LOG_ERROR("Scene: Cannot load scene from empty filename");
@@ -103,6 +105,7 @@ void Scene::unload() {
  * Update the Animation properties <timestep> seconds into the future
 */
 double Scene::update(double deltatime, double DELTA_STEP) {
+    //LOG_DEBUG("scene update called");
     while (deltatime >= DELTA_STEP) {
         for (auto object: this->objects) {
             object.updateAnimation(DELTA_STEP);

@@ -56,7 +56,6 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/src/rendering)
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/shared)
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/launcher)
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/utils)
-
 add_subdirectory(external/osqp)
 add_library(odeint INTERFACE)
 target_include_directories(odeint INTERFACE external/odeint-v2/include)

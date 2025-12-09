@@ -209,6 +209,7 @@ void ModelProperties::update(const animation::AnimationProperties &animProps) {
                 if (cam == nullptr) {
                     LOG_WARN("ModelProps update: Camera is null, not setting view matrix. Use Scene->set_camera()");
                 } else {
+					LOG_DEBUG("modeling: binding view matrix");
                     shader->setUniform("view", cam->getView());
                 }
             }

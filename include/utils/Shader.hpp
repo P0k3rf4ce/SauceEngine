@@ -8,7 +8,7 @@
 
 
 
-#include <Eigen/Core>
+#include <Eigen/Geometry>
 
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
@@ -61,6 +61,7 @@ void setUniform(const std::string& name, float x, float y, float z);
 void setUniform(const std::string& name, float x, float y, float z, float w);
 
 void setUniform(const std::string& name, const Eigen::Matrix4f& mat4);
+void setUniform(const std::string& name, const Eigen::Affine3d& mat4);
 void setUniform(const std::string& name, const glm::mat4& mat);
 
 void bind();

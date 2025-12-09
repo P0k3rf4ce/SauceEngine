@@ -11,7 +11,7 @@ TEST(AnimationPropertiesTest, ComputeCentreOfMassAndVolumeEmptyMesh) {
     Eigen::Vector3d com;
     double volume;
 
-    AnimationProperties::computeCenreOfMassAndVolume(vertices, indices, com, volume);
+    AnimationProperties::computeCentreOfMassAndVolume(vertices, indices, com, volume);
 
     EXPECT_EQ(com, Eigen::Vector3d(0, 0, 0));
     EXPECT_EQ(volume, 0);
@@ -34,7 +34,7 @@ TEST(AnimationPropertiesTest, ComputeCenterOfMassAndVolumeOfTetrahedron) {
     Eigen::Vector3d expectedCom(0.25, 0.25, 0.25), actualCom;
     double expectedVolume = 1.0 / 6.0, actualVolume;
 
-    AnimationProperties::computeCenreOfMassAndVolume(vertices, indices, actualCom, actualVolume);
+    AnimationProperties::computeCentreOfMassAndVolume(vertices, indices, actualCom, actualVolume);
 
     EXPECT_NEAR(actualCom.x(), expectedCom.x(), 1e-6);
     EXPECT_NEAR(actualCom.y(), expectedCom.y(), 1e-6);

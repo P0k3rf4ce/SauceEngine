@@ -75,5 +75,6 @@ bool Mesh::validate() {
 }
 
 void Mesh::bind() const {
+	LOG_DEBUG_F("binding vao with id %u", VAO);
 	glBindVertexArray(VAO);
 }

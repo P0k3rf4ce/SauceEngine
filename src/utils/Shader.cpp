@@ -335,27 +335,27 @@ void Shader::setUniform(const std::string& name, const Eigen::Affine3d& mat) {
     GLint location = getUniformLocation(name);
     if (location != -1) {
         ensureShaderActive([&]() {
-            glUniformMatrix4fv(location, 1, GL_FALSE, mat4.data());
+            glUniformMatrix4dv(location, 1, GL_FALSE, mat.data());
         });
     }
 }
 
 /* Mat4f uniform */
-void Shader::setUniform(const std::string& name, const Eigen::Matrix4f& mat4) {
+void Shader::setUniform(const std::string& name, const Eigen::Matrix4f& mat) {
     GLint location = getUniformLocation(name);
     if (location != -1) {
         ensureShaderActive([&]() {
-            glUniformMatrix4fv(location, 1, GL_FALSE, mat4.data());
+            glUniformMatrix4fv(location, 1, GL_FALSE, mat.data());
         });
     }
 }
 
 /* glm Mat4f uniform */
-void Shader::setUniform(const std::string& name, const glm::mat4& mat4) {
+void Shader::setUniform(const std::string& name, const glm::mat4& mat) {
     GLint location = getUniformLocation(name);
     if (location != -1) {
         ensureShaderActive([&]() {
-            glUniformMatrix4fv(location, 1, GL_FALSE, &mat4[0][0]); // copying from joey here
+            glUniformMatrix4fv(location, 1, GL_FALSE, &mat[0][0]); // copying from joey here
         });
     }
 }

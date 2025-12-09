@@ -22,10 +22,7 @@ struct AppOptions {
 
     AppOptions(int argc, const char *argv[]);
     AppOptions(): scr_width(DEFAULT_SCR_WIDTH), scr_height(DEFAULT_SCR_HEIGHT), tickrate(DEFAULT_TICKRATE), scene_file(), help(false) {}
-<<<<<<< HEAD
 
-=======
->>>>>>> render-merge-dev
     boost::program_options::options_description getHelpMessage() const;
 
 private:

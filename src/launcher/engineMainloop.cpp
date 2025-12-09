@@ -11,6 +11,7 @@
 #include <iostream>
 
 #include "shared/Scene.hpp"
+#include "utils/Logger.hpp"
 
 int engine_mainloop(const AppOptions &ops) {
 
@@ -52,6 +53,7 @@ int engine_mainloop(const AppOptions &ops) {
 
         deltatime = scene->update(deltatime, delta_step);
         
+		LOG_DEBUG("swapping buffers");
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
