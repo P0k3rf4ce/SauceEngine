@@ -27,6 +27,10 @@ int engine_mainloop(const AppOptions &ops) {
         return 1;
     }
 
+	// turn on depth testing (why wasnt this on before)
+	// for some rsn rendering breaks if this is on
+	//glEnable(GL_DEPTH_TEST);
+
     // Create scene - load from file if provided, otherwise create empty scene
     auto scene = std::make_shared<Scene>();
     if (!ops.scene_file.empty()) {
