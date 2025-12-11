@@ -11,6 +11,10 @@
 
 using namespace Eigen;
 
+float radians(float degrees) {
+	return degrees * (M_PI / 180.f);
+}
+
 Camera::Camera(Vector3f pos, Vector3f front) {
     this->pos=pos;
     this->up=Vector3f(0.f,1.f,0.f);
@@ -18,11 +22,6 @@ Camera::Camera(Vector3f pos, Vector3f front) {
 }
 
 void Camera::updateView() {
-    glm::vec3 front;
-        front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
-        front.y = sin(glm::radians(Pitch));
-        front.z = sin(glm::radians(Yaw)) * cos(glm::radians(Pitch));
-        Front = glm::normalize(front);
 
     right=up.cross(front);
 	right.normalize();
@@ -32,10 +31,6 @@ void Camera::updateView() {
 void Camera::LookAt(Vector3f front) {
 	this->front=front;
 	updateView();
-}
-
-float radians(float degrees) {
-	return degrees * (M_PI / 180.f);
 }
 
 void Camera::LookAt(float yaw, float pitch) {
@@ -83,7 +78,7 @@ void Camera::ProcessKeyboard(Camera::Movement direction, double deltatime) {
 
 const float SENSITIVITY = 0.1f;
 
-void Camera::ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true)
+void Camera::ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch)
 {
     xoffset *= SENSITIVITY;
     yoffset *= SENSITIVITY;
@@ -101,5 +96,5 @@ void Camera::ProcessMouseMovement(float xoffset, float yoffset, GLboolean constr
     }
 
     // update Front, Right and Up Vectors using the updated Euler angles
-    updateCameraVectors();
+    LookAt(Yaw, Pitch);
 }

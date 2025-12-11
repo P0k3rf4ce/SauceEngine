@@ -2,7 +2,14 @@
 #define ENGINE_MAINLOOP_HPP
 
 #include "launcher/optionParser.hpp"
+#include "shared/Scene.hpp"
 #include "utils/Camera.hpp"
+
+bool firstMouse = true;
+float lastX = 0.f;
+float lastY = 0.f;
+
+std::shared_ptr<Scene> scene;
 
 struct GLFWwindow;
 
@@ -12,6 +19,7 @@ bool initGLAD();
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window, double deltatime, std::shared_ptr<Camera> camera);
 int engine_mainloop(const AppOptions &ops);
+void mouse_callback(GLFWwindow* window, double xposIn, double yposIn);
 
 // Precision should be up to a millisecond
 inline double get_seconds_since_epoch();

@@ -27,12 +27,15 @@ int engine_mainloop(const AppOptions &ops) {
         return 1;
     }
 
+    lastX = float(ops.scr_width) / 2.f;
+    lastY = float(ops.scr_height) / 2.f;
+
 	// turn on depth testing (why wasnt this on before)
 	// for some rsn rendering breaks if this is on
 	//glEnable(GL_DEPTH_TEST);
 
     // Create scene - load from file if provided, otherwise create empty scene
-    auto scene = std::make_shared<Scene>();
+    scene = std::make_shared<Scene>();
     if (!ops.scene_file.empty()) {
         std::cout << "Loading scene from file: " << ops.scene_file << std::endl;
         std::string sceneFilePath = ops.scene_file;
@@ -40,6 +43,8 @@ int engine_mainloop(const AppOptions &ops) {
     } else {
         std::cout << "No scene file provided, creating empty scene" << std::endl;
     }
+
+    glfwSetCursorPosCallback(window, mouse_callback);
 
     // Set this scene as the active scene
     Scene::set_active_scene(scene);
@@ -117,6 +122,26 @@ void processInput(GLFWwindow* window, double deltatime, std::shared_ptr<Camera> 
         camera->ProcessKeyboard(Camera::LEFT, deltatime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera->ProcessKeyboard(Camera::RIGHT, deltatime);
+}
+
+void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
+{
+    float xpos = static_cast<float>(xposIn);
+    float ypos = static_cast<float>(yposIn);
+    if (firstMouse)
+    {
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
+    }
+
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+
+    lastX = xpos;
+    lastY = ypos;
+
+    scene->get_camera()->ProcessMouseMovement(xoffset, yoffset);
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
