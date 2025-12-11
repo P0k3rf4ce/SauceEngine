@@ -18,6 +18,12 @@ Camera::Camera(Vector3f pos, Vector3f front) {
 }
 
 void Camera::updateView() {
+    glm::vec3 front;
+        front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
+        front.y = sin(glm::radians(Pitch));
+        front.z = sin(glm::radians(Yaw)) * cos(glm::radians(Pitch));
+        Front = glm::normalize(front);
+
     right=up.cross(front);
 	right.normalize();
     view=Camera::lookat(right, up, front, pos);
@@ -55,4 +61,45 @@ Matrix4f Camera::lookat(Vector3f right, Vector3f up, Vector3f direction, Vector3
 		{direction(0), direction(1), direction(2), pose.dot(direction)},
 		{0.f,		   0.f,			 0.f,           1.f}
 	};
+}
+
+void Camera::ProcessKeyboard(Camera::Movement direction, double deltatime) {
+    switch (direction) {
+    case FORWARD:
+        pos += deltatime * front;
+        break;
+    case BACKWARD:
+        pos -= deltatime * front;
+        break;
+    case RIGHT:
+        pos += deltatime * right;
+        break;
+    case LEFT:
+        pos -= deltatime * right;
+        break;
+    }
+    updateView();
+}
+
+const float SENSITIVITY = 0.1f;
+
+void Camera::ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true)
+{
+    xoffset *= SENSITIVITY;
+    yoffset *= SENSITIVITY;
+
+    Yaw += xoffset;
+    Pitch += yoffset;
+
+    // make sure that when pitch is out of bounds, screen doesn't get flipped
+    if (constrainPitch)
+    {
+        if (Pitch > 89.0f)
+            Pitch = 89.0f;
+        if (Pitch < -89.0f)
+            Pitch = -89.0f;
+    }
+
+    // update Front, Right and Up Vectors using the updated Euler angles
+    updateCameraVectors();
 }

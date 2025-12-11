@@ -4,10 +4,19 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
+#include <glad/glad.h>
+
 using namespace Eigen;
 
 class Camera {
     public:
+        enum Movement {
+            FORWARD,
+            BACKWARD,
+            LEFT,
+            RIGHT
+        };
+
         /* move the camera to a target point */
         void setPos(Vector3f pos) {
             this->pos=pos;
@@ -45,6 +54,9 @@ class Camera {
 
         Camera(Vector3f pos, Vector3f front);
 
+        void ProcessKeyboard(Movement direction, double deltatime);
+        void ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true);
+
     private:
         /* coordinates where the camera is */
         Vector3f pos;
@@ -56,6 +68,10 @@ class Camera {
         Vector3f right;
         /* view matrix */
         Matrix4f view; // is there a reason this is a Matrix4f over an Affine3d
+
+            // euler Angles
+        float Yaw;
+        float Pitch;
 
         float fov;
 
