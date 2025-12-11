@@ -13,6 +13,12 @@
 #include "shared/Scene.hpp"
 #include "utils/Logger.hpp"
 
+static bool firstMouse = true;
+static float lastX = 0.f;
+static float lastY = 0.f;
+
+static std::shared_ptr<Scene> scene;
+
 int engine_mainloop(const AppOptions &ops) {
 
     initGLFW();

@@ -5,12 +5,6 @@
 #include "shared/Scene.hpp"
 #include "utils/Camera.hpp"
 
-bool firstMouse = true;
-float lastX = 0.f;
-float lastY = 0.f;
-
-std::shared_ptr<Scene> scene;
-
 struct GLFWwindow;
 
 void initGLFW();
