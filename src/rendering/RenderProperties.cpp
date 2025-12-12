@@ -48,13 +48,7 @@ void RenderProperties::update(const modeling::ModelProperties &modelProps, const
 
 
     // set projection matrix(?)
-    glm::mat4 projection = glm::perspective(
-            //glm::radians(Scene::get_active_scene()->get_camera()->getFOV()),
-            glm::radians(90.0f),
-            (float)Scene::scr_width / (float)Scene::scr_height,
-            0.1f,
-            100.0f
-    );
+    glm::mat4 projection = Scene::get_active_scene()->get_camera()->getProjectionMatrix();
     model->getShader()->setUniform("projection", projection);
 
 

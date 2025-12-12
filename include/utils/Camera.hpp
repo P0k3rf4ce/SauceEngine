@@ -50,16 +50,27 @@ public:
 
     glm::mat4 getViewMatrix() { return glm::lookAt(pos, pos + front, world_up); }
 
+    glm::mat4 getProjectionMatrix() { 
+        return glm::perspective(
+            glm::radians(fov), 
+            scr_width / scr_height, 
+            0.1f, 10.0f
+        ); 
+    }
+
     float getFOV() { return fov; }
 
     Camera(
+        float screen_width,
+        float screen_height,
         glm::vec3 pos = { 0, 0, 1 },
         glm::vec3 world_up = { 0, 1, 0 },
         float yaw = YAW_DEFAULT,
         float pitch = PITCH_DEFAULT,
         float fov = FOV_DEFAULT
-    ) : pos(pos), world_up(world_up), yaw(yaw), pitch(pitch), 
-    movement_speed(SPEED_DEFAULT), mouse_sensitivity(SENSITIVITY_DEFAULT) 
+    ) : pos(pos), world_up(world_up), yaw(yaw), pitch(pitch), fov(fov),
+    movement_speed(SPEED_DEFAULT), mouse_sensitivity(SENSITIVITY_DEFAULT),
+    scr_width(screen_width), scr_height(screen_height) 
     {
         updateView();
     }
@@ -115,6 +126,7 @@ private:
     float yaw, pitch;
 
     float fov;
+    float scr_width, scr_height;
 
     /*
     * helper. any time front or pos changes, we need to call

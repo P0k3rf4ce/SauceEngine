@@ -9,11 +9,11 @@ unsigned int Scene::scr_width = 0;
 unsigned int Scene::scr_height = 0;
 
 Scene::Scene() {
-    active_camera = std::make_shared<Camera>();
+    active_camera = std::make_shared<Camera>(scr_width, scr_height);
 }
 
 Scene::Scene(std::string &filename) {
-    active_camera = std::make_shared<Camera>();
+    active_camera = std::make_shared<Camera>(scr_width, scr_height);
 
     //Logger::getInstance().setLogLevel(LogLevel::DEBUG);
 
@@ -135,7 +135,7 @@ void Scene::set_camera(std::shared_ptr<Camera> cam) {
 std::shared_ptr<Camera> Scene::get_camera() {
     if (this->active_camera == nullptr) {
         LOG_WARN("Scene default camera is null... Creating camera with default values");
-        set_camera(std::make_shared<Camera>());
+        set_camera(std::make_shared<Camera>(scr_width, scr_height));
     }
     return this->active_camera;
 }
