@@ -15,7 +15,7 @@ Scene::Scene() {
 Scene::Scene(std::string &filename) {
     active_camera = std::make_shared<Camera>(Vector3f(0, 0, 0), Vector3f(0, 0, 1));
 
-    // Logger::getInstance().setLogLevel(LogLevel::DEBUG);
+    //Logger::getInstance().setLogLevel(LogLevel::DEBUG);
 
     // Load the GLTF scene file
     if (filename.empty()) {

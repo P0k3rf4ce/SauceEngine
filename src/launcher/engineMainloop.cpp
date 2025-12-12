@@ -64,7 +64,7 @@ int engine_mainloop(const AppOptions &ops) {
     while (!glfwWindowShouldClose(window)){
         processInput(window, deltatime, scene->get_camera());
 
-        glClearColor(1, 0, 0, 1);
+        glClearColor(0, 0, 0, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         current_frame_time = get_seconds_since_epoch();
@@ -73,7 +73,6 @@ int engine_mainloop(const AppOptions &ops) {
 
         deltatime = scene->update(deltatime, delta_step);
         
-		LOG_DEBUG("swapping buffers");
         glfwSwapBuffers(window);
         glfwPollEvents();
     }

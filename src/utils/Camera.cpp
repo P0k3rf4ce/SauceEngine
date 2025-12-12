@@ -59,6 +59,7 @@ Matrix4f Camera::lookat(Vector3f right, Vector3f up, Vector3f direction, Vector3
 }
 
 void Camera::ProcessKeyboard(Camera::Movement direction, double deltatime) {
+    deltatime *= 10.0d;
     switch (direction) {
     case FORWARD:
         pos += deltatime * front;
@@ -67,10 +68,10 @@ void Camera::ProcessKeyboard(Camera::Movement direction, double deltatime) {
         pos -= deltatime * front;
         break;
     case RIGHT:
-        pos += deltatime * right;
+        pos -= deltatime * right;
         break;
     case LEFT:
-        pos -= deltatime * right;
+        pos += deltatime * right;
         break;
     }
     updateView();

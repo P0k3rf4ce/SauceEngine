@@ -42,10 +42,10 @@ void RenderProperties::update(const modeling::ModelProperties &modelProps, const
     // set model matrix
     Eigen::Vector3d push(0.0, -1.0, 0.0);
     //model->getShader()->setUniform("model", animProps.getModelMatrix().scale(0.5f).translate(push));
-	glm::mat4 mat = glm::translate(glm::mat4(0.2f), glm::vec3(-1.0f, 0.0f, -5.0f));
+	//glm::mat4 mat = glm::translate(glm::mat4(0.2f), glm::vec3(-1.0f, 0.0f, -5.0f));
+	glm::mat4 mat = glm::mat4(0.2f);
 	model->getShader()->setUniform("model", mat);
 
-    LOG_DEBUG("rendering: model uniform set");
 
     // set projection matrix(?)
     glm::mat4 projection = glm::perspective(
@@ -55,10 +55,8 @@ void RenderProperties::update(const modeling::ModelProperties &modelProps, const
             0.1f,
             100.0f
     );
-	LOG_DEBUG("rendering: binding proj matrix");
     model->getShader()->setUniform("projection", projection);
 
-    // LOG_DEBUG("proj uniform set (supposedly)");
 
     // get textures - TODO
     //std::vector<modeling::MeshMaterialPair> mats = model->getMeshMaterialPairs();
@@ -66,8 +64,13 @@ void RenderProperties::update(const modeling::ModelProperties &modelProps, const
     // draw each mesh
     for (const auto& [mesh, material] : model->getMeshMaterialPairs()) {
         if (mesh) {
-			LOG_DEBUG_F("attempting to draw %u vertices", mesh->vertices.size());
-            glDrawElements(GL_TRIANGLES, mesh->vertices.size(), GL_UNSIGNED_INT, 0);
+            for (const auto& vertex : mesh->vertices) {
+                LOG_DEBUG_F("vertex: %f, %f, %f", vertex.Position.x, vertex.Position.y, vertex.Position.z);
+            }
+            for (const auto& index : mesh->indices) {
+                LOG_DEBUG_F("index: %u", index);
+            }
+            glDrawElements(GL_TRIANGLES, mesh->indices.size(), GL_UNSIGNED_INT, 0);
         }
     }
 

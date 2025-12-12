@@ -31,7 +31,6 @@ std::shared_ptr<Shader> Model::getShader() {
 
 void Model::setupForRendering() {
     if (shader) {
-		LOG_DEBUG("attempting to bind shader");
         shader->bind();
     }
 
