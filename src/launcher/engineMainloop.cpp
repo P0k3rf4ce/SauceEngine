@@ -75,7 +75,6 @@ int engine_mainloop(const AppOptions &ops) {
 
         deltatime = scene->update(deltatime, delta_step);
         
-		LOG_DEBUG("swapping buffers");
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
