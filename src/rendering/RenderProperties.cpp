@@ -67,7 +67,7 @@ void RenderProperties::update(const modeling::ModelProperties &modelProps, const
     for (const auto& [mesh, material] : model->getMeshMaterialPairs()) {
         if (mesh) {
 			LOG_DEBUG_F("attempting to draw %u vertices", mesh->vertices.size());
-            glDrawElements(GL_TRIANGLES, mesh->vertices.size(), GL_UNSIGNED_INT, 0);
+            glDrawElements(GL_TRIANGLES, mesh->indices.size(), GL_UNSIGNED_INT, 0);
         }
     }
 

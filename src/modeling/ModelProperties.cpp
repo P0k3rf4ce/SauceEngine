@@ -210,16 +210,7 @@ void ModelProperties::update(const animation::AnimationProperties &animProps) {
                     LOG_WARN("ModelProps update: Camera is null, not setting view matrix. Use Scene->set_camera()");
                 } else {
 					LOG_DEBUG("modeling: binding view matrix");
-					
-					// im doing this manually for now but this should be put in a separate tool / done automatically
-					glm::mat4 result;
-					for (size_t i = 0; i < 4; ++i) {
-						for (size_t j = 0; j < 4; ++j) {
-							result[i][j] = cam->getView()(j, i);
-						}
-					}
-
-                    shader->setUniform("view", result);
+                    shader->setUniform("view", cam->getViewMatrix());
                 }
             }
         }

@@ -17,7 +17,7 @@ static bool firstMouse = true;
 static float lastX = 0.f;
 static float lastY = 0.f;
 
-static std::shared_ptr<Scene> scene;
+static std::shared_ptr<Scene> scene = nullptr;
 
 int engine_mainloop(const AppOptions &ops) {
 
@@ -33,8 +33,10 @@ int engine_mainloop(const AppOptions &ops) {
         return 1;
     }
 
-    lastX = float(ops.scr_width) / 2.f;
-    lastY = float(ops.scr_height) / 2.f;
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    lastX = float(ops.scr_width) / 2.0f;
+    lastY = float(ops.scr_height) / 2.0f;
 
 	// turn on depth testing (why wasnt this on before)
 	// for some rsn rendering breaks if this is on
@@ -64,7 +66,7 @@ int engine_mainloop(const AppOptions &ops) {
     while (!glfwWindowShouldClose(window)){
         processInput(window, deltatime, scene->get_camera());
 
-        glClearColor(1, 0, 0, 1);
+        glClearColor(0, 0, 0, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         current_frame_time = get_seconds_since_epoch();
@@ -121,13 +123,13 @@ void processInput(GLFWwindow* window, double deltatime, std::shared_ptr<Camera> 
         glfwSetWindowShouldClose(window, true);
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera->ProcessKeyboard(Camera::FORWARD, deltatime);
+        camera->processKeyboard(Camera::Movement::FORWARD, deltatime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera->ProcessKeyboard(Camera::BACKWARD, deltatime);
+        camera->processKeyboard(Camera::Movement::BACKWARD, deltatime);
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera->ProcessKeyboard(Camera::LEFT, deltatime);
+        camera->processKeyboard(Camera::Movement::LEFT, deltatime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera->ProcessKeyboard(Camera::RIGHT, deltatime);
+        camera->processKeyboard(Camera::Movement::RIGHT, deltatime);
 }
 
 void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
@@ -147,7 +149,7 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
     lastX = xpos;
     lastY = ypos;
 
-    scene->get_camera()->ProcessMouseMovement(xoffset, yoffset);
+    scene->get_camera()->processMouseMovement(xoffset, yoffset);
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
