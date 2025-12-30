@@ -10,8 +10,10 @@ build.sh
 .idea/
 .cmake/
 test_coverage.sh
+scripts
 coverage*
 *.log
+*.profraw
 src/.DS_Store
 include/.DS_Store
 .DS_Store

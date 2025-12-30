@@ -5,16 +5,22 @@
 #include "utils/EigenToGLM.hpp"
 #include "utils/Shader.hpp"
 
+struct SpotLightGpuData
+{
+    glm::vec4 position;
+    glm::vec4 direction;
+    glm::vec4 color;
+    glm::mat4 lightSpaceMatrix;
+    glm::vec4 cutoff;
+};
+
 namespace rendering
 {
     SpotLightProperties::SpotLightProperties(const glm::vec3 &position, const glm::vec3 &direction, float cutOff, float outerCutOff, const glm::vec3 &colour)
         : LightProperties(colour), m_position(position), m_direction(glm::normalize(direction)), m_cutOff(cutOff), m_outerCutOff(outerCutOff)
-    {
-    }
+    {}
 
-    SpotLightProperties::~SpotLightProperties()
-    {
-    }
+    SpotLightProperties::~SpotLightProperties() {}
 
     void SpotLightProperties::update(Scene &scene, animation::AnimationProperties &animProps)
     {

@@ -7,35 +7,39 @@
 
 #include "shared/Object.hpp"
 #include "rendering/LightProperties.hpp"
+#include "utils/Camera.hpp"
 
 class Scene {
 private:
     std::vector<Object> objects;
-
-    // store lights as polymorphic objects (shared ownership)
+    std::shared_ptr<Camera> active_camera = nullptr;
     std::vector<std::shared_ptr<rendering::LightProperties>> lights;
 
-    // pointer to the currently active scene
-    static Scene *s_activeScene;
+    void uploadSpotLightsBuffer();
+    unsigned int m_spotLightSSBO = 0;
+
+    static std::shared_ptr<Scene> active_scene;
+
 public:
     Scene();
     Scene(std::string &filename);
     ~Scene();
 
-    // getters
-    const std::vector<std::shared_ptr<rendering::LightProperties>> &getLights() const noexcept;
-    static Scene *getActiveScene() noexcept;
-    void addLight(std::shared_ptr<rendering::LightProperties> light); // note to emmy...?
+    std::vector<std::shared_ptr<rendering::LightProperties>> &getLights();
+    void addLight(std::shared_ptr<rendering::LightProperties> light);
 
     void load();
     void unload();
 
+    std::shared_ptr<Camera> get_camera();
+    void set_camera(std::shared_ptr<Camera> cam);
     double update(double deltatime, double DELTA_STEP);
-    void draw(rendering::Shader& shader); // self-note to emmy here
 
-private:
-    void uploadSpotLightsBuffer();
-    unsigned int m_spotLightSSBO = 0; // note to emmy
+    static std::shared_ptr<Scene> getActiveScene();
+    static void set_active_scene(std::shared_ptr<Scene> s);
+
+    static unsigned int scr_width;
+    static unsigned int scr_height;
 };
 
 #endif

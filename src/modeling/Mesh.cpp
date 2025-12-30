@@ -5,7 +5,9 @@
 
 using namespace std;
 
-Mesh::Mesh(vector<Vertex> vertices, vector<unsigned int> indices)
+Mesh::Mesh(vector<Vertex> vertices, vector<unsigned int> indices, bool setupGL)
+	: glSetup(setupGL)
+
 {
 	this->vertices = vertices;
 	this->indices = indices;
@@ -13,8 +15,10 @@ Mesh::Mesh(vector<Vertex> vertices, vector<unsigned int> indices)
 	if (!this->validate()) {
 		throw std::runtime_error("Bad mesh loaded");
 	}
+	if (glSetup) {
+		setupMesh();
+	}
 
-	setupMesh();
 }
 
 void Mesh::setupMesh()
@@ -68,4 +72,8 @@ bool Mesh::validate() {
 	}
 
 	return true;
+}
+
+void Mesh::bind() const {
+	glBindVertexArray(VAO);
 }

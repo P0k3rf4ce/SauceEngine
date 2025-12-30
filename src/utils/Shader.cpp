@@ -3,18 +3,16 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
-#include <glm/gtc/type_ptr.hpp>
 
 // Converts our SHADER TYPE to GL name
 GLenum Shader::getGLShaderType(SHADER_TYPE type) {
     switch (type) {
-        case UNINITIALIZED: return UNINITIALIZED;
         case VERTEX: return GL_VERTEX_SHADER;
         case FRAGMENT: return GL_FRAGMENT_SHADER;
         case GEOMETRY: return GL_GEOMETRY_SHADER;
         case COMPUTE: return GL_COMPUTE_SHADER;
+        default: return -1;
     }
-    return -1; // Invalid type
 }
 
 /*

@@ -14,3 +14,8 @@ target_link_libraries(modelingLib PUBLIC glfw)
 
 find_package(Eigen3 CONFIG REQUIRED NO_MODULE)
 target_link_libraries(modelingLib PUBLIC Eigen3::Eigen)
+
+find_package(assimp CONFIG REQUIRED)
+target_link_libraries(modelingLib PUBLIC assimp::assimp)
+
+target_link_libraries(modelingLib PUBLIC utilsLib)

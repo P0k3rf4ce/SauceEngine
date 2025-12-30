@@ -8,6 +8,9 @@
 #include "modeling/ModelProperties.hpp"
 #include "rendering/RenderProperties.hpp"
 
+namespace modeling { class ModelingProperties; }
+
+
 class Object {
 private:
     std::string gltfFilename;
@@ -15,6 +18,8 @@ private:
     std::shared_ptr<modeling::ModelProperties> modelProps;
     std::shared_ptr<rendering::RenderProperties> renderProps;
 public:
+    Object();
+    Object(std::shared_ptr<animation::AnimationProperties> animProps, std::shared_ptr<modeling::ModelProperties> modelProps, std::shared_ptr<rendering::RenderProperties> renderProps);
     Object(std::string gltfFilename);
     ~Object();
 
@@ -25,11 +30,6 @@ public:
     void updateAnimation(double DELTA_STEP);
     void updateModeling();
     void updateRendering();
-  
-    /**
-     * Draw the object using the given shader
-    */
-    void draw(rendering::Shader& shader); // self-note to emmy here
 };
 
 #endif

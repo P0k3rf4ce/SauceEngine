@@ -1,4 +1,7 @@
 #include "shared/Scene.hpp"
+#include "utils/Logger.hpp"
+#include "modeling/ModelLoader.hpp"
+#include <filesystem>
 
 // from here
 #include <glad/glad.h>
@@ -10,39 +13,87 @@
 
 #include "rendering/SpotLightProperties.hpp"
 
-// note to emmy
-namespace
-{
-    struct SpotLightGpuData
-    {
-        glm::vec4 position;
-        glm::vec4 direction;
-        glm::vec4 color;
-        glm::mat4 lightSpaceMatrix;
-        glm::vec4 cutoff;
-    };
-
-    constexpr unsigned int SPOT_LIGHT_SSBO_BINDING = 2;
-}
-
-// to here
-// define static active scene pointer
-Scene *Scene::s_activeScene = nullptr;
+// Initialize static member
+std::shared_ptr<Scene> Scene::active_scene = nullptr;
+unsigned int Scene::scr_width = 0;
+unsigned int Scene::scr_height = 0;
 
 Scene::Scene() {
-    // set this scene as the active scene
-    s_activeScene = this;
+    active_camera = std::make_shared<Camera>(scr_width, scr_height);
+    active_scene = std::make_shared<Scene>(this);
 }
 
 Scene::Scene(std::string &filename) {
-    s_activeScene = this;
+    active_camera = std::make_shared<Camera>(scr_width, scr_height);
+    active_scene = std::make_shared<Scene>(this);
+
+    //Logger::get_instance().setLogLevel(LogLevel::DEBUG);
+    
+    // Load the GLTF scene file
+    if (filename.empty()) {
+        LOG_ERROR("Scene: Cannot load scene from empty filename");
+        return;
+    }
+
+    if (!std::filesystem::exists(filename)) {
+        LOG_ERROR_F("Scene: File does not exist: %s", filename.c_str());
+        return;
+    }
+
+    LOG_INFO_F("Scene: Loading scene from file: %s", filename.c_str());
+
+    // Use ModelLoader to parse the GLTF file
+    // We'll create a shader for the scene
+    auto shader = std::make_shared<Shader>();
+    if (!shader) {
+        LOG_ERROR("Scene: Failed to create shader");
+        return;
+    }
+
+    // Load all models from the GLTF file
+    auto models = modeling::ModelLoader::loadModels(filename, shader);
+
+    if (models.empty()) {
+        LOG_WARN_F("Scene: no models loaded from file: %s", filename.c_str());
+        return;
+    }
+
+    LOG_INFO_F("Scene: Loaded %d models from file", static_cast<int>(models.size()));
+
+    // Group models by node name to create Objects
+    // Each unique node becomes one Object
+    std::unordered_map<std::string, std::vector<std::shared_ptr<modeling::Model>>> nodeGroups;
+
+    for (const auto& model : models) {
+        std::string nodeName = "default";
+
+        // Get node name from model metadata
+        if (model->hasMetadata("node_name")) {
+            nodeName = model->getMetadataValue<std::string>("node_name");
+        }
+
+        nodeGroups[nodeName].push_back(model);
+    }
+
+    LOG_INFO_F("Scene: Grouped models into %d nodes", static_cast<int>(nodeGroups.size()));
+
+    // Create one Object for the entire scene
+    // The Object constructor will internally use ModelLoader and get the first model
+    // TODO: Future enhancement - support creating multiple Objects from multi-object GLTF files
+    // This would require extending Object to accept a Model directly, or loading each model separately
+    try {
+        Object obj(filename);
+        objects.push_back(std::move(obj));
+        LOG_INFO_F("Scene: Created Object from GLTF file with %d models", static_cast<int>(models.size()));
+    } catch (const std::exception& e) {
+        LOG_ERROR_F("Scene: Failed to create Object: %s", e.what());
+    }
 }
 
 Scene::~Scene() {
-    if (s_activeScene == this) {
-        s_activeScene = nullptr;
+    if (active_scene == std::make_shared<Scene>(this)) {
+        active_scene = nullptr;
     }
-    // here
     if (m_spotLightSSBO != 0) {
         glDeleteBuffers(1, &m_spotLightSSBO);
         m_spotLightSSBO = 0;
@@ -72,6 +123,7 @@ void Scene::unload() {
  * Update the Animation properties <timestep> seconds into the future
 */
 double Scene::update(double deltatime, double DELTA_STEP) {
+    //LOG_DEBUG("scene update called");
     while (deltatime >= DELTA_STEP) {
         for (auto object: this->objects) {
             object.updateAnimation(DELTA_STEP);
@@ -90,20 +142,42 @@ double Scene::update(double deltatime, double DELTA_STEP) {
     return deltatime;
 }
 
-const std::vector<std::shared_ptr<rendering::LightProperties>> &Scene::getLights() const noexcept {
-    return lights;
+void Scene::set_camera(std::shared_ptr<Camera> cam) {
+    if (cam == nullptr) {
+        LOG_WARN("Attempted to set scene camera to nullptr");
+        return;
+    }
+    this->active_cam = cam;
 }
 
-Scene *Scene::getActiveScene() noexcept {
-    return s_activeScene;
+std::shared_ptr<Scene> Scene::get_active_scene() {
+    return active_scene;
 }
 
-// here
+void Scene::set_active_scene(std::shared_ptr<Scene> s) {
+    if (s == nullptr) {
+        LOG_WARN("Attempted to set active scene to nullptr");
+        return;
+    }
+    active_scene = s;
+}
+
+
+// SHADOWS
+
+// register light within scene
 void Scene::addLight(std::shared_ptr<rendering::LightProperties> light) {
     lights.push_back(std::move(light));
 }
 
-// self-note to emmy here
+// getter for lights
+std::vector<std::shared_ptr<rendering::LightProperties>> &Scene::getLights() {
+    return lights;
+}
+
+// ------------
+
+
 void Scene::draw(rendering::Shader& shader) {
     uploadSpotLightsBuffer();
     for (auto object: this->objects) {
@@ -111,7 +185,6 @@ void Scene::draw(rendering::Shader& shader) {
     }
 }
 
-// note to emmy
 void Scene::uploadSpotLightsBuffer() {
     if (m_spotLightSSBO == 0) {
         glGenBuffers(1, &m_spotLightSSBO);
@@ -135,9 +208,11 @@ void Scene::uploadSpotLightsBuffer() {
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_spotLightSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER,
-                 static_cast<GLsizeiptr>(gpuLights.size() * sizeof(SpotLightGpuData)),
+    static_cast<GLsizeiptr>(gpuLights.size() * sizeof(SpotLightGpuData)),
                  gpuLights.empty() ? nullptr : gpuLights.data(),
                  GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SPOT_LIGHT_SSBO_BINDING, m_spotLightSSBO);
+
+    // that 2 is sus
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, m_spotLightSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }

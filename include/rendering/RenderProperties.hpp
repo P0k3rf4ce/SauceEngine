@@ -2,7 +2,7 @@
 #define RENDER_PROPERTIES_HPP
 
 #include "modeling/ModelProperties.hpp"
-#include <glad/glad.h>
+#include <glm/glm.hpp>
 
 namespace rendering {
 
@@ -10,6 +10,14 @@ namespace rendering {
  * Stores all render related properties of an object
 */
 class RenderProperties {
+private:
+    glm::mat4 modelMatrix; // Cached transformation matrix from GLTF
+    
+    /**
+     * Extract and build the model transformation from GLTF metadata
+     */
+    void buildModelMatrix(const modeling::ModelProperties &modelProps);
+
 public:
     RenderProperties(const modeling::ModelProperties &modelProps);
     ~RenderProperties();
