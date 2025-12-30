@@ -51,6 +51,6 @@ void Object::updateModeling() {
     this->modelProps->update(*(this->animProps.get()));
 }
 
-void Object::updateRendering() {
-    this->renderProps->update(*(this->modelProps.get()), *(this->animProps.get()));
+void Object::updateRendering(bool shadow) {
+    this->renderProps->update(*(this->modelProps.get()), *(this->animProps.get()), shadow);
 }

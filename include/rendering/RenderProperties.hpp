@@ -38,7 +38,7 @@ public:
     /**
      * Run shaders for this object
     */
-    void update(const modeling::ModelProperties &modelProps, const animation::AnimationProperties &animProps);
+    void update(const modeling::ModelProperties &modelProps, const animation::AnimationProperties &animProps, bool shadow);
 };
 
 }

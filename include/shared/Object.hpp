@@ -29,7 +29,7 @@ public:
 
     void updateAnimation(double DELTA_STEP);
     void updateModeling();
-    void updateRendering();
+    void updateRendering(bool shadow);
 };
 
 #endif

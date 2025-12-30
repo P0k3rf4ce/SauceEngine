@@ -82,7 +82,7 @@ void RenderProperties::buildModelMatrix(const modeling::ModelProperties &modelPr
 /**
  * Run shaders for this object
 */
-void RenderProperties::update(const modeling::ModelProperties &modelProps, const animation::AnimationProperties &animProps) {
+void RenderProperties::update(const modeling::ModelProperties &modelProps, const animation::AnimationProperties &animProps, bool shadow) {
 
     // retrieve model
     std::shared_ptr<modeling::Model> model = modelProps.getModel();
