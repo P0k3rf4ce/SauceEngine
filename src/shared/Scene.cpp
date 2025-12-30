@@ -119,25 +119,37 @@ void Scene::unload() {
     }
 }
 
+// draws the objects of the scene
+void Scene::renderObjects(bool shadow) {
+    for (auto object: this->objects) {
+        object.updateRendering(shadow);
+    }
+}
+
 /**
- * Update the Animation properties <timestep> seconds into the future
+ * Update the scene <timestep> seconds into the future
 */
 double Scene::update(double deltatime, double DELTA_STEP) {
     //LOG_DEBUG("scene update called");
+
+	bool flag = false;
     while (deltatime >= DELTA_STEP) {
         for (auto object: this->objects) {
             object.updateAnimation(DELTA_STEP);
         }
         deltatime -= DELTA_STEP;
+		flag = true;
     }
 
     for (auto object: this->objects) {
         object.updateModeling();
     }
 
-    for (auto object: this->objects) {
-        object.updateRendering();
-    }
+	if (flag) {
+	    // TODO: update shadow maps
+	}
+
+	this->renderObjects();
 
     return deltatime;
 }
@@ -163,7 +175,7 @@ void Scene::set_active_scene(std::shared_ptr<Scene> s) {
 }
 
 
-// SHADOWS
+// FOR SHADOWS
 
 // register light within scene
 void Scene::addLight(std::shared_ptr<rendering::LightProperties> light) {

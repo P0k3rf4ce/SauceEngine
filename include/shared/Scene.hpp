@@ -33,6 +33,7 @@ public:
 
     std::shared_ptr<Camera> get_camera();
     void set_camera(std::shared_ptr<Camera> cam);
+	void renderObjects(bool shadow = false);
     double update(double deltatime, double DELTA_STEP);
 
     static std::shared_ptr<Scene> getActiveScene();
