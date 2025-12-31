@@ -87,8 +87,9 @@ void RenderProperties::update(const modeling::ModelProperties &modelProps, const
     // retrieve model
     std::shared_ptr<modeling::Model> model = modelProps.getModel();
 
-    // set pbr stuff - currently not a thing
-    // set shadow stuff - currently not a thing
+	// TODO
+    // set pbr stuff
+    // set shadow stuff
 
     // set model matrix (use cached transformation from GLTF)
     model->getShader()->setUniform("model", modelMatrix);
