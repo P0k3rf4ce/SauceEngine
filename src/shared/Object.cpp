@@ -21,6 +21,10 @@ Object::~Object() {
     this->modelProps.reset();
 }
 
+void Object::checkObjType() {
+    // TODO
+}
+
 /**
  * This function is meant to load this Object back into use
 */

@@ -37,7 +37,7 @@ namespace rendering
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
 		// attach cubemap to fbo
-        glBindFramebuffer(GL_FRAMEBUFFER, m_cubemapFBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, m_depthMapFBO);
         glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, m_depthMapTex, 0);
         glDrawBuffer(GL_NONE);
         glReadBuffer(GL_NONE);
@@ -64,15 +64,14 @@ namespace rendering
 				{FRAGMENT, "src/rendering/shaders/shadow/shadow_point.frag"},
 				{GEOMETRY, "src/rendering/shaders/shadow/shadow_point.geom"},
 				{VERTEX, "src/rendering/shaders/shadow/shadow_point.vert"}};
-			Shader shader = new Shader();
-			shader.loadFromFiles(shaderFiles);
-			m_shader = std::make_shared<Shader>(shader);
+			m_shader = std::make_shared<Shader>();
+			m_shader->loadFromFiles(shaderFiles);
 	    }
 	}
 
-    void PointLight::update(animation::AnimationProperties &animProps)
+    void PointLight::update(std::shared_ptr<animation::AnimationProperties> &animProps)
     {
-        m_position = E2GLM(animProps.getModelMatrix()) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f).xyz;
+        m_position = glm::vec3(E2GLM(animProps->getModelMatrix()) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
 
 		// extend(?) from abstract
 		LightProperties::update(nullptr);
@@ -91,8 +90,9 @@ namespace rendering
 			m_shader->setUniform("shadowMats[" + std::to_string(i) + "]", mat);
     }
 
-    glm::vec3 &PointLight::getPosition() const noexcept
+    glm::vec3 &PointLight::getPosition() const noexcept {
         return m_position;
+	}
 
 	void PointLight::buildMatrix() {
 		glm::mat4 proj = glm::perspective(glm::radians(90.0f), m_aspect, m_near, m_far);
@@ -117,33 +117,36 @@ namespace rendering
 				glm::vec3(0.0, -1.0, 0.0)));
 	}
 
-	float PointLight::getNear()
+	float PointLight::getNear() {
 	    return m_near;
-	float PointLight::getFar()
+	}
+	float PointLight::getFar() {
 	    return m_far;
-	void PointLight::setNear(float f)
+	}
+	void PointLight::setNear(float f) {
 	    m_near = f;
-	void PointLight::setFar(float f)
+	}
+	void PointLight::setFar(float f) {
 	    m_far = f;
+	}
 
 	// dir light class
     DirLight::DirLight(const glm::vec3 &lightPos,
-                 const glm::vec3 &colour = glm::vec3(1.0f))
+                 const glm::vec3 &colour)
         : LightProperties(colour), m_lightPos(lightPos)
     {
 
     }
 
-    DirLight::~DirLight() = default;
+    DirLight::~DirLight() {}
 
 	void DirLight::initShader() {
 	    if (!m_shader) {
 			std::unordered_map<SHADER_TYPE, std::string> shaderFiles = {
 				{FRAGMENT, "src/rendering/shaders/shadow/shadow_dir.frag"},
 				{VERTEX, "src/rendering/shaders/shadow/shadow_dir.vert"}};
-			Shader shader = new Shader();
-			shader.loadFromFiles(shaderFiles);
-			m_shader = std::make_shared<Shader>(shader);
+			m_shader = std::make_shared<Shader>();
+			m_shader->loadFromFiles(shaderFiles);
 	    }
 	}
 
@@ -152,8 +155,8 @@ namespace rendering
 		LightProperties::confShadowMap();
 
 		// bind shader
-		this->shader->bind();
-		this->shader->setUniform("lightSpaceMatrix", m_lightSpaceMatrix);
+		m_shader->bind();
+		m_shader->setUniform("lightSpaceMatrix", m_lightSpaceMatrix);
     }
 
     void DirLight::setOrtho(float orthoSize, float nearPlane, float farPlane)
@@ -190,9 +193,8 @@ namespace rendering
 			std::unordered_map<SHADER_TYPE, std::string> shaderFiles = {
 				{FRAGMENT, "src/rendering/shaders/shadow/shadow_dir.frag"},
 				{VERTEX, "src/rendering/shaders/shadow/shadow_dir.vert"}};
-			Shader shader = new Shader();
-			shader.loadFromFiles(shaderFiles);
-			m_shader = std::make_shared<Shader>(shader);
+			m_shader = std::make_shared<Shader>();
+			m_shader->loadFromFiles(shaderFiles);
 	    }
 	}
 

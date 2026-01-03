@@ -6,14 +6,15 @@
 #include <memory>
 
 #include "shared/Object.hpp"
-#include "rendering/LightProperties.hpp"
 #include "utils/Camera.hpp"
+
+namespace rendering { class LightProperties; }
 
 struct Skybox {
 	unsigned int irradiance;
 	unsigned int prefilter;
 	unsigned int brdf;
-}
+};
 
 class Scene {
 private:

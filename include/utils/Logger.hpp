@@ -104,8 +104,8 @@ public:
 private:
     // Helper to convert arguments to printf-compatible strings
     // For std::string, return c_str()
-    static const char* toPrintfArg(const std:;string& arg) {
-        return arg.c_str()
+    static const char* toPrintfArg(const std::string& arg) {
+        return arg.c_str();
     }
     
     // For all other types, return by value

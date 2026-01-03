@@ -7,10 +7,8 @@
 #include "animation/AnimationProperties.hpp"
 #include "modeling/ModelProperties.hpp"
 #include "rendering/RenderProperties.hpp"
-#include "rendering/LightProperties.hpp"
 
-namespace modeling { class ModelingProperties; }
-
+namespace rendering { class LightProperties; }
 
 class Object {
 private:
@@ -23,6 +21,8 @@ public:
     Object(std::shared_ptr<animation::AnimationProperties> animProps, std::shared_ptr<modeling::ModelProperties> modelProps, std::shared_ptr<rendering::RenderProperties> renderProps);
     Object(std::string gltfFilename);
     ~Object();
+
+    void checkObjType();
 
     void load();
     void unload();

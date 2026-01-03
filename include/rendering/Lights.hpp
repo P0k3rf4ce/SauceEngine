@@ -37,7 +37,7 @@ namespace rendering
 		void buildMatrix() override;
 		void initShader();
 
-		static std::shared_ptr<Shader> m_shader = nullptr;
+		static std::shared_ptr<Shader> m_shader;
     };
 
 	// dir light class
@@ -66,7 +66,7 @@ namespace rendering
 		void buildMatrix() override;
 		void initShader();
 
-		static std::shared_ptr<Shader> m_shader = nullptr;
+		static std::shared_ptr<Shader> m_shader;
     };
 
 
@@ -95,6 +95,6 @@ namespace rendering
 		void buildMatrix() override;
 		void initShader();
 
-		static std::shared_ptr<Shader> m_shader = nullptr;
+		static std::shared_ptr<Shader> m_shader;
     };
 }

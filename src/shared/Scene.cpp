@@ -11,7 +11,7 @@
 #include <utility>
 #include <vector>
 
-#include "rendering/SpotLightProperties.hpp"
+#include "rendering/Lights.hpp"
 
 // Initialize static member
 std::shared_ptr<Scene> Scene::active_scene = nullptr;
@@ -148,7 +148,7 @@ double Scene::update(double deltatime, double DELTA_STEP) {
 	// update shadow maps if needed
 	if (flag) {
 		for (auto light : this->lights)
-		    light->update();
+		    light->update(light->getLightAnimObj());
 	}
 
 	// do final render
@@ -163,10 +163,10 @@ void Scene::set_camera(std::shared_ptr<Camera> cam) {
         LOG_WARN("Attempted to set scene camera to nullptr");
         return;
     }
-    this->active_cam = cam;
+    this->active_camera = cam;
 }
 
-std::shared_ptr<Scene> Scene::get_active_scene() {
+std::shared_ptr<Scene> Scene::getActiveScene() {
     return active_scene;
 }
 
@@ -193,42 +193,42 @@ std::vector<std::shared_ptr<rendering::LightProperties>> &Scene::getLights() {
 
 // ------------
 
+// TODO: review
+// void Scene::draw(rendering::Shader& shader) {
+//     uploadSpotLightsBuffer();
+//     for (auto object: this->objects) {
+//         object.draw(shader);
+//     }
+// }
 
-void Scene::draw(rendering::Shader& shader) {
-    uploadSpotLightsBuffer();
-    for (auto object: this->objects) {
-        object.draw(shader);
-    }
-}
+// void Scene::uploadSpotLightsBuffer() {
+//     if (m_spotLightSSBO == 0) {
+//         glGenBuffers(1, &m_spotLightSSBO);
+//     }
 
-void Scene::uploadSpotLightsBuffer() {
-    if (m_spotLightSSBO == 0) {
-        glGenBuffers(1, &m_spotLightSSBO);
-    }
+//     std::vector<SpotLightGpuData> gpuLights;
+//     for (const auto &light : lights) {
+//         auto spot = std::dynamic_pointer_cast<rendering::SpotLightProperties>(light);
+//         if (!spot) {
+//             continue;
+//         }
 
-    std::vector<SpotLightGpuData> gpuLights;
-    for (const auto &light : lights) {
-        auto spot = std::dynamic_pointer_cast<rendering::SpotLightProperties>(light);
-        if (!spot) {
-            continue;
-        }
+//         SpotLightGpuData gpuLight{};
+//         gpuLight.position = glm::vec4(spot->getPosition(), 1.0f);
+//         gpuLight.direction = glm::vec4(glm::normalize(spot->getDirection()), 0.0f);
+//         gpuLight.color = glm::vec4(spot->getColour(), 1.0f);
+//         gpuLight.lightSpaceMatrix = spot->getLightSpaceMatrix();
+//         gpuLight.cutoff = glm::vec4(spot->getCutOff(), spot->getOuterCutOff(), 0.0f, 0.0f);
+//         gpuLights.push_back(gpuLight);
+//     }
 
-        SpotLightGpuData gpuLight{};
-        gpuLight.position = glm::vec4(spot->getPosition(), 1.0f);
-        gpuLight.direction = glm::vec4(glm::normalize(spot->getDirection()), 0.0f);
-        gpuLight.color = glm::vec4(spot->getColour(), 1.0f);
-        gpuLight.lightSpaceMatrix = spot->getLightSpaceMatrix();
-        gpuLight.cutoff = glm::vec4(spot->getCutOff(), spot->getOuterCutOff(), 0.0f, 0.0f);
-        gpuLights.push_back(gpuLight);
-    }
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_spotLightSSBO);
+//     glBufferData(GL_SHADER_STORAGE_BUFFER,
+//     static_cast<GLsizeiptr>(gpuLights.size() * sizeof(SpotLightGpuData)),
+//                  gpuLights.empty() ? nullptr : gpuLights.data(),
+//                  GL_DYNAMIC_DRAW);
 
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_spotLightSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER,
-    static_cast<GLsizeiptr>(gpuLights.size() * sizeof(SpotLightGpuData)),
-                 gpuLights.empty() ? nullptr : gpuLights.data(),
-                 GL_DYNAMIC_DRAW);
-
-    // that 2 is sus
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, m_spotLightSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-}
+//     // that 2 is sus
+//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, m_spotLightSSBO);
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+// }
