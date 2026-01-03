@@ -9,6 +9,12 @@
 #include "rendering/LightProperties.hpp"
 #include "utils/Camera.hpp"
 
+struct Skybox {
+	unsigned int irradiance;
+	unsigned int prefilter;
+	unsigned int brdf;
+}
+
 class Scene {
 private:
     std::vector<Object> objects;
@@ -33,7 +39,7 @@ public:
 
     std::shared_ptr<Camera> get_camera();
     void set_camera(std::shared_ptr<Camera> cam);
-	void renderObjects(bool shadow = false);
+	void renderObjects(bool shadow = false, std::shared_ptr<rendering::LightProperties> lightProps = nullptr);
     double update(double deltatime, double DELTA_STEP);
 
     static std::shared_ptr<Scene> getActiveScene();
@@ -41,6 +47,8 @@ public:
 
     static unsigned int scr_width;
     static unsigned int scr_height;
+
+	Skybox skybox;
 };
 
 #endif

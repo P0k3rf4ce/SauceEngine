@@ -120,9 +120,9 @@ void Scene::unload() {
 }
 
 // draws the objects of the scene
-void Scene::renderObjects(bool shadow) {
+void Scene::renderObjects(bool shadow, std::shared_ptr<rendering::LightProperties> lightProps) {
     for (auto object: this->objects) {
-        object.updateRendering(shadow);
+        object.updateRendering(shadow, lightProps);
     }
 }
 
@@ -145,10 +145,14 @@ double Scene::update(double deltatime, double DELTA_STEP) {
         object.updateModeling();
     }
 
+	// update shadow maps if needed
 	if (flag) {
-	    // TODO: update shadow maps
+		for (auto light : this->lights)
+		    light->update();
 	}
 
+	// do final render
+	// TODO - setup postprocessing here
 	this->renderObjects();
 
     return deltatime;

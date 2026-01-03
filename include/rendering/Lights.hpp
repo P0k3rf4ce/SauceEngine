@@ -10,27 +10,37 @@
 
 namespace rendering
 {
-
+	// point light class
     class PointLight : public LightProperties
     {
     public:
         PointLight(const glm::vec3 &position, const glm::vec3 &colour = glm::vec3(1.0f));
         ~PointLight();
 
-        void update(Scene &scene, animation::AnimationProperties &animProps) override;
-        void confShadowMap(Scene &scene, Shader &shader) override;
+        void update(std::shared_ptr<AnimationProperties> &animProps) override;
+        void confShadowMap() override;
 
-        const glm::vec3 &getPosition() const noexcept;
+		float getNear();
+		float getFar();
+		void setNear(float f);
+		void setFar(float f);
+
+        glm::vec3 &getPosition();
 
     private:
-        void initShadowCubemap();
-
         glm::vec3 m_position;
-        GLuint m_cubemapFBO;
-        GLuint m_cubemapTex;
         std::vector<glm::mat4> m_lightSpaceMatrices;
+
+		float m_near = 1.0f;
+		float m_far = 25.0f;
+
+		void buildMatrix() override;
+		void initShader();
+
+		static std::shared_ptr<Shader> m_shader = nullptr;
     };
 
+	// dir light class
     class DirLight : public LightProperties
     {
     public:
@@ -38,26 +48,53 @@ namespace rendering
                  const glm::vec3 &colour = glm::vec3(1.0f));
         ~DirLight() override;
 
-        void update(Scene &scene, animation::AnimationProperties &animProps) override;
-        void confShadowMap(Scene &scene, Shader &shader) override;
+        void confShadowMap() override;
 
-        const glm::vec3 &getLightPosition() const noexcept { return m_lightPos; }
+        glm::vec3 &getLightPosition() { return m_lightPos; }
 
-        glm::vec3 getLightDirection() const noexcept { return glm::normalize(-m_lightPos); }
+        glm::vec3 getLightDirection() { return glm::normalize(-m_lightPos); }
 
-        void setLightPosition(const glm::vec3 &pos);
+        void setLightPosition(glm::vec3 &pos);
         void setOrtho(float orthoSize, float nearPlane, float farPlane);
 
     private:
-        void rebuildProjectionIfNeeded();
-        void rebuildProjection();
-
         glm::vec3 m_lightPos;
         float m_orthoSize = 10.0f;
         float m_nearPlane = 1.0f;
         float m_farPlane = 25.0f;
 
-        // Rebuild flag
-        mutable bool m_projectionNeedsRebuild = true;
+		void buildMatrix() override;
+		void initShader();
+
+		static std::shared_ptr<Shader> m_shader = nullptr;
+    };
+
+
+	// spot light class
+    class SpotLight : public LightProperties
+    {
+    public:
+        SpotLight(const glm::vec3& position, const glm::vec3& direction, float cutOff, float outerCutOff, const glm::vec3& colour = glm::vec3(1.0f));
+        ~SpotLight() override;
+
+        void update(std::shared_ptr<AnimationProperties> &animProps) override;
+        void confShadowMap() override;
+
+        glm::mat4& getLightSpaceMatrix();
+        glm::vec3& getPosition();
+        glm::vec3& getDirection();
+        float getCutOff();
+        float getOuterCutOff();
+
+    private:
+        glm::vec3 m_position;
+        glm::vec3 m_direction;
+        float m_cutOff;
+        float m_outerCutOff;
+
+		void buildMatrix() override;
+		void initShader();
+
+		static std::shared_ptr<Shader> m_shader = nullptr;
     };
 }

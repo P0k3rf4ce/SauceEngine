@@ -7,6 +7,7 @@
 #include "animation/AnimationProperties.hpp"
 #include "modeling/ModelProperties.hpp"
 #include "rendering/RenderProperties.hpp"
+#include "rendering/LightProperties.hpp"
 
 namespace modeling { class ModelingProperties; }
 
@@ -29,7 +30,7 @@ public:
 
     void updateAnimation(double DELTA_STEP);
     void updateModeling();
-    void updateRendering(bool shadow);
+    void updateRendering(bool shadow, std::shared_ptr<rendering::LightProperties> lightProps);
 };
 
 #endif

@@ -5,6 +5,7 @@
 
 #include <Eigen/Geometry>
 #include "shared/Scene.hpp"
+#include "rendering/RenderProperties.hpp"
 #include "animation/AnimationProperties.hpp"
 
 namespace rendering
@@ -15,41 +16,36 @@ namespace rendering
     {
     public:
         // construct with optional colour (defaults to white)
-        explicit LightProperties(const glm::vec3 &colour = glm::vec3(1.0f));
+        explicit LightProperties(glm::vec3 &colour = glm::vec3(1.0f));
 
         // virtual destructor for abstract base class
         virtual ~LightProperties() = 0;
 
         // accessors
-        const glm::vec3 &getColour() const noexcept;
-        void setColour(const glm::vec3 &colour) noexcept;
+        glm::vec3 &getColour();
+        void setColour(glm::vec3 &colour);
+		glm::mat4 getLightSpaceMat();
 
-        // lifecycle update method that derived classes must implement
-        virtual void update(Scene& scene, animation::AnimationProperties& animProps) = 0;
+		std::shared_ptr<RenderProperties> getLightObj();
+		void setLightObj(std::shared_ptr<RenderProperties> obj);
 
-        // configure shadow map parameters (abstract)
-        // self-note to emmy - merge this properly
-        virtual void confShadowMap(const animation::AnimationProperties &animProps);
-        virtual void confShadowMap(Scene& scene, Shader& shader) = 0;
+        virtual void update(std::shared_ptr<AnimationProperties>& animProps = nullptr);
 
     protected:
         glm::vec3 m_colour;
+		std::shared_ptr<RenderProperties> m_lightObject = nullptr;
 
         // shadow map resources
-        GLuint depthMapFBO = 0;
-        GLuint depthMapTex = 0;
+        GLuint m_depthMapFBO = 0;
+        GLuint m_depthMapTex = 0;
         const unsigned int shadowWidth = 1024;
         const unsigned int shadowHeight = 1024;
+		const float m_aspect = (float)shadowWidth/(float)shadowHeight;
 
-        // view transforms
-        // note to emmy - double check
-        Eigen::Matrix4f projection;
-        static Shader *shader;
-        virtual void initShader();
-        virtual void loadLightSpaceMatrix(const animation::AnimationProperties &animProps);
-
-    private:
-        void initShadowResources();
+		glm::mat4 m_lightSpaceMatrix;
+        virtual void buildMatrix() = 0;
+        virtual void initShader() = 0;
+        virtual void confShadowMap();
     };
 
 } // namespace rendering

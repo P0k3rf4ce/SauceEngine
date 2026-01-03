@@ -51,6 +51,10 @@ void Object::updateModeling() {
     this->modelProps->update(*(this->animProps.get()));
 }
 
-void Object::updateRendering(bool shadow) {
+void Object::updateRendering(bool shadow, std::shared_ptr<rendering::LightProperties> lightProps) {
+	// if updating shadow map, dont draw the light itself to avoid issues
+	if (shadow && this->renderProps == lightProps->getLightObj())
+		return;
+
     this->renderProps->update(*(this->modelProps.get()), *(this->animProps.get()), shadow);
 }

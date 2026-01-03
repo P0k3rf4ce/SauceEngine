@@ -26,7 +26,7 @@ uniform sampler2DArrayShadow shadowMaps;
 uniform samplerCubeArrayShadow pointMaps;
 
 // lights
-struct DirectionalLight
+struct DirLight
 {
     vec4 Position;
     vec4 Color;
@@ -39,7 +39,7 @@ struct PointLight
     vec4 Color;
 };
 
-struct SpotLightProperties
+struct SpotLight
 {
     vec4 Position;
     vec4 Direction;
@@ -51,7 +51,7 @@ struct SpotLightProperties
 
 layout(std430) readonly buffer dirLightData
 {
-    DirectionalLight dirLights[];
+    DirLight dirLights[];
 };
 
 layout(std430) readonly buffer pointLightData
@@ -61,7 +61,7 @@ layout(std430) readonly buffer pointLightData
 
 layout(std430) readonly buffer spotLightData
 {
-    SpotLightProperties spotLights[];
+    SpotLight spotLights[];
 };
 
 uniform vec3 camPos;

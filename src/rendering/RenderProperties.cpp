@@ -84,36 +84,50 @@ void RenderProperties::buildModelMatrix(const modeling::ModelProperties &modelPr
 */
 void RenderProperties::update(const modeling::ModelProperties &modelProps, const animation::AnimationProperties &animProps, bool shadow) {
 
-    // retrieve model
-    std::shared_ptr<modeling::Model> model = modelProps.getModel();
-
-	// TODO
-    // set pbr stuff
-    // set shadow stuff
+    auto model = modelProps.getModel();
+	auto shader = model->getShader();
 
     // set model matrix (use cached transformation from GLTF)
-    model->getShader()->setUniform("model", modelMatrix);
+    shader->setUniform("model", modelMatrix);
 
+	if (shadow) {
+		// draw each mesh
+		for (const auto& [mesh, material] : model->getMeshMaterialPairs()) {
+		    if (mesh) { glDrawElements(GL_TRIANGLES, mesh->indices.size(), GL_UNSIGNED_INT, 0); }
+		}
+	} else {
+		auto skybox = Scene::get_active_scene()->skybox;
 
-    // set projection matrix(?)
-    glm::mat4 projection = Scene::get_active_scene()->get_camera()->getProjectionMatrix();
-    model->getShader()->setUniform("projection", projection);
+		// set projection matrix
+		auto projection = Scene::get_active_scene()->get_camera()->getProjectionMatrix();
+		shader->setUniform("projection", projection);
 
+		// draw each mesh
+		bool pbr = false; // temp thing
+		for (const auto& [mesh, material] : model->getMeshMaterialPairs()) {
+			if (mesh) {
+				if (pbr) {
+					// set pbr textures
+					shader->setUniform("albedoMap", material.albedo->id);
+					shader->setUniform("normalMap", material.normal->id);
+					shader->setUniform("metallicMap", material.metallic->id);
+					shader->setUniform("roughnessMap", material.roughness->id);
+					shader->setUniform("aoMap", material.ambient_occlusion->id);
 
-    // get textures - TODO
-    //std::vector<modeling::MeshMaterialPair> mats = model->getMeshMaterialPairs();
-    
-    // draw each mesh
-    for (const auto& [mesh, material] : model->getMeshMaterialPairs()) {
-        if (mesh) {
-            for (const auto& vertex : mesh->vertices) {
-                LOG_DEBUG_F("vertex: %f, %f, %f", vertex.Position.x, vertex.Position.y, vertex.Position.z);
-            }
-            for (const auto& index : mesh->indices) {
-                LOG_DEBUG_F("index: %u", index);
-            }
-            glDrawElements(GL_TRIANGLES, mesh->indices.size(), GL_UNSIGNED_INT, 0);
-        }
-    }
+					// set pbr lighting maps
+					shader->setUniform("irradianceMap", skybox.irradiance);
+					shader->setUniform("prefilterMap", skybox.prefilter);
+					shader->setUniform("brdfLUT", skybox.brdf);
+
+					// TODO - set shadow textures
+				}
+
+				// draw call
+				glDrawElements(GL_TRIANGLES, mesh->indices.size(), GL_UNSIGNED_INT, 0);
+			}
+		}
+	}
+
 
 }
+
