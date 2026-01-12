@@ -13,9 +13,9 @@ protected:
 
     void SetUp() override {
 		/* setup logger since it's helpful */
-        Logger& logger = Logger::getInstance();
-        logger.setLogLevel(LogLevel::DEBUG);
-        logger.enableColor(true);
+        //Logger& logger = Logger::getInstance();
+        //logger.setLogLevel(LogLevel::DEBUG);
+        //logger.enableColor(true);
 
         // Initialize GLFW
         if (!glfwInit()) {
