@@ -1,5 +1,5 @@
 #include "modeling/Material.hpp"
-#include "utils/Logger.hpp"
+//#include "utils/Logger.hpp"
 #include <iostream>
 #include <glad/glad.h>
 #include <stb_image.h>
@@ -22,7 +22,8 @@ std::shared_ptr<Texture> TextureCache::getDefaultTexture() {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         defaultTexture = std::make_shared<Texture>(std::move(data), 1, 1, 4, textureID);
-        LOG_DEBUG("Created default white texture");
+        //LOG_DEBUG("Created default white texture");
+		std::cout << "Created default white texture";
     }
     return defaultTexture;
 }
@@ -31,7 +32,8 @@ std::shared_ptr<Texture> TextureCache::getTexture(const std::string& path) {
     // Check if already cached
     auto it = textureCache.find(path);
     if (it != textureCache.end()) {
-        LOG_DEBUG_F("Using cached texture: %s", path.c_str());
+        //LOG_DEBUG_F("Using cached texture: %s", path.c_str());
+		std::cout << "Using cached texture: " << path.c_str();
         return it->second;
     }
 
@@ -41,11 +43,13 @@ std::shared_ptr<Texture> TextureCache::getTexture(const std::string& path) {
     unsigned char* imageData = stbi_load(path.c_str(), &width, &height, &channels, 0);
 
     if (!imageData) {
-        LOG_ERROR_F("Failed to load texture: %s - %s", path.c_str(), stbi_failure_reason());
+        //LOG_ERROR_F("Failed to load texture: %s - %s", path.c_str(), stbi_failure_reason());
+		std::cout << "Failed to load texture: " << path.c_str() << " - " << stbi_failure_reason();
         return getDefaultTexture();
     }
 
-    LOG_INFO_F("Loaded texture: %s (%dx%d, %d channels)", path.c_str(), width, height, channels);
+    //LOG_INFO_F("Loaded texture: %s (%dx%d, %d channels)", path.c_str(), width, height, channels);
+	std::cout << "Loaded texture: " << path.c_str() << " (" << width << "x" << height << ", " << channels << " channels)";
 
     // Determine OpenGL format
     GLenum format = GL_RGB;
@@ -121,11 +125,13 @@ std::shared_ptr<Texture> TextureCache::getEmbeddedTexture(const aiTexture* aiTex
     }
 
     if (!imageData) {
-        LOG_ERROR("Failed to load embedded texture");
+        //LOG_ERROR("Failed to load embedded texture");
+		std::cout << "Failed to load embedded texture";
         return getDefaultTexture();
     }
 
-    LOG_INFO_F("Loaded embedded texture (%dx%d, %d channels)", width, height, channels);
+    //LOG_INFO_F("Loaded embedded texture (%dx%d, %d channels)", width, height, channels);
+	std::cout << "Loaded embedded texture (" << width << "x" << height << ", " << channels << " channels)";
 
     // Generate OpenGL texture
     GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;

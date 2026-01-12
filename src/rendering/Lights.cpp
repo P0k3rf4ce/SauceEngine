@@ -1,8 +1,6 @@
 #include "rendering/Lights.hpp"
-#include "utils/Logger.hpp"
-#include "shared/Scene.hpp"
+//#include "utils/Logger.hpp"
 #include "utils/EigenToGLM.hpp"
-#include "utils/Shader.hpp"
 #include <vector>
 #include <glm/gtc/matrix_transform.hpp>
 #include <string>
@@ -44,13 +42,12 @@ namespace rendering
 
 		// make sure fbo is built
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-            LOG_ERROR("Shadow cubemap FBO not complete!");
+            //LOG_ERROR("Shadow cubemap FBO not complete!");
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        LOG_INFO("Shadow cubemap initialized.");
+        //LOG_INFO("Shadow cubemap initialized.");
 
-		// compile shader
-		this->initShader();
+		this->initShader(); // compile shader
     }
 
     PointLight::~PointLight()
@@ -69,12 +66,12 @@ namespace rendering
 	    }
 	}
 
-    void PointLight::update(std::shared_ptr<animation::AnimationProperties> &animProps)
+    void PointLight::update(const std::shared_ptr<animation::AnimationProperties> &animProps)
     {
         m_position = glm::vec3(E2GLM(animProps->getModelMatrix()) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
 
 		// extend(?) from abstract
-		LightProperties::update(nullptr);
+		LightProperties::update();
     }
 
     void PointLight::confShadowMap() {
@@ -82,7 +79,7 @@ namespace rendering
 		LightProperties::confShadowMap();
 
 		m_shader->bind();
-		m_shader->setUniform("lightPos", m_position);
+		m_shader->setUniform("lightPos", m_position.x, m_position.y, m_position.z);
 		m_shader->setUniform("farPlane", m_far);
 
 		int i = 0;
@@ -90,9 +87,7 @@ namespace rendering
 			m_shader->setUniform("shadowMats[" + std::to_string(i) + "]", mat);
     }
 
-    glm::vec3 &PointLight::getPosition() const noexcept {
-        return m_position;
-	}
+    glm::vec3 &PointLight::getPosition() { return m_position; }
 
 	void PointLight::buildMatrix() {
 		glm::mat4 proj = glm::perspective(glm::radians(90.0f), m_aspect, m_near, m_far);
@@ -135,7 +130,7 @@ namespace rendering
                  const glm::vec3 &colour)
         : LightProperties(colour), m_lightPos(lightPos)
     {
-
+		this->initShader(); // compile shader
     }
 
     DirLight::~DirLight() {}
@@ -159,18 +154,18 @@ namespace rendering
 		m_shader->setUniform("lightSpaceMatrix", m_lightSpaceMatrix);
     }
 
-    void DirLight::setOrtho(float orthoSize, float nearPlane, float farPlane)
+    void DirLight::setOrtho(float orthoSize, float near, float far)
     {
         m_orthoSize = orthoSize;
-        m_nearPlane = nearPlane;
-        m_farPlane = farPlane;
+        m_near = near;
+        m_far = far;
     }
 
 	void DirLight::buildMatrix() {
 		glm::mat4 proj = glm::ortho(
             -m_orthoSize, m_orthoSize,
             -m_orthoSize, m_orthoSize,
-            m_nearPlane, m_farPlane);
+            m_near, m_far);
 
 		glm::mat4 view = glm::lookAt(
 				m_lightPos,
@@ -184,7 +179,9 @@ namespace rendering
 	// spot light class
     SpotLight::SpotLight(const glm::vec3 &position, const glm::vec3 &direction, float cutOff, float outerCutOff, const glm::vec3 &colour)
         : LightProperties(colour), m_position(position), m_direction(glm::normalize(direction)), m_cutOff(cutOff), m_outerCutOff(outerCutOff)
-    {}
+    {
+		this->initShader(); // compile shader
+	}
 
     SpotLight::~SpotLight() {}
 
@@ -198,12 +195,12 @@ namespace rendering
 	    }
 	}
 
-    void SpotLight::update(animation::AnimationProperties &animProps)
+    void SpotLight::update(const std::shared_ptr<animation::AnimationProperties> &animProps)
     {
-        m_position = E2GLM(animProps.getModelMatrix()) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f).xyz;
+        m_position = glm::vec3(E2GLM(animProps->getModelMatrix()) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
 
 		// extend(?) from abstract
-		LightProperties::update(nullptr);
+		LightProperties::update();
     }
 
     void SpotLight::confShadowMap() {
@@ -215,37 +212,18 @@ namespace rendering
 		m_shader->setUniform("lightSpaceMatrix", m_lightSpaceMatrix);
     }
 
-    const glm::mat4 &SpotLight::getLightSpaceMatrix() const
-    {
-        return m_lightSpaceMatrix;
-    }
-
-    const glm::vec3 &SpotLight::getPosition() const noexcept
-    {
-        return m_position;
-    }
-
-    const glm::vec3 &SpotLight::getDirection() const noexcept
-    {
-        return m_direction;
-    }
-
-    float SpotLight::getCutOff() const noexcept
-    {
-        return m_cutOff;
-    }
-
-    float SpotLight::getOuterCutOff() const noexcept
-    {
-        return m_outerCutOff;
-    }
+    glm::mat4 &SpotLight::getLightSpaceMatrix() { return m_lightSpaceMatrix; }
+    glm::vec3 &SpotLight::getPosition() { return m_position; }
+    glm::vec3 &SpotLight::getDirection() { return m_direction; }
+    float SpotLight::getCutOff() { return m_cutOff; }
+    float SpotLight::getOuterCutOff() { return m_outerCutOff; }
 
 	void SpotLight::buildMatrix() {
 		glm::mat4 proj = glm::perspective(
 			2 * glm::radians(m_outerCutOff),
 			m_aspect,
-			m_nearPlane,
-			m_farPlane);
+			m_near,
+			m_far);
 
 		glm::mat4 view = glm::lookAt(
 				m_position,

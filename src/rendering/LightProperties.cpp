@@ -3,7 +3,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <Eigen/Geometry>
 #include "rendering/LightProperties.hpp"
-#include "utils/Logger.hpp"
+//#include "utils/Logger.hpp"
 #include "utils/Shader.hpp"
 #include "utils/EigenToGLM.hpp"
 
@@ -32,7 +32,7 @@ namespace rendering
         GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
         if (status != GL_FRAMEBUFFER_COMPLETE)
         {
-            LOG_ERROR("Shadow FBO incomplete: " + status);
+            //LOG_ERROR("Shadow FBO incomplete: " + status);
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             glDeleteTextures(1, &m_depthMapTex);
@@ -43,10 +43,7 @@ namespace rendering
         }
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        LOG_INFO("Shadow map initialized.");
-
-		// compile shader
-        this->initShader();
+        //LOG_INFO("Shadow map initialized.");
     }
 
     // provide definition for pure-virtual destructor
@@ -90,11 +87,16 @@ namespace rendering
 		// bind shader - done in derived class
     }
 
+	// setter
+	void LightProperties::setSelfPtr(std::shared_ptr<LightProperties> p) {
+	    m_selfPtr = p;
+	}
+
 	// update this light's shadow map
-	void LightProperties::update(std::shared_ptr<AnimationProperties>&) {
+	void LightProperties::update(const std::shared_ptr<AnimationProperties>&) {
 	    this->buildMatrix();
 		this->confShadowMap();
-		Scene::getActiveScene()->renderObjects(true, std::make_shared<LightProperties>(this));
+		Scene::get_active_scene()->renderObjects(true, m_selfPtr);
 	}
 
 } // namespace rendering

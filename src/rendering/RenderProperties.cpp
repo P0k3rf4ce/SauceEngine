@@ -8,8 +8,7 @@
 #include "rendering/RenderProperties.hpp"
 
 #include "modeling/Model.hpp"
-#include "shared/Scene.hpp"
-#include "utils/Logger.hpp"
+//#include "utils/Logger.hpp"
 
 using namespace rendering;
 
@@ -105,19 +104,41 @@ void RenderProperties::update(const modeling::ModelProperties &modelProps, const
 		// draw each mesh
 		bool pbr = false; // temp thing
 		for (const auto& [mesh, material] : model->getMeshMaterialPairs()) {
-			if (mesh) {
+			if (mesh && material) {
 				if (pbr) {
 					// set pbr textures
-					shader->setUniform("albedoMap", material.albedo->id);
-					shader->setUniform("normalMap", material.normal->id);
-					shader->setUniform("metallicMap", material.metallic->id);
-					shader->setUniform("roughnessMap", material.roughness->id);
-					shader->setUniform("aoMap", material.ambient_occlusion->id);
+					glActiveTexture(GL_TEXTURE0);
+					glBindTexture(GL_TEXTURE_2D, static_cast<int>(material->albedo->id));
+					shader->setUniform("albedoMap", 0);
+
+					glActiveTexture(GL_TEXTURE1);
+					glBindTexture(GL_TEXTURE_2D, static_cast<int>(material->normal->id));
+					shader->setUniform("normalMap", 1);
+
+					glActiveTexture(GL_TEXTURE2);
+					glBindTexture(GL_TEXTURE_2D, static_cast<int>(material->metallic->id));
+					shader->setUniform("metallicMap", 2);
+
+					glActiveTexture(GL_TEXTURE3);
+					glBindTexture(GL_TEXTURE_2D, static_cast<int>(material->roughness->id));
+					shader->setUniform("roughnessMap", 3);
+
+					glActiveTexture(GL_TEXTURE4);
+					glBindTexture(GL_TEXTURE_2D, static_cast<int>(material->ambient_occlusion->id));
+					shader->setUniform("aoMap", 4);
 
 					// set pbr lighting maps
-					shader->setUniform("irradianceMap", skybox.irradiance);
-					shader->setUniform("prefilterMap", skybox.prefilter);
-					shader->setUniform("brdfLUT", skybox.brdf);
+					glActiveTexture(GL_TEXTURE5);
+					glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.irradiance);
+					shader->setUniform("irradianceMap", 5);
+
+					glActiveTexture(GL_TEXTURE6);
+					glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.prefilter);
+					shader->setUniform("prefilterMap", 6);
+
+					glActiveTexture(GL_TEXTURE7);
+					glBindTexture(GL_TEXTURE_2D, skybox.brdf);
+					shader->setUniform("brdfLUT", 7);
 
 					// TODO - set shadow textures
 				}

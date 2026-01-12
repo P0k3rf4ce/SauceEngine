@@ -17,7 +17,7 @@ namespace rendering
         PointLight(const glm::vec3 &position, const glm::vec3 &colour = glm::vec3(1.0f));
         ~PointLight();
 
-        void update(std::shared_ptr<AnimationProperties> &animProps) override;
+        void update(const std::shared_ptr<AnimationProperties> &animProps) override;
         void confShadowMap() override;
 
 		float getNear();
@@ -55,13 +55,13 @@ namespace rendering
         glm::vec3 getLightDirection() { return glm::normalize(-m_lightPos); }
 
         void setLightPosition(glm::vec3 &pos);
-        void setOrtho(float orthoSize, float nearPlane, float farPlane);
+        void setOrtho(float orthoSize, float near, float far);
 
     private:
         glm::vec3 m_lightPos;
         float m_orthoSize = 10.0f;
-        float m_nearPlane = 1.0f;
-        float m_farPlane = 25.0f;
+        float m_near = 1.0f;
+        float m_far = 25.0f;
 
 		void buildMatrix() override;
 		void initShader();
@@ -77,7 +77,7 @@ namespace rendering
         SpotLight(const glm::vec3& position, const glm::vec3& direction, float cutOff, float outerCutOff, const glm::vec3& colour = glm::vec3(1.0f));
         ~SpotLight() override;
 
-        void update(std::shared_ptr<AnimationProperties> &animProps) override;
+        void update(const std::shared_ptr<AnimationProperties> &animProps) override;
         void confShadowMap() override;
 
         glm::mat4& getLightSpaceMatrix();
@@ -91,6 +91,8 @@ namespace rendering
         glm::vec3 m_direction;
         float m_cutOff;
         float m_outerCutOff;
+		float m_near = 1.0f;
+		float m_far = 25.0f;
 
 		void buildMatrix() override;
 		void initShader();

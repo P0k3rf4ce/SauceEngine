@@ -1,8 +1,11 @@
 #ifndef RENDER_PROPERTIES_HPP
 #define RENDER_PROPERTIES_HPP
 
+#include "shared/Scene.hpp"
 #include "modeling/ModelProperties.hpp"
 #include <glm/glm.hpp>
+
+class Scene;
 
 namespace rendering {
 

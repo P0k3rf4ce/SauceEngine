@@ -5,15 +5,17 @@
 #include <vector>
 #include <memory>
 
+#include "shared/Scene.hpp"
 #include "shared/Object.hpp"
 #include "utils/Camera.hpp"
 
 namespace rendering { class LightProperties; }
+class Object;
 
 struct Skybox {
-	unsigned int irradiance;
-	unsigned int prefilter;
-	unsigned int brdf;
+	int irradiance;
+	int prefilter;
+	int brdf;
 };
 
 class Scene {
@@ -43,7 +45,7 @@ public:
 	void renderObjects(bool shadow = false, std::shared_ptr<rendering::LightProperties> lightProps = nullptr);
     double update(double deltatime, double DELTA_STEP);
 
-    static std::shared_ptr<Scene> getActiveScene();
+    static std::shared_ptr<Scene> get_active_scene();
     static void set_active_scene(std::shared_ptr<Scene> s);
 
     static unsigned int scr_width;

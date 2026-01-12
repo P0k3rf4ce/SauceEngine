@@ -10,7 +10,7 @@
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
-#include "utils/Logger.hpp"
+//#include "utils/Logger.hpp"
 
 enum SHADER_TYPE {
   UNINITIALIZED,
@@ -63,11 +63,13 @@ void bind();
 void unbind();
 
 Shader() {
-  LOG_DEBUG("Shader object created");
+  //LOG_DEBUG("Shader object created");
+	std::cout << "Shader object created";
 }
 
 ~Shader(){
-  LOG_DEBUG("Shader object destroyed");
+  //LOG_DEBUG("Shader object destroyed");
+	std::cout << "Shader object destroyed";
   
   // Check if OpenGL context is still valid before making OpenGL calls
   // This prevents segfaults during shutdown
@@ -77,7 +79,8 @@ Shader() {
   }
 
   if (bound) {
-    LOG_WARN_F("Shader %d is still bound during destruction. Forcing unbind.", shaderProgram);
+    //LOG_WARN_F("Shader %d is still bound during destruction. Forcing unbind.", shaderProgram);
+	  std::cout << "Shader " << shaderProgram << " is still bound during destruction. Forcing unbind.";
     unbind();
   }
   

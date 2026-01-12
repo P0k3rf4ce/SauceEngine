@@ -11,7 +11,7 @@
 #include <iostream>
 
 #include "shared/Scene.hpp"
-#include "utils/Logger.hpp"
+//#include "utils/Logger.hpp"
 
 static bool firstMouse = true;
 static float lastX = 0.f;

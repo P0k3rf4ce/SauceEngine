@@ -65,7 +65,7 @@ namespace
 
             if (!allocateColorTextureRGBA16F(&pingTex[i], widthFixed, heightFixed))
             {
-                LOG_ERROR(("Bloom: failed to allocate ping-pong texture " + std::to_string(i)).c_str());
+                //LOG_ERROR(("Bloom: failed to allocate ping-pong texture " + std::to_string(i)).c_str());
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
                 return false;
             }
@@ -75,9 +75,9 @@ namespace
             GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
             if (status != GL_FRAMEBUFFER_COMPLETE)
             {
-                LOG_ERROR(("Bloom: ping-pong FBO " + std::to_string(i) + " incomplete (0x" +
-                           std::to_string(static_cast<unsigned int>(status)) + ")")
-                              .c_str());
+                //LOG_ERROR(("Bloom: ping-pong FBO " + std::to_string(i) + " incomplete (0x" +
+                           //std::to_string(static_cast<unsigned int>(status)) + ")")
+                              //.c_str());
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
                 return false;
             }
@@ -99,7 +99,7 @@ namespace
 
         if (!allocateColorTextureRGBA16F(&outTex, widthFixed, heightFixed))
         {
-            LOG_ERROR("Bloom: failed to allocate output texture");
+            //LOG_ERROR("Bloom: failed to allocate output texture");
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             return false;
         }
@@ -109,7 +109,7 @@ namespace
         GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
         if (status != GL_FRAMEBUFFER_COMPLETE)
         {
-            LOG_ERROR(("Bloom: output FBO incomplete (0x" + std::to_string(static_cast<unsigned int>(status)) + ")").c_str());
+            //LOG_ERROR(("Bloom: output FBO incomplete (0x" + std::to_string(static_cast<unsigned int>(status)) + ")").c_str());
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             return false;
         }
@@ -138,7 +138,7 @@ namespace
         bool ok = blurShader.loadFromFiles(blurFiles) && combineShader.loadFromFiles(combineFiles);
         if (!ok)
         {
-            LOG_ERROR("Bloom: failed to load blur/combine shaders. Check asset paths.");
+            //LOG_ERROR("Bloom: failed to load blur/combine shaders. Check asset paths.");
             return false;
         }
         shadersReady = true;
@@ -242,7 +242,7 @@ namespace
             return 0;
         if (sourceTex == 0)
         {
-            LOG_ERROR("Bloom: runSeparableGaussianBlur sourceTex == 0");
+            //LOG_ERROR("Bloom: runSeparableGaussianBlur sourceTex == 0");
             return 0;
         }
         if (kernelRadius < 0)
@@ -255,13 +255,13 @@ namespace
         std::vector<float> weights;
         if (!buildGaussianKernel(kernelRadius, sigma, &weights))
         {
-            LOG_ERROR("Bloom: buildGaussianKernel failed.");
+            //LOG_ERROR("Bloom: buildGaussianKernel failed.");
             blurShader.unbind();
             return 0;
         }
         if (!uploadKernelToShader(&blurShader, kernelRadius, &weights))
         {
-            LOG_ERROR("Bloom: uploadKernelToShader failed.");
+            //LOG_ERROR("Bloom: uploadKernelToShader failed.");
             blurShader.unbind();
             return 0;
         }
@@ -336,7 +336,7 @@ bool initBloom(int width, int height)
     if (width <= 0 || height <= 0)
     {
         std::string errMsg = "initBloom: invalid size " + std::to_string(width) + "x" + std::to_string(height);
-        LOG_ERROR(errMsg.c_str());
+       //LOG_ERROR(errMsg.c_str());
         return false;
     }
     widthFixed = width;
@@ -359,12 +359,12 @@ GLuint applyBloom(GLuint sceneTex,
 {
     if (sceneTex == 0 || brightTex == 0)
     {
-        LOG_ERROR(("applyBloom: invalid inputs (sceneTex=" + std::to_string(sceneTex) + ", brightTex=" + std::to_string(brightTex) + ").").c_str());
+       //LOG_ERROR(("applyBloom: invalid inputs (sceneTex=" + std::to_string(sceneTex) + ", brightTex=" + std::to_string(brightTex) + ").").c_str());
         return 0;
     }
     if (!shadersReady || outFbo == 0 || pingFbo[0] == 0 || pingFbo[1] == 0)
     {
-        LOG_ERROR("applyBloom: bloom not initialized. Call initBloom(width, height) first.");
+       //LOG_ERROR("applyBloom: bloom not initialized. Call initBloom(width, height) first.");
         return 0;
     }
 
@@ -380,14 +380,14 @@ GLuint applyBloom(GLuint sceneTex,
         currentSource = runSeparableGaussianBlur(currentSource, kernelRadius, sigma);
         if (currentSource == 0)
         {
-            LOG_ERROR(("applyBloom: blur pass " + std::to_string(i) + " failed.").c_str());
+           //LOG_ERROR(("applyBloom: blur pass " + std::to_string(i) + " failed.").c_str());
             return 0;
         }
     }
 
     if (!compositeSceneAndBloom(sceneTex, currentSource, exposure))
     {
-        LOG_ERROR("applyBloom: composite failed.");
+       //LOG_ERROR("applyBloom: composite failed.");
         return 0;
     }
     return outTex;
@@ -401,24 +401,24 @@ GLuint applyBloomWithKernel(GLuint sceneTex,
 {
     if (sceneTex == 0 || brightTex == 0)
     {
-        LOG_ERROR(("applyBloomWithKernel: invalid inputs (sceneTex=" + std::to_string(sceneTex) + ", brightTex=" + std::to_string(brightTex) + ").").c_str());
+       //LOG_ERROR(("applyBloomWithKernel: invalid inputs (sceneTex=" + std::to_string(sceneTex) + ", brightTex=" + std::to_string(brightTex) + ").").c_str());
         return 0;
     }
     if (!shadersReady || outFbo == 0 || pingFbo[0] == 0 || pingFbo[1] == 0)
     {
-        LOG_ERROR("applyBloomWithKernel: bloom not initialized. Call initBloom(width, height) first.");
+       //LOG_ERROR("applyBloomWithKernel: bloom not initialized. Call initBloom(width, height) first.");
         return 0;
     }
 
     GLuint blurred = runSeparableGaussianBlur(brightTex, kernelRadius, sigma);
     if (blurred == 0)
     {
-        LOG_ERROR("applyBloomWithKernel: blur failed.");
+       //LOG_ERROR("applyBloomWithKernel: blur failed.");
         return 0;
     }
     if (!compositeSceneAndBloom(sceneTex, blurred, exposure))
     {
-        LOG_ERROR("applyBloomWithKernel: composite failed.");
+       //LOG_ERROR("applyBloomWithKernel: composite failed.");
         return 0;
     }
     return outTex;

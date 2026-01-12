@@ -6,7 +6,7 @@
 
 #include <glad/glad.h>
 
-#include "utils/Logger.hpp"
+//#include "utils/Logger.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>

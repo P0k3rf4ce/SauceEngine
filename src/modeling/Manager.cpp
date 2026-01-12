@@ -7,11 +7,13 @@ void AssetManager::load_file(std::string GLTF_path) {
     // check if file has been loaded already
     for (auto &scene: this->scenes){
         if (scene.path == GLTF_path) {        // file found
-            LOG_INFO_F("{} has been found", GLTF_path);
+            //LOG_INFO_F("{} has been found", GLTF_path);
+			std::cout << GLTF_path << " has been found";
             
             // file is still loaded
             if (!scene.is_marked_unloaded) {
-                LOG_INFO_F("{} is already loaded", GLTF_path);
+                //LOG_INFO_F("{} is already loaded", GLTF_path);
+				std::cout << GLTF_path << " is already loaded";
                 return;
             }
             scene.is_marked_unloaded = false;
@@ -21,7 +23,8 @@ void AssetManager::load_file(std::string GLTF_path) {
             
             // check if changed
             if (loaded_models.size() != scene.contents.size()) {
-                LOG_ERROR_F("Number of models have changed since this was last loaded {} != {}", loaded_models.size(), scene.contents.size());
+                //LOG_ERROR_F("Number of models have changed since this was last loaded {} != {}", loaded_models.size(), scene.contents.size());
+				std::cout << "Number of models have changed since this was last loaded " << loaded_models.size() << " != " << "scene.contents.size()";
                 return;
             }
 
@@ -35,13 +38,15 @@ void AssetManager::load_file(std::string GLTF_path) {
                     }
                 }
             }
-            LOG_INFO_F("{} reloaded into memory", GLTF_path);
+            //LOG_INFO_F("{} reloaded into memory", GLTF_path);
+			std::cout << GLTF_path << " reloaded into memory";
             return;
         }
     }
 
     // file has not been loaded yet.
-    LOG_INFO_F("Found new file: {}", GLTF_path);
+    //LOG_INFO_F("Found new file: {}", GLTF_path);
+	std::cout << "Found new file: " << GLTF_path;
 
     auto loaded_models = modeling::ModelLoader::loadModels(GLTF_path, this->shaders);
     MaybeContents contents;
@@ -55,14 +60,16 @@ void AssetManager::load_file(std::string GLTF_path) {
         false,
         contents
     });
-    LOG_INFO_F("{} added to manager", GLTF_path);
+    //LOG_INFO_F("{} added to manager", GLTF_path);
+	std::cout << GLTF_path << " added to manager";
 
 }
 
 void AssetManager::mark_unloadable(std::string GLTF_path) {
     for (auto &scene: this->scenes) {
         if (scene.path == GLTF_path) {// file found
-            LOG_INFO_F("{} found", GLTF_path);
+            //LOG_INFO_F("{} found", GLTF_path);
+			std::cout << GLTF_path << " found";
             scene.is_marked_unloaded = true;
             
             // for every loaded model, replace with a maybe loaded variant
@@ -72,11 +79,13 @@ void AssetManager::mark_unloadable(std::string GLTF_path) {
                     maybe_model = MaybeUnloadedModel(std::move(*loaded_model));
                 }
             }
-            LOG_INFO_F("{} marked unloadable", GLTF_path);
+            //LOG_INFO_F("{} marked unloadable", GLTF_path);
+			std::cout << GLTF_path << " marked unloadable";
             return;
         }
     }
 
-    LOG_ERROR_F("Attempted to unload unregistered file: {}", GLTF_path);
+    //LOG_ERROR_F("Attempted to unload unregistered file: {}", GLTF_path);
+	std::cout << "Attempted to unload unregistered file: " << GLTF_path;
 }
 

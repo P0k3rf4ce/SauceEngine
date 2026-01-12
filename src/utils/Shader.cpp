@@ -1,5 +1,5 @@
 #include "utils/Shader.hpp"
-#include "utils/Logger.hpp"
+//#include "utils/Logger.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -34,7 +34,7 @@ bool Shader::compileShader(GLuint& shader, SHADER_TYPE shaderType, const std::st
     if (!success) {
         GLchar infoLog[1024];
         glGetShaderInfoLog(shader, 1024, NULL, infoLog);
-        LOG_ERROR("Shader compilation failed: " + std::string(infoLog));
+       //LOG_ERROR("Shader compilation failed: " + std::string(infoLog));
         glDeleteShader(shader);
         return false;
     }
@@ -51,13 +51,13 @@ void Shader::checkCompileErrors(GLuint shader, const std::string& type) {
         glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
         if (!success) {
             glGetShaderInfoLog(shader, 1024, NULL, infoLog);
-            LOG_ERROR_F("%s shader compilation failed: %s", type.c_str(), infoLog);
+           //LOG_ERROR_F("%s shader compilation failed: %s", type.c_str(), infoLog);
         }
     } else {
         glGetProgramiv(shader, GL_LINK_STATUS, &success);
         if (!success) {
             glGetProgramInfoLog(shader, 1024, NULL, infoLog);
-            LOG_ERROR_F("Program linking failed: %s", infoLog);
+           //LOG_ERROR_F("Program linking failed: %s", infoLog);
         }
     }
 }
@@ -67,7 +67,7 @@ void Shader::checkCompileErrors(GLuint shader, const std::string& type) {
 bool Shader::addShader(SHADER_TYPE shaderType, const std::string& source) {
     // Check if this shader type already exists
     if (shaderMap.find(shaderType) != shaderMap.end()) {
-        LOG_WARN("Shader type already exists. Use replaceShader() to replace it.");
+       //LOG_WARN("Shader type already exists. Use replaceShader() to replace it.");
         return false;
     }
     
@@ -75,7 +75,7 @@ bool Shader::addShader(SHADER_TYPE shaderType, const std::string& source) {
     if (compileShader(shader, shaderType, source)) {
         shaders.push_back(shader);
         shaderMap[shaderType] = shader;
-                LOG_DEBUG("Shader type added successfully");
+               //LOG_DEBUG("Shader type added successfully");
         return true;
     }
     return false;
@@ -93,7 +93,7 @@ bool Shader::replaceShader(SHADER_TYPE shaderType, const std::string& source) {
     if (compileShader(shader, shaderType, source)) {
         shaders.push_back(shader);
         shaderMap[shaderType] = shader;
-        LOG_DEBUG_F("Shader type %d replaced successfully", shaderType);
+       //LOG_DEBUG_F("Shader type %d replaced successfully", shaderType);
         // Clear uniform cache since the program will need to be relinked
         uniformCache.clear();
         
@@ -122,7 +122,7 @@ bool Shader::removeShader(SHADER_TYPE shaderType) {
         // Remove from map
         shaderMap.erase(it);
         
-        LOG_DEBUG_F("Shader type %d removed successfully", shaderType);
+       //LOG_DEBUG_F("Shader type %d removed successfully", shaderType);
 
         // Clear uniform cache since the program will need to be relinked
         uniformCache.clear();
@@ -130,7 +130,7 @@ bool Shader::removeShader(SHADER_TYPE shaderType) {
         return true;
     }
 
-    LOG_WARN_F("Shader type %d not found", shaderType);
+   //LOG_WARN_F("Shader type %d not found", shaderType);
     return false;
 }
 
@@ -140,7 +140,7 @@ bool Shader::removeShader(SHADER_TYPE shaderType) {
 */
 bool Shader::linkProgram() {
     if (shaders.empty()) {
-        LOG_ERROR("No shaders to link");
+       //LOG_ERROR("No shaders to link");
         return false;
     }
     
@@ -185,7 +185,7 @@ bool Shader::loadFromFiles(const std::unordered_map<SHADER_TYPE, std::string>& s
     for (const auto& pair : shaderFiles) {
         std::ifstream file(pair.second);
         if (!file.is_open()) {
-            LOG_ERROR_F("Failed to open shader file: %s", pair.second.c_str());
+           //LOG_ERROR_F("Failed to open shader file: %s", pair.second.c_str());
             return false;
         }
         
@@ -238,7 +238,7 @@ GLint Shader::getUniformLocation(const std::string& name) {
     uniformCache[name] = location;
     
     if (location == -1) {
-        LOG_WARN_F("Uniform '%s' not found for shader program %d", name.c_str(), shaderProgram);
+       //LOG_WARN_F("Uniform '%s' not found for shader program %d", name.c_str(), shaderProgram);
     }
     
     return location;
@@ -257,7 +257,7 @@ GLint Shader::getUniformLocation(const std::string& name) {
 */
 void Shader::ensureShaderActive(std::function<void()> uniformSetter) {
     if (shaderProgram == 0) {
-        LOG_WARN("Cannot set uniform - no shader program created");
+       //LOG_WARN("Cannot set uniform - no shader program created");
         return;
     }
     
@@ -345,7 +345,7 @@ void Shader::setUniform(const std::string& name, const glm::mat4& mat) {
     GLint location = getUniformLocation(name);
     if (location != -1) {
         ensureShaderActive([&]() {
-            glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(mat));
+            glUniformMatrix4fv(location, 1, GL_FALSE, &mat[0][0]);
         });
     }
 }
@@ -356,16 +356,16 @@ void Shader::setUniform(const std::string& name, const glm::mat4& mat) {
  */
 void Shader::bind() {
     if (shaderProgram == 0) {
-        LOG_ERROR("Error: Cannot bind shader - no program created");
+       //LOG_ERROR("Error: Cannot bind shader - no program created");
         return;
     }
     
     if (!bound) {
         glUseProgram(shaderProgram);
         bound = true;
-        LOG_DEBUG("Shader bound and activated successfully");
+       //LOG_DEBUG("Shader bound and activated successfully");
     } else {
-        LOG_WARN_F("Shader %d is already unbound", shaderProgram);
+       //LOG_WARN_F("Shader %d is already unbound", shaderProgram);
     }
 }
 
@@ -373,9 +373,9 @@ void Shader::unbind() {
     if (bound) {
         glUseProgram(0);
         bound = false;
-        LOG_DEBUG_F("Shader %d unbound successfully", shaderProgram);
+       //LOG_DEBUG_F("Shader %d unbound successfully", shaderProgram);
     } else {
-        LOG_WARN_F("Shader %d is already unbound", shaderProgram);
+       //LOG_WARN_F("Shader %d is already unbound", shaderProgram);
     }
 }
 

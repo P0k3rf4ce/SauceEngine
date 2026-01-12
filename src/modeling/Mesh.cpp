@@ -1,7 +1,7 @@
 #include <glad/glad.h>
 
 #include "modeling/Mesh.hpp"
-#include "utils/Logger.hpp"
+//#include "utils/Logger.hpp"
 
 using namespace std;
 
@@ -56,17 +56,20 @@ bool Mesh::validate() {
 	auto nvert = this->vertices.size();
 
 	if (nvert < 1) {
-		LOG_ERROR("Bad mesh contains no vertices");
+		//LOG_ERROR("Bad mesh contains no vertices");
+		std::cout << "Bad mesh contains no vertices";
 		return false;
 	}
 	if (this->indices.size() <= 1) {
-		LOG_ERROR_F("Bad mesh has %d indices",this->indices.size());
+		//LOG_ERROR_F("Bad mesh has %d indices",this->indices.size());
+		std::cout << "Bad mesh has " << this->indices.size() << " indices";
 		return false;
 	}
 
 	for (int i=0; i<this->indices.size(); i++) {
 		if (this->indices[i] >= nvert) {
-			LOG_ERROR_F("Bad mesh: indices[%d]=%d, exceeding %d vertices",i,this->indices[i],nvert);
+			//LOG_ERROR_F("Bad mesh: indices[%d]=%d, exceeding %d vertices",i,this->indices[i],nvert);
+			std::cout << "Bad mesh: indices[" << i << "]=" << this->indices[i] << ", exceeding " << nvert << " vertices";
 			return false;
 		}
 	}

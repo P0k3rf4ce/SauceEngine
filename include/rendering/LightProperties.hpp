@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include <glm/glm.hpp>
 #include <glad/glad.h>
 
@@ -12,6 +14,7 @@ using namespace animation;
 
 namespace rendering
 {
+	class RenderProperties;
 
     // abstract base class for light properties
     class LightProperties
@@ -33,12 +36,16 @@ namespace rendering
 		void setLightObj(std::shared_ptr<RenderProperties> obj);
 		void setLightAnimObj(std::shared_ptr<AnimationProperties> obj);
 
-        virtual void update(std::shared_ptr<AnimationProperties>& animProps);
+		void setSelfPtr(std::shared_ptr<LightProperties> p);
+
+        virtual void update(const std::shared_ptr<AnimationProperties>& animProps = nullptr);
 
     protected:
         glm::vec3 m_colour;
 		std::shared_ptr<RenderProperties> m_lightObject = nullptr;
 		std::shared_ptr<AnimationProperties> m_lightObjectAnim = nullptr;
+
+		std::shared_ptr<LightProperties> m_selfPtr = nullptr;
 
         // shadow map resources
         GLuint m_depthMapFBO = 0;

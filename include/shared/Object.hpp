@@ -8,6 +8,7 @@
 #include "modeling/ModelProperties.hpp"
 #include "rendering/RenderProperties.hpp"
 
+#include "rendering/LightProperties.hpp"
 namespace rendering { class LightProperties; }
 
 class Object {

@@ -1,5 +1,5 @@
 #include "modeling/ModelLoader.hpp"
-#include "utils/Logger.hpp"
+//#include "utils/Logger.hpp"
 #include <filesystem>
 #include <iostream>
 // commented out to avoid compile errors
@@ -17,7 +17,7 @@ namespace modeling {
         const std::string& filePath, 
         std::shared_ptr<Shader> shader
     ) {
-        LOG_INFO_F("Loading models from file: %s", filePath.c_str());
+        //LOG_INFO_F("Loading models from file: %s", filePath.c_str());
         
         // Create Assimp importer
         Assimp::Importer importer;
@@ -38,13 +38,13 @@ namespace modeling {
         
         // Validate the loaded scene
         if (!validateScene(scene)) {
-            LOG_ERROR_F("Failed to load model from file: %s", filePath.c_str());
-            LOG_ERROR_F("Assimp error: %s", importer.GetErrorString());
+            //LOG_ERROR_F("Failed to load model from file: %s", filePath.c_str());
+            //LOG_ERROR_F("Assimp error: %s", importer.GetErrorString());
             return {};
         }
         
-        LOG_INFO_F("Successfully loaded scene with %d meshes, %d materials",
-                scene->mNumMeshes, scene->mNumMaterials);
+        //LOG_INFO_F("Successfully loaded scene with %d meshes, %d materials",
+                //scene->mNumMeshes, scene->mNumMaterials);
 
         // Process the scene and return models
         return processScene(scene, shader, filePath);
@@ -55,24 +55,24 @@ namespace modeling {
         std::shared_ptr<Shader> shader,
         const std::string& filePath
     ) {
-        LOG_DEBUG("Processing scene...");
+        //LOG_DEBUG("Processing scene...");
 
         std::vector<std::shared_ptr<Model>> models;
 
         // Get the directory containing the model file for texture loading
         std::string modelDir = getDirectoryPath(filePath);
-        LOG_DEBUG_F("Model directory: %s", modelDir.c_str());
+        //LOG_DEBUG_F("Model directory: %s", modelDir.c_str());
 
         // Create texture cache for this scene
         TextureCache textureCache;
 
         // Load all materials first
         std::vector<std::shared_ptr<Material>> materials = loadMaterials(scene, textureCache, modelDir);
-        LOG_INFO_F("Loaded %d materials", static_cast<int>(materials.size()));
+        //LOG_INFO_F("Loaded %d materials", static_cast<int>(materials.size()));
 
         // Load GLTF extensions
         std::unordered_map<std::string, PropertyValue> gltfExtensions = loadGLTFExtensions(scene);
-        LOG_INFO_F("Loaded %d GLTF extensions", static_cast<int>(gltfExtensions.size()));
+        //LOG_INFO_F("Loaded %d GLTF extensions", static_cast<int>(gltfExtensions.size()));
 
         // Map to store node metadata for each model
         std::unordered_map<std::shared_ptr<Model>, std::unordered_map<std::string, PropertyValue>> nodeData;
@@ -87,7 +87,7 @@ namespace modeling {
             applyGLTFExtensions(model, gltfExtensions);
         }
 
-        LOG_INFO_F("Successfully processed scene into %d models", static_cast<int>(models.size()));
+        //LOG_INFO_F("Successfully processed scene into %d models", static_cast<int>(models.size()));
         return models;
     }
 
@@ -99,8 +99,8 @@ namespace modeling {
         std::shared_ptr<Shader> shader,
         std::unordered_map<std::shared_ptr<Model>, std::unordered_map<std::string, PropertyValue>>& nodeData
     ) {
-        LOG_DEBUG_F("Processing node: %s (meshes: %d, children: %d)",
-                    node->mName.C_Str(), node->mNumMeshes, node->mNumChildren);
+        //LOG_DEBUG_F("Processing node: %s (meshes: %d, children: %d)",
+                    //node->mName.C_Str(), node->mNumMeshes, node->mNumChildren);
 
         // Store node metadata
         std::unordered_map<std::string, PropertyValue> metadata;
@@ -166,10 +166,10 @@ namespace modeling {
 
                 models.push_back(model);
 
-                LOG_DEBUG_F("Created model from node '%s', mesh '%s'",
-                           node->mName.C_Str(), assimpMesh->mName.C_Str());
+                //LOG_DEBUG_F("Created model from node '%s', mesh '%s'",
+                           //node->mName.C_Str(), assimpMesh->mName.C_Str());
             } else {
-                LOG_WARN_F("Failed to load mesh: %s", assimpMesh->mName.C_Str());
+                //LOG_WARN_F("Failed to load mesh: %s", assimpMesh->mName.C_Str());
             }
         }
 
@@ -187,22 +187,22 @@ namespace modeling {
 
     bool ModelLoader::validateScene(const aiScene* scene) {
         if (!scene) {
-            LOG_ERROR("Scene is null");
+            //LOG_ERROR("Scene is null");
             return false;
         }
         
         if (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) {
-            LOG_ERROR("Scene data is incomplete");
+            //LOG_ERROR("Scene data is incomplete");
             return false;
         }
         
         if (!scene->mRootNode) {
-            LOG_ERROR("Scene has no root node");
+            //LOG_ERROR("Scene has no root node");
             return false;
         }
         
         if (scene->mNumMeshes == 0) {
-            LOG_WARN("Scene contains no meshes");
+            //LOG_WARN("Scene contains no meshes");
             // This might be valid for some files, so don't return false
         }
         
@@ -212,14 +212,14 @@ namespace modeling {
     // TODO: Mesh loader 
 
     std::shared_ptr<Mesh> ModelLoader::loadMeshFromNode(aiMesh* mesh, const aiScene* scene, std::shared_ptr<Shader> shader) {
-        LOG_DEBUG_F("Loading mesh: %s", mesh->mName.C_Str());
+        //LOG_DEBUG_F("Loading mesh: %s", mesh->mName.C_Str());
 
         std::vector<Vertex> vertices;
         std::vector<unsigned int> indices;
 
         // Call the mesh processing function
         if (!processMesh(mesh, vertices, indices)) {
-            LOG_ERROR_F("Failed to process mesh: %s", mesh->mName.C_Str());
+            //LOG_ERROR_F("Failed to process mesh: %s", mesh->mName.C_Str());
             return nullptr;
         }
 
@@ -228,7 +228,7 @@ namespace modeling {
             bool setupGL = (shader != nullptr);
             return std::make_shared<Mesh>(vertices, indices, setupGL);
         } catch (const std::exception& e) {
-            LOG_ERROR_F("Failed to create Mesh object: %s", e.what());
+            //LOG_ERROR_F("Failed to create Mesh object: %s", e.what());
             return nullptr;
         }
     }
@@ -262,7 +262,7 @@ namespace modeling {
     unsigned int nfaces = mesh->mNumFaces;
 
 		if (nvertices < 1) {
-			LOG_ERROR("Mesh has no vertices, fail");
+			//LOG_ERROR("Mesh has no vertices, fail");
 			return false;
 		}
 		if (!(mesh->HasFaces())) {
@@ -271,7 +271,7 @@ namespace modeling {
 			 * faces via "special scene flags" but I'm
 			 * assuming this is out of scope
 			 */
-			LOG_ERROR("Mesh has no indices, fail");
+			//LOG_ERROR("Mesh has no indices, fail");
 			return false;
 		}
 
@@ -301,7 +301,7 @@ namespace modeling {
 				 * Therefore we should consider it an error if
 				 * a mesh gets to this point with no normals.
 				 */
-				LOG_ERROR("Mesh loader: mesh has no normal vectors, did assimp fail to generate them?");
+				//LOG_ERROR("Mesh loader: mesh has no normal vectors, did assimp fail to generate them?");
 				return false;
 			}
 
@@ -316,11 +316,11 @@ namespace modeling {
 			}
 
 			vertices.push_back(v);
-			LOG_DEBUG_F("vertex {}: <{},{},{}>, UV=({}, {}), normal <{},{},{}>",i,
-					v.Position.x,v.Position.y,v.Position.z,
-					v.TexCoords.x,v.TexCoords.y,
-					v.Normal.x,v.Normal.y,v.Normal.z
-			);
+			//LOG_DEBUG_F("vertex {}: <{},{},{}>, UV=({}, {}), normal <{},{},{}>",i,
+					//v.Position.x,v.Position.y,v.Position.z,
+					//v.TexCoords.x,v.TexCoords.y,
+					//v.Normal.x,v.Normal.y,v.Normal.z
+			//);
 		}
 
         /* fetch faces/indices */
@@ -330,7 +330,7 @@ namespace modeling {
 
 			/* skip points/lines, only load triangles */
 			if (f.mNumIndices!=3) {
-				LOG_INFO_F("Mesh loader: faces[{}] is not a triangle, skipping",i);
+				//LOG_INFO_F("Mesh loader: faces[{}] is not a triangle, skipping",i);
 				continue;
 			}
 
@@ -339,7 +339,7 @@ namespace modeling {
                 idx = f.mIndices[j];
 				/* check for indices out of bounds - we cannot use vertex 4 of a triangle */
                 if (idx>=nvertices) {
-                    LOG_ERROR_F("Mesh loader: indices[{}] of faces[{}]={}, but there are only {} vertices", j, i, idx, nvertices);
+                    //LOG_ERROR_F("Mesh loader: indices[{}] of faces[{}]={}, but there are only {} vertices", j, i, idx, nvertices);
 					return false;
 				}
                 indices.push_back(idx);
@@ -348,11 +348,11 @@ namespace modeling {
 
         /* if for some reason the model has faces but they are all points/lines, fail to load */
         if (indices.empty()) {
-            LOG_ERROR("Mesh loader: mesh did not contain any triangles");
+            //LOG_ERROR("Mesh loader: mesh did not contain any triangles");
             return false;
         }
 
-        LOG_DEBUG_F("Mesh loaded: %u vertices, %zu indices", nvertices, indices.size());
+        //LOG_DEBUG_F("Mesh loaded: %u vertices, %zu indices", nvertices, indices.size());
 
         return true;
     }
@@ -389,7 +389,7 @@ namespace modeling {
                     const aiTexture* embeddedTex = scene->mTextures[idx];
                     return cache.getEmbeddedTexture(embeddedTex);
                 }
-                LOG_WARN_F("Invalid embedded texture index: %d", idx);
+                //LOG_WARN_F("Invalid embedded texture index: %d", idx);
                 return cache.getDefaultTexture();
             }
 
@@ -398,7 +398,7 @@ namespace modeling {
             std::string texturePathStr = texturePath.string();
 
             if (!std::filesystem::exists(texturePath)) {
-                LOG_WARN_F("Texture file not found: %s", texturePathStr.c_str());
+                //LOG_WARN_F("Texture file not found: %s", texturePathStr.c_str());
                 return cache.getDefaultTexture();
             }
 
@@ -421,7 +421,7 @@ namespace modeling {
         for (unsigned int i = 0; i < scene->mNumMaterials; i++) {
             auto material = processMaterial(scene->mMaterials[i], scene, cache, modelDir);
             if (!material) {
-                LOG_WARN_F("Failed to process material %d, using fallback", i);
+                //LOG_WARN_F("Failed to process material %d, using fallback", i);
                 material = make_default_material("fallback", cache);
             }
             materials.push_back(std::move(material));
@@ -436,7 +436,7 @@ namespace modeling {
         const std::string& modelDir
     ) {
         if (!aiMat) {
-            LOG_WARN("Null aiMaterial, using default material");
+            //LOG_WARN("Null aiMaterial, using default material");
             return make_default_material("material", cache);
         }
 
@@ -447,7 +447,7 @@ namespace modeling {
             name = ainame.C_Str();
         }
 
-        LOG_DEBUG_F("Processing material: %s", name.c_str());
+        //LOG_DEBUG_F("Processing material: %s", name.c_str());
 
         // Load textures for PBR workflow
         auto base   = loadTextureFromMaterial(aiMat, scene, aiTextureType_DIFFUSE, cache, modelDir);
@@ -463,12 +463,12 @@ namespace modeling {
     }
 
     std::unordered_map<std::string, PropertyValue> ModelLoader::loadGLTFExtensions(const aiScene* scene) {
-        LOG_DEBUG("Loading GLTF extensions from scene");
+        //LOG_DEBUG("Loading GLTF extensions from scene");
         
         std::unordered_map<std::string, PropertyValue> extensions;
         
         if (!scene->mMetaData) {
-            LOG_DEBUG("No metadata found in scene");
+            //LOG_DEBUG("No metadata found in scene");
             return extensions;
         }
         
@@ -503,7 +503,7 @@ namespace modeling {
                         value = std::string(static_cast<aiString*>(entry.mData)->C_Str());
                         break;
                     default:
-                        LOG_WARN_F("Unknown metadata type for key: %s", keyStr.c_str());
+                        //LOG_WARN_F("Unknown metadata type for key: %s", keyStr.c_str());
                         continue;
                 }
                 
@@ -519,7 +519,7 @@ namespace modeling {
         const aiScene* scene, 
         std::unordered_map<std::string, PropertyValue>& extensions
     ) {
-        LOG_DEBUG_F("Processing GLTF node: %s", node->mName.C_Str());
+        //LOG_DEBUG_F("Processing GLTF node: %s", node->mName.C_Str());
         
         std::string nodeName = node->mName.C_Str();
         
@@ -588,22 +588,22 @@ namespace modeling {
             return;
         }
         
-        LOG_DEBUG_F("Applying %d GLTF extensions to model", static_cast<int>(extensions.size()));
+        //LOG_DEBUG_F("Applying %d GLTF extensions to model", static_cast<int>(extensions.size()));
         
         for (const auto& [extensionName, extensionData] : extensions) {
             if (extensionName.find("KHR_materials_unlit") != std::string::npos) {
-                LOG_INFO("Model uses unlit material");
+                //LOG_INFO("Model uses unlit material");
             } else if (extensionName.find("KHR_materials_pbrSpecularGlossiness") != std::string::npos) {
-                LOG_INFO("Model uses PBR specular-glossiness workflow");
+                //LOG_INFO("Model uses PBR specular-glossiness workflow");
             } else if (extensionName.find("KHR_lights_punctual") != std::string::npos) {
-                LOG_INFO("Model contains punctual lights");
+                //LOG_INFO("Model contains punctual lights");
             } else if (extensionName.find("KHR_draco_mesh_compression") != std::string::npos) {
-                LOG_INFO("Model uses Draco compression");
+                //LOG_INFO("Model uses Draco compression");
             } else if (extensionName.find("transform") != std::string::npos) {
-                LOG_DEBUG_F("Transform data: %s", extensionName.c_str());
+                //LOG_DEBUG_F("Transform data: %s", extensionName.c_str());
             } else if (extensionName.find("LOD") != std::string::npos || 
                        extensionName.find("lod") != std::string::npos) {
-                LOG_INFO_F("LOD information: %s", extensionName.c_str());
+                //LOG_INFO_F("LOD information: %s", extensionName.c_str());
             }
         }
     }
