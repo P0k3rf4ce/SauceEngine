@@ -1,7 +1,8 @@
-#include "launcher/launcherWindow.hpp"
-#include "launcher/optionParser.hpp"
-#include "launcher/engineMainloop.hpp"
+#include <launcher/launcherWindow.hpp>
+#include <launcher/optionParser.hpp>
+#include <app/SauceEngineApp.hpp>
 
+#include <QApplication>
 #include <QGridLayout>
 #include <QIntValidator>
 #include <QLineEdit>
@@ -82,5 +83,19 @@ void LauncherWindow::onLaunchClicked() {
     ops.tickrate = optionsMap["tickrate"].second->text().toDouble();
     ops.scene_file = optionsMap["scene_file"].second->text().toStdString();
 
-    engine_mainloop(ops);
+    SauceEngineApp mainApp;
+
+    try {
+        mainApp.run();
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+    }
 }
+
+int startupLauncher(int argc, const char** argv) {
+  QApplication app(argc, const_cast<char**>(argv));
+  LauncherWindow window(argc, argv);
+  window.show();
+  return app.exec();
+}
+

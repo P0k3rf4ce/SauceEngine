@@ -15,3 +15,5 @@ scripts
 coverage*
 *.log
 *.profraw
+.cache
+

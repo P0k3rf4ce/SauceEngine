@@ -6,8 +6,6 @@ target_include_directories(utilsLib PRIVATE
   ${PROJECT_SOURCE_DIR}/include
 )
 
-find_package(glad CONFIG REQUIRED)
-target_link_libraries(utilsLib PUBLIC glad::glad)
 
 find_package(glfw3 CONFIG REQUIRED)
 target_link_libraries(utilsLib PUBLIC glfw)

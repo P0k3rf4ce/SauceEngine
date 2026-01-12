@@ -1,5 +1,4 @@
-#ifndef LAUNCHER_WINDOW_HPP
-#define LAUNCHER_WINDOW_HPP
+#pragma once
 
 #include <QWidget>
 #include <QLabel>
@@ -15,17 +14,18 @@ using OptionsMapValue = std::pair<std::unique_ptr<QLabel>, std::unique_ptr<QLine
 using OptionsMap = std::unordered_map<std::string, OptionsMapValue>;
 
 class LauncherWindow : public QWidget {
-    Q_OBJECT
+  Q_OBJECT
 
 public:
-    LauncherWindow(int argc, const char *argv[], QWidget *parent = nullptr);
+  LauncherWindow(int argc, const char *argv[], QWidget *parent = nullptr);
 
 private slots:
-    void onLaunchClicked();
+  void onLaunchClicked();
 
 private:
-    std::vector<std::string> options;
-    OptionsMap optionsMap;
+  std::vector<std::string> options;
+  OptionsMap optionsMap;
 };
 
-#endif
+int startupLauncher(int argc, const char** argv);
+

@@ -1,20 +1,21 @@
 {
+  "name": "sauce-engine",
+  "version": "0.1.0",
   "dependencies": [
-    "assimp",
-    "boost-program-options",
-    "eigen3",
-    "glad",
     "glfw3",
     "glm",
-    "gtest",
-    "opengl",
-    "opengl-registry",
+    "ktx",
+    "nlohmann-json",
+    "stb",
+    "tinygltf",
+    "tinyobjloader",
+    "vulkan-sdk-components",
+    "boost-program-options",
     {
       "name": "qtbase",
       "features": [
         "widgets"
       ]
-    },
-    "stb"
+    }
   ]
 }
