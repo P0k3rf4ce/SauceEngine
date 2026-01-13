@@ -20,10 +20,10 @@ Download the Vulkan SDK from here: https://vulkan.lunarg.com/sdk/home
 
 After installing, you need to enable the environment variables so CMake and the application can find the Vulkan headers and libraries. 
 
-Add the following to your shell configuration (e.g., `~/.zshrc` or `~/.bashrc`), replacing the path with your actual installation path and version:
+(For Mac users) Add the following to your shell configuration (e.g., `~/.zshrc` or `~/.bashrc`), replacing the path with your actual installation path and version:
 
 ```sh
-source "$HOME/VulkanSDK/1.4.335.1/setup-env.sh"
+source ".../VulkanSDK/<VulkanSDK-version>/setup-env.sh"
 ```
 
 ### Step 1: Download and set up vcpkg
