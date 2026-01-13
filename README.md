@@ -14,6 +14,18 @@ https://cmake.org/download/
 
 download the source distribution and then use the default install settings.
 
+### Step 0.5: Install Vulkan SDK
+
+Download the Vulkan SDK from here: https://vulkan.lunarg.com/sdk/home
+
+After installing, you need to enable the environment variables so CMake and the application can find the Vulkan headers and libraries. 
+
+Add the following to your shell configuration (e.g., `~/.zshrc` or `~/.bashrc`), replacing the path with your actual installation path and version:
+
+```sh
+source "$HOME/VulkanSDK/1.4.335.1/setup-env.sh"
+```
+
 ### Step 1: Download and set up vcpkg
 
 Download vcpkg anywhere on your computer (not in our repo):
