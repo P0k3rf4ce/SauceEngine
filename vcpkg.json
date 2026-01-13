@@ -9,7 +9,6 @@
     "stb",
     "tinygltf",
     "tinyobjloader",
-    "vulkan-sdk-components",
     "boost-program-options",
     {
       "name": "qtbase",
