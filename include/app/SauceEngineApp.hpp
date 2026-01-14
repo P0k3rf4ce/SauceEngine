@@ -261,8 +261,8 @@ private:
   void createDescriptorSetLayout() {
     vk::DescriptorSetLayoutBinding uboLayoutBinding {
       .binding = 0,
-      .descriptorCount = 1,
       .descriptorType = vk::DescriptorType::eUniformBuffer,
+      .descriptorCount = 1,
       .stageFlags = vk::ShaderStageFlagBits::eVertex,
     };
     vk::DescriptorSetLayoutCreateInfo dsLayoutInfo {
@@ -543,8 +543,8 @@ private:
 
   void createDescriptorPool() {
     vk::DescriptorPoolSize poolSize {
-      .descriptorCount = MAX_FRAMES_IN_FLIGHT,
       .type = vk::DescriptorType::eUniformBuffer,
+      .descriptorCount = MAX_FRAMES_IN_FLIGHT,
     };
 
     vk::DescriptorPoolCreateInfo poolCreateInfo {
