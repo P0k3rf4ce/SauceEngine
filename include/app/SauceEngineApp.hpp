@@ -135,7 +135,7 @@ private:
     createSwapChain(); // TODO: Renderer
     createImageViews(); // TODO: Renderer
     createDescriptorSetLayout(); // Keep here
-    createGraphicsPipeline(); // TODO: Renderer 
+    createGraphicsPipeline(); // TODO: GraphicsPipeline 
     createCommandPool(); // TODO: Renderer 
     createVertexBuffer(); // Keep here 
     createIndexBuffer(); // Keep here 
