@@ -19,34 +19,40 @@ public:
 	void set_active(bool active);
 
 
-	// TODO - TASK: implement the methods below
-
 	/**
 	 * Initializes and adds a component of type <T> with name <name>
 	 *
 	 * @param name Name for the new component
 	 */
 	template <typename T>
-	void add_component(const std::string name);
+	void add_component(const std::string name) {
+		// TODO
+	}
 
 	/**
 	 * Removes the most recently added component of a specified type
 	 */
 	template <typename T>
-	void remove_component();
+	void remove_component() {
+		// TODO
+	}
 
 	/**
 	 * Removes the most recently added component of a specified name
 	 *
 	 * @param name Name of the component to remove
 	 */
-	void remove_component(const std::string name);
+	void remove_component(const std::string name) {
+		// TODO
+	}
 
 	/**
 	 * Returns a raw pointer to the most recently added component of a specified type
 	 */
 	template <typename T>
-	T* get_component();
+	T* get_component() {
+		// TODO
+	}
 
 	/*
 	 * Returns a raw pointer to the most recently added component of a specified name
