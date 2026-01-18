@@ -228,15 +228,36 @@ struct Renderer {
     sauce::BufferUtils::copyBuffer(logicalDevice, commandPool, *pQueue, stagingBuffer, indexBuffer, bufferSize);
   }
 
-  void transitionImageLayout(
-    uint32_t imageIndex,
+  /**
+   * @brief Transitions a swapchain image from one layout to another.
+   *
+   * This function inserts a pipeline barrier specifying:
+   * 1. How the image was accessed previously.
+   * 2. How the image will be accessed next.
+   * 3. Which parts of the image are affected.
+   *
+   * @param imageIndex Index of the swapchain image being transitioned.
+   * @param oldLayout The image's current layout before the transition.
+   * @param newLayout The layout the image must be in for the next operation.
+   * @param srcAccessMask Types of memory access performed before the barrier.
+   * @param dstAccessMask Types of memory access required after the barrier.
+   * @param srcStageMask Pipeline stage where the previous access occurred.
+   * @param dstStageMask Earliest pipeline stage where the next access may occur.
+   *
+   * @throws std::runtime_error If the command buffer is not in the recording state.
+   */
+   void transitionImageLayout(
+    uint32_t imageIndex, 
     vk::ImageLayout oldLayout,
     vk::ImageLayout newLayout,
-    vk::AccessFlags2 srcAccessMask,
-    vk::AccessFlags2 dstAccessMask,
-    vk::PipelineStageFlags2 srcStageMask,
+    vk::AccessFlags2 srcAccessMask, 
+    vk::AccessFlags2 dstAccessMask, 
+    vk::PipelineStageFlags2 srcStageMask, 
     vk::PipelineStageFlags2 dstStageMask
   ) {
+
+    // Describe how the image was being used before, what we will use it for next, and what 
+    // part of the image will be impacted, using the given parameters. 
     vk::ImageMemoryBarrier2 barrier {
       .srcStageMask = srcStageMask,
       .srcAccessMask = srcAccessMask,
@@ -256,73 +277,109 @@ struct Renderer {
       },
     };
 
+    // Create a barrier for this image so we can finish up the previous work
+    // so we can do other things with it safely
     vk::DependencyInfo dependencyInfo {
       .dependencyFlags = {},
       .imageMemoryBarrierCount = 1,
       .pImageMemoryBarriers = &barrier,
     };
 
+    // Set the pipeline barrier for the image
     commandBuffers[frameIndex].pipelineBarrier2(dependencyInfo);
   }
 
+  /**
+   * @brief Records all GPU commands required to render a single frame.
+   *
+   * This function builds the full command buffer for one frame by completing the following:
+   * 1. Transition the swapchain image into a layout for rendering.
+   * 2. Start a dynamic rendering pass after clearing the image.
+   * 3. Bind the graphics pipeline, vertex/index buffers, and descriptor sets.
+   * 4. Set the viewport and scissor state.
+   * 5. Perform a draw call for the current mesh.
+   * 6. Finish the rendering pass and mark the image for presentation.
+   *
+   * The resulting command buffer can be submitted to the graphics queue.
+   *
+   * @param imageIndex Index of the swapchain image that this frame will render into.
+   *
+   * @throws std::runtime_error If command buffer recording fails or if the image
+   *         cannot be transitioned into the required layouts.
+   */
   void recordCommandBuffer(uint32_t imageIndex){
-    commandBuffers[frameIndex].begin({});
+    commandBuffers[frameIndex].begin({});  // start recording items into the frame's command buffer
 
+    // Prepare swapchain image so we can draw on it
     transitionImageLayout(
       imageIndex,
-      vk::ImageLayout::eUndefined,
-      vk::ImageLayout::eColorAttachmentOptimal,
-      {},
-      vk::AccessFlagBits2::eColorAttachmentWrite,
-      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-      vk::PipelineStageFlagBits2::eColorAttachmentOutput
+      vk::ImageLayout::eUndefined, // discard whatever was in the image previously 
+      vk::ImageLayout::eColorAttachmentOptimal, // set image to a render target, able to draw on it now
+      {}, // empty access mask, 
+      vk::AccessFlagBits2::eColorAttachmentWrite, // set to writing colour data to the image
+      vk::PipelineStageFlagBits2::eColorAttachmentOutput, //  treat previous state as if it occurred in the color-attachment stage
+      vk::PipelineStageFlagBits2::eColorAttachmentOutput // attachment writes must finish before any future color attachment operations begin
     );
 
+    // Use to clear image to be all black
     vk::ClearValue clearColor = vk::ClearColorValue { 0.0f, 0.0f, 0.0f, 1.0f };
+
+    // Use to specify how to treat the swapchain image during rendering
     vk::RenderingAttachmentInfo attachmentInfo = {
       .imageView = pSwapChain->getImageViews()[imageIndex],
       .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-      .loadOp = vk::AttachmentLoadOp::eClear,
-      .storeOp = vk::AttachmentStoreOp::eStore,
-      .clearValue = clearColor,
+      .loadOp = vk::AttachmentLoadOp::eClear, // clear image first
+      .storeOp = vk::AttachmentStoreOp::eStore, // keep the final image when done
+      .clearValue = clearColor, // use what was specified above
     };
 
+    // For dynamic rendering
     vk::RenderingInfo renderingInfo {
-      .renderArea = { 
+      .renderArea = {  // rectangle of image to render into
         .offset = { 0, 0 }, 
-        .extent = pSwapChain->getExtent(),
+        .extent = pSwapChain->getExtent(), // render across the whole swapchain image
       },
       .layerCount = 1,
       .colorAttachmentCount = 1,
-      .pColorAttachments = &attachmentInfo,
+      .pColorAttachments = &attachmentInfo, // as specified above
     };
 
+    
     commandBuffers[frameIndex].beginRendering(renderingInfo);
 
-    commandBuffers[frameIndex].bindPipeline(vk::PipelineBindPoint::eGraphics, **pPipeline);
-    commandBuffers[frameIndex].bindVertexBuffers(0, *vertexBuffer, {0});
-    commandBuffers[frameIndex].bindIndexBuffer( *indexBuffer, 0, vk::IndexType::eUint16 );
-    commandBuffers[frameIndex].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pPipeline->getLayout(), 0, *descriptorSets[frameIndex], nullptr);
+    // like a "setup" phase for the image before drawing to it
+    commandBuffers[frameIndex].bindPipeline(vk::PipelineBindPoint::eGraphics, **pPipeline); // bind the desired graphics pipeline, so the gpu knows how to draw things 
+    commandBuffers[frameIndex].bindVertexBuffers(0, *vertexBuffer, {0}); // buffer for the mesh's vertex data
+    commandBuffers[frameIndex].bindIndexBuffer( *indexBuffer, 0, vk::IndexType::eUint16 ); // index buffer listing vertex indices used by drawIndexed
+    commandBuffers[frameIndex].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pPipeline->getLayout(), 0, *descriptorSets[frameIndex], nullptr); // uniform buffers, textures, samplers
+    // end of "setup" phase
 
+    // determines how clip-space coordinates are mapped to the swapchain image
+    // in this case, it will cover the entire image
     commandBuffers[frameIndex].setViewport(
         0, vk::Viewport(0.0f, 0.0f, static_cast<float>(pSwapChain->getExtent().width), 
         static_cast<float>(pSwapChain->getExtent().height), 0.0f, 1.0f));
+
+    // determine where drawing is allowed, currently set to the full image so nothing is clipped
     commandBuffers[frameIndex].setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), pSwapChain->getExtent()));
 
+    // actually invoke drawing, the mesh is rendered here
     commandBuffers[frameIndex].drawIndexed(indices.size(), 1, 0, 0, 0);
 
     commandBuffers[frameIndex].endRendering();
-
+    
+    // Image is finished writing, we can now convert it to somethign that can be shown on screen to the user
     transitionImageLayout(
       imageIndex,
       vk::ImageLayout::eColorAttachmentOptimal,
-      vk::ImageLayout::ePresentSrcKHR,
-      vk::AccessFlagBits2::eColorAttachmentWrite,
+      vk::ImageLayout::ePresentSrcKHR, // swapchain image is ready to be shown on screen
+      vk::AccessFlagBits2::eColorAttachmentWrite, // ensure all color writes are finished
       {},
-      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-      vk::PipelineStageFlagBits2::eBottomOfPipe
+      vk::PipelineStageFlagBits2::eColorAttachmentOutput, 
+      vk::PipelineStageFlagBits2::eBottomOfPipe // set to wait until the last part of the pipeline is done before we show it to the user
     );
 
+    // stop recording commands into the frame's command buffer
     commandBuffers[frameIndex].end();
   }
 
