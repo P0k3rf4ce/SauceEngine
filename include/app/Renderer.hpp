@@ -326,25 +326,44 @@ struct Renderer {
     commandBuffers[frameIndex].end();
   }
 
+  /**
+   * @brief Orchestrates the rendering of a single frame.
+   * * This function handles the synchronization between the CPU and GPU by:
+   * 1. Waiting for the previous frame's fence to ensure resources are free.
+   *    - Fence is a synchronization primitive used to sync the GPU with the CPU.
+   * 2. Acquiring an image from the swapchain.
+   * 3. Recording and submitting command buffers to the graphics queue.
+   * 4. Presenting the finished image back to the screen.
+   * * @param logicalDevice The device handle used to manage synchronization primitives.
+   * @throws std::runtime_error If synchronization fails or the swapchain becomes invalid.
+   */
   void drawFrame(const sauce::LogicalDevice& logicalDevice){
+    // Wait for the in-flight fence to be signaled, ensuring the previous frame finished rendering
+    // This ensures the CPU doesn't submit additional frames while our previous frames are still rendering
     auto fenceResult = logicalDevice->waitForFences(*inFlightFences[frameIndex], vk::True, UINT64_MAX);
     if (fenceResult != vk::Result::eSuccess) {
       throw std::runtime_error("Failed to wait for fence!");
     }
 
+    // Request the next available image from the swap chain (our display engine)
     auto [result, imageIndex] = (*pSwapChain)->acquireNextImage(UINT64_MAX, *presentCompleteSemaphores[frameIndex], nullptr);
 
+    // Verify the swap chain image was acquired successfully (suboptimal is acceptable)
     if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
       throw std::runtime_error("Failed to acquire swap chain image");
     }
 
+    // Reset the fence for the next frame
     logicalDevice->resetFences(*inFlightFences[frameIndex]);
 
+    // Reset and record the command buffer with rendering commands
     commandBuffers[frameIndex].reset();
     recordCommandBuffer(imageIndex);
 
+    // Update the uniform buffer with current transformation matrices
     updateUniformBuffer(frameIndex);
 
+    // Prepare submission: wait for image to be available before starting color attachment output
     vk::PipelineStageFlags waitDestinationStageMask { vk::PipelineStageFlagBits::eColorAttachmentOutput };
     const vk::SubmitInfo submitInfo {
       .waitSemaphoreCount = 1,
@@ -356,8 +375,10 @@ struct Renderer {
       .pSignalSemaphores = &*renderFinishedSemaphores[imageIndex],
     };
 
+    // Submit the command buffer to the queue for execution, signaling the fence when complete
     pQueue->submit(submitInfo, *inFlightFences[frameIndex]);
 
+    // Prepare presentation: wait for rendering to finish before presenting
     const vk::PresentInfoKHR presentInfoKHR {
       .waitSemaphoreCount = 1,
       .pWaitSemaphores = &*renderFinishedSemaphores[imageIndex],
@@ -366,27 +387,47 @@ struct Renderer {
       .pImageIndices = &imageIndex,
     };
 
+    // Present the rendered image to the screen
     result = pQueue->presentKHR(presentInfoKHR);
     if (result != vk::Result::eSuccess) {
       throw std::runtime_error("Failed to present swap chain image!");
     }
 
+    // Advance to the next frame in the circular buffer
     frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
   }
 
+  /**
+   * @brief Updates the Uniform Buffer Object (UBO) with current frame transformations.
+   * * Calculates the elapsed time to handle object rotation and constructs the 
+   *   Model-View-Projection (MVP) matrices. The resulting data is copied directly 
+   *   into the GPU-mapped memory for the specific frame being rendered.
+   * * @note Vulkan's clip space Y-axis is inverted compared to OpenGL. This function 
+   *   manually compensates by flipping the Y-coordinate in the projection matrix.
+   * * @param curImage The index of the current swapchain image/frame being processed.
+   */
   void updateUniformBuffer(uint32_t curImage) {
+    // Record the start time on first call (static initialization)
     static auto startTime = std::chrono::high_resolution_clock::now();
 
+    // Get the current time and calculate elapsed time in seconds
     auto currentTime = std::chrono::high_resolution_clock::now();
     float time = std::chrono::duration<float>(currentTime - startTime).count();
 
+    // Create uniform buffer object with transformation matrices
     sauce::UniformBufferObject ubo {
+      // Model matrix: rotates the object 90 degrees per second around the Z axis
       .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+      // View matrix: camera positioned at (2, 2, 2) looking at the origin
       .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.1f)),
+      // Projection matrix: 45-degree field of view with 0.1-10.0 clipping plane
       .proj = glm::perspective(glm::radians(45.0f), static_cast<float>(pSwapChain->getExtent().width) / static_cast<float>(pSwapChain->getExtent().height), 0.1f, 10.0f),
     };
+    
+    // Flip Y coordinate of projection matrix (Vulkan uses inverted Y compared to OpenGL)
     ubo.proj[1][1] *= -1;
 
+    // Copy the uniform buffer data to GPU-mapped memory for the current frame
     memcpy(uniformBuffersMapped[curImage], &ubo, sizeof(ubo));
   }
 
