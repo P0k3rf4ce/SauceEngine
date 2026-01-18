@@ -6,12 +6,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 project(SauceEngine)
 
-# Add coverage flags for Apple builds
-# if(APPLE)
-#     add_compile_options(-g -fprofile-instr-generate -fcoverage-mapping)
-#     add_link_options(-fprofile-instr-generate -g)
-# endif()
-
 if(WIN32)
   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
@@ -20,29 +14,19 @@ if(WIN32)
 endif()
 
 set(EXEC_NAME SauceEngine)
-add_executable(SauceEngine src/main.cpp)
+add_executable(${EXEC_NAME} src/main.cpp)
+
+if (!WIN32) 
+  target_compile_options(${EXEC_NAME} PUBLIC -Wall -Wpedantic -Wextra -Wreorder-init-list -g -O2)
+endif()
 
 find_package(Vulkan REQUIRED)
 target_link_libraries(${EXEC_NAME} PUBLIC Vulkan::Vulkan)
-
-# find_package(glfw3 CONFIG REQUIRED)
-# target_link_libraries(${PROJECT_NAME} PUBLIC glfw)
 
 find_package(Boost REQUIRED COMPONENTS program_options)
 target_link_libraries(${PROJECT_NAME} PUBLIC Boost::program_options)
 
 find_package(Qt6Widgets CONFIG REQUIRED)
-
-# target_link_libraries(${PROJECT_NAME} PUBLIC Qt6::Widgets)
-# 
-# # Deploy Qt runtime dependencies (DLLs and plugins)
-# if(WIN32)
-#     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-#         COMMAND ${CMAKE_COMMAND} -E echo "Deploying Qt dependencies..."
-#         COMMAND Qt6::windeployqt --no-compiler-runtime --no-translations "$<TARGET_FILE:${PROJECT_NAME}>"
-#         COMMENT "Running windeployqt to deploy Qt dependencies"
-#     )
-# endif()
 
 target_include_directories(SauceEngine PRIVATE
   ${PROJECT_SOURCE_DIR}/include
@@ -72,21 +56,11 @@ endfunction()
 add_slang_shader_target(shadersTarget SOURCES ${SHADERS_DIR}/shader.slang)
 add_dependencies(${EXEC_NAME} shadersTarget)
 
-# add_subdirectory(${PROJECT_SOURCE_DIR}/src/animation)
-# add_subdirectory(${PROJECT_SOURCE_DIR}/src/modeling)
-# add_subdirectory(${PROJECT_SOURCE_DIR}/src/rendering)
-# add_subdirectory(${PROJECT_SOURCE_DIR}/src/shared)
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/launcher)
-# add_subdirectory(${PROJECT_SOURCE_DIR}/src/utils)
-# add_subdirectory(external/osqp)
 
 target_link_libraries(${EXEC_NAME} PRIVATE launcherLib) 
 
-# Suppress duplicate library warnings from Qt6 static plugins on macOS
 if(APPLE)
     target_link_options(${EXEC_NAME} PRIVATE "LINKER:-no_warn_duplicate_libraries")
 endif()
 
-if (BUILD_TESTS)
-    add_subdirectory(${PROJECT_SOURCE_DIR}/test)
-endif()

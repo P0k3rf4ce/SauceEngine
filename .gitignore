@@ -16,4 +16,5 @@ coverage*
 *.log
 *.profraw
 .cache
+shaders/slang.spv
 
