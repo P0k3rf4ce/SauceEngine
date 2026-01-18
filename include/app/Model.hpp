@@ -4,6 +4,7 @@
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
+#include <app/Component.hpp>
 #include <app/Mesh.hpp>
 #include <app/Material.hpp>
 
@@ -23,14 +24,14 @@ struct MeshEntry {
       : mesh(std::move(m)), material(std::move(mat)) {}
 };
 
-struct Model {
-  std::string name;
+class Model : public Component {
+public:
   std::vector<MeshEntry> meshes;
 
-  Model() = default;
+  Model() : Component("Model") {}
 
   explicit Model(std::string modelName)
-      : name(std::move(modelName)) {}
+      : Component(std::move(modelName)) {}
 
   void addMesh(Mesh mesh, MaterialPtr material = nullptr) {
     meshes.emplace_back(std::move(mesh), std::move(material));
@@ -57,6 +58,9 @@ struct Model {
       meshes[meshIndex].material = std::move(material);
     }
   }
+
+  void update(float deltaT) override {}
+  void render() override {}
 };
 
 using ModelPtr = std::shared_ptr<Model>;
