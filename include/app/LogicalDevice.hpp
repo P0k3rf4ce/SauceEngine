@@ -70,7 +70,7 @@ struct LogicalDevice {
     return &device;
   }
 
-  uint32_t getQueueIndex() {
+  uint32_t getQueueIndex() const noexcept {
     return queueIndex;
   }
 
