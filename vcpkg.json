@@ -9,12 +9,6 @@
     "stb",
     "tinygltf",
     "tinyobjloader",
-    "boost-program-options",
-    {
-      "name": "qtbase",
-      "features": [
-        "widgets"
-      ]
-    }
+    "boost-program-options"
   ]
 }

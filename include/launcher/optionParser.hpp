@@ -18,7 +18,6 @@ struct AppOptions {
     double tickrate;
     std::string scene_file;
     bool help;
-    bool skip_launcher;
 
     AppOptions(int argc, const char *argv[]);
     AppOptions(): scr_width(DEFAULT_SCR_WIDTH), scr_height(DEFAULT_SCR_HEIGHT), tickrate(DEFAULT_TICKRATE), scene_file(), help(false) {}
