@@ -124,16 +124,16 @@ Renderer(
   }
 
   /**
-   * @brief Allocates and configures descriptor sets to bind specific buffers to the layout.
+   * @brief Allocates and configures descriptor sets for per-frame uniform buffers.
    *
-   * This function performs three main steps:
-   * 1. **Create Pool:** Creates a `vk::DescriptorPool` large enough to hold the descriptors for all frames in flight.
-   * 2. **Allocate Sets:** Allocates one `vk::DescriptorSet` per frame using the layout defined in `createDescriptorSetLayout`.
-   * 3. **Update Sets:** Populates the allocated sets by pointing them to the actual `uniformBuffers` created in memory.
+   * Steps:
+   * 1. Create a descriptor pool sized for all frames in flight.
+   * 2. Allocate one descriptor set per frame using the shared layout.
+   * 3. Update each set to point at the correct UBO buffer.
    *
-   * This links the logical "Binding 0" in the shader to the specific memory address of the UBO on the GPU.
+   * This wires shader binding 0 to the per-frame `UniformBufferObject` storage.
    *
-   * @param logicalDevice The device used for pool creation and set allocation/updating.
+   * @param logicalDevice The device used for pool creation and descriptor updates.
    */
   void createDescriptorSets(const sauce::LogicalDevice& logicalDevice) {
     vk::DescriptorPoolSize poolSize {
@@ -178,26 +178,22 @@ Renderer(
       logicalDevice->updateDescriptorSets(descriptorWrite, {});
     }
   }
-/**
- * @brief Creates uniform buffers for storing per-frame transformation data.
- *
- * This function allocates one uniform buffer per frame in flight, ensuring that
- * each frame has its own dedicated memory for the Model-View-Projection matrices.
- * The buffers are created with host-visible and host-coherent memory properties,
- * allowing direct CPU writes without explicit flush operations.
- *
- * Each buffer is persistently mapped to CPU-accessible memory for efficient updates
- * during rendering. This eliminates the need for map/unmap operations every frame.
- *
- * @param physicalDevice The GPU used to query memory properties.
- * @param logicalDevice The device used to create buffers and allocate memory.
- *
- * @throws std::runtime_error If buffer creation or memory allocation fails.
- */
-void createUniformBuffers(
-    const sauce::PhysicalDevice& physicalDevice,
-    const sauce::LogicalDevice& logicalDevice
-) {
+  /**
+   * @brief Creates per-frame uniform buffers for transformation data.
+   *
+   * Each frame gets its own host-visible, host-coherent buffer holding the
+   * model/view/projection matrices. Buffers stay mapped so updates are just
+   * memcpy calls without repeated map/unmap work.
+   *
+   * @param physicalDevice The GPU used to query memory properties.
+   * @param logicalDevice The device used to create buffers and allocate memory.
+   *
+   * @throws std::runtime_error If buffer creation or memory allocation fails.
+   */
+  void createUniformBuffers(
+      const sauce::PhysicalDevice& physicalDevice,
+      const sauce::LogicalDevice& logicalDevice
+  ) {
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
       vk::DeviceSize size = sizeof(UniformBufferObject);
       vk::raii::Buffer buf = nullptr;
@@ -217,27 +213,21 @@ void createUniformBuffers(
       uniformBuffersMapped.emplace_back(uniformBuffersMemory[i].mapMemory(0, size));
     }
   }
-/**
- * @brief Creates and initializes the vertex buffer containing mesh geometry data.
- *
- * This function uses a staging buffer approach for optimal GPU performance:
- * 1. Creates a host-visible staging buffer and copies vertex data from CPU memory.
- * 2. Creates a device-local vertex buffer optimized for GPU access.
- * 3. Issues a GPU copy command to transfer data from staging to device-local memory.
- * 4. Staging buffer is automatically destroyed when it goes out of scope.
- *
- * Device-local memory provides faster access speeds for the GPU compared to
- * host-visible memory, improving rendering performance.
- *
- * @param physicalDevice The GPU used to query memory properties.
- * @param logicalDevice The device used to create buffers and issue transfer commands.
- *
- * @throws std::runtime_error If buffer creation or memory transfer fails.
- */
-void createVertexBuffer(
-    const sauce::PhysicalDevice& physicalDevice,
-    const sauce::LogicalDevice& logicalDevice
-) {
+  /**
+   * @brief Creates the vertex buffer and uploads mesh data to GPU memory.
+   *
+   * Uses a staging buffer so vertex data is first written by the CPU, then
+   * copied into device-local memory for fast GPU access.
+   *
+   * @param physicalDevice The GPU used to query memory properties.
+   * @param logicalDevice The device used to create buffers and issue transfers.
+   *
+   * @throws std::runtime_error If buffer creation or memory transfer fails.
+   */
+  void createVertexBuffer(
+      const sauce::PhysicalDevice& physicalDevice,
+      const sauce::LogicalDevice& logicalDevice
+  ) {
     vk::DeviceSize bufferSize = sizeof(Vertex) * vertices.size();
 
     vk::raii::Buffer stagingBuffer = nullptr;
