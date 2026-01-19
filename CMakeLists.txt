@@ -27,7 +27,6 @@ find_package(Boost REQUIRED COMPONENTS program_options)
 target_link_libraries(${PROJECT_NAME} PUBLIC Boost::program_options)
 
 find_package(Qt6Widgets CONFIG REQUIRED)
-find_package(glfw3 CONFIG REQUIRED) 
 
 target_include_directories(SauceEngine PRIVATE
   ${PROJECT_SOURCE_DIR}/include

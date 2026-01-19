@@ -32,10 +32,9 @@ endif()
 
 # Deploy Qt runtime dependencies (DLLs and plugins)
 if(WIN32)
-   # add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    #    COMMAND ${CMAKE_COMMAND} -E echo "Deploying Qt dependencies..."
-     #   COMMAND Qt6::windeployqt --no-compiler-runtime --no-translations "$<TARGET_FILE:${PROJECT_NAME}>"
-      #  COMMENT "Running windeployqt to deploy Qt dependencies"
-    #)
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E echo "Deploying Qt dependencies..."
+        COMMAND Qt6::windeployqt --no-compiler-runtime --no-translations "$<TARGET_FILE:${PROJECT_NAME}>"
+        COMMENT "Running windeployqt to deploy Qt dependencies"
+    )
 endif()
-
