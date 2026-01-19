@@ -15,6 +15,7 @@ struct LogicalDevice {
   LogicalDevice(std::nullptr_t) {}
 
   LogicalDevice(const sauce::PhysicalDevice& physicalDevice, const sauce::RenderSurface& surface) {
+	  /* queue properties of the physical device */
     std::vector<vk::QueueFamilyProperties> queueFamilyProps = (*physicalDevice).getQueueFamilyProperties();
 
     uint32_t graphicsAndPresentIndex;
@@ -27,17 +28,18 @@ struct LogicalDevice {
 
     queueIndex = static_cast<uint32_t>(std::distance(queueFamilyProps.begin(), graphicsQueueFamilyProp));
 
-    
-    if (!(*physicalDevice).getSurfaceSupportKHR(queueIndex, **surface)) { 
+
+    if (!(*physicalDevice).getSurfaceSupportKHR(queueIndex, **surface)) {
       throw std::runtime_error("Presentation not supported in the chosen queue!");
     }
 
+	/* feature chain for the logical device */
     vk::StructureChain<
       vk::PhysicalDeviceFeatures2,
       vk::PhysicalDeviceVulkan11Features,
-      vk::PhysicalDeviceVulkan13Features, 
+      vk::PhysicalDeviceVulkan13Features,
       vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
-    > featureChain 
+    > featureChain
     {
       {},
       { .shaderDrawParameters = true },
@@ -45,12 +47,15 @@ struct LogicalDevice {
       { .extendedDynamicState = true },
     };
 
+	/* create queue */
     float queuePriority = 0.5f;
     vk::DeviceQueueCreateInfo deviceQueueCreateInfo {
       .queueFamilyIndex = queueIndex,
       .queueCount = 1,
       .pQueuePriorities = &queuePriority,
     };
+
+	/* create logical device */
     vk::DeviceCreateInfo deviceCreateInfo {
       .pNext = &featureChain.get(),
       .queueCreateInfoCount = 1,
@@ -58,7 +63,6 @@ struct LogicalDevice {
       .enabledExtensionCount = static_cast<uint32_t>(physicalDevice.requiredExtensions.size()),
       .ppEnabledExtensionNames = physicalDevice.requiredExtensions.data(),
     };
-
     device = vk::raii::Device { *physicalDevice, deviceCreateInfo };
   }
 
