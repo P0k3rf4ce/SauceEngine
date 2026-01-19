@@ -30,28 +30,32 @@ struct Renderer {
 
   static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
-  /**
-   * @brief Initializes the Renderer and allocates core Vulkan resources.
-   *
-   * This constructor sets up the entire rendering context. The initialization order is critical:
-   * 1.  **Queue & SwapChain:** Retrieves the graphics queue and creates the swapchain for presentation.
-   * 2.  **Pipeline Resources:** Creates the descriptor layout (resource signatures) and the graphics pipeline.
-   * 3.  **Command Resources:**Allocates a command pool and command buffers for recording draw calls.
-   * 4.  **Buffers:** Creates GPU-mapped buffers for Uniforms (UBO), Vertices, and Indices.
-   * 5.  **Descriptors:** Allocates and writes descriptor sets to bind UBOs to the shader.
-   * 6.  **Synchronization:** Creates semaphores (GPU-GPU sync) and fences (CPU-GPU sync) for the frame loop.
-   *
-   * @param physicalDevice The chosen GPU hardware handle.
-   * @param logicalDevice  The logical interface to the GPU.
-   * @param renderSurface  The surface abstraction (window) to render onto.
-   * @param window         The raw GLFW window handle.
-   */
-  Renderer(
-      const sauce::PhysicalDevice& physicalDevice,
-      const sauce::LogicalDevice& logicalDevice,
-      const sauce::RenderSurface& renderSurface,
-      GLFWwindow* window
-  ) {
+/**
+ * @brief Constructs the Renderer and initializes all Vulkan rendering resources.
+ *
+ * This constructor sets up the complete rendering pipeline by:
+ * 1. Creating a graphics queue for command submission.
+ * 2. Initializing the swap chain for presenting images to the screen.
+ * 3. Setting up descriptor set layouts for uniform buffer access.
+ * 4. Building the graphics pipeline with shaders and render state.
+ * 5. Creating command pools and buffers for recording GPU commands.
+ * 6. Allocating uniform, vertex, and index buffers for scene data.
+ * 7. Configuring descriptor sets to bind uniform buffers to shaders.
+ * 8. Creating synchronization primitives (semaphores and fences) for frame coordination.
+ *
+ * @param physicalDevice The GPU being used for rendering operations.
+ * @param logicalDevice The logical device interface for resource creation.
+ * @param renderSurface The window surface where images will be presented.
+ * @param window GLFW window handle for querying window properties.
+ *
+ * @throws std::runtime_error If any Vulkan resource fails to initialize.
+ */
+Renderer(
+    const sauce::PhysicalDevice& physicalDevice,
+    const sauce::LogicalDevice& logicalDevice,
+    const sauce::RenderSurface& renderSurface,
+    GLFWwindow* window
+) {
     queueIndex = logicalDevice.getQueueIndex();
     pQueue = std::make_unique<vk::raii::Queue>(*logicalDevice, queueIndex, 0);
 
@@ -174,11 +178,26 @@ struct Renderer {
       logicalDevice->updateDescriptorSets(descriptorWrite, {});
     }
   }
-
-  void createUniformBuffers(
-      const sauce::PhysicalDevice& physicalDevice,
-      const sauce::LogicalDevice& logicalDevice
-      ) {
+/**
+ * @brief Creates uniform buffers for storing per-frame transformation data.
+ *
+ * This function allocates one uniform buffer per frame in flight, ensuring that
+ * each frame has its own dedicated memory for the Model-View-Projection matrices.
+ * The buffers are created with host-visible and host-coherent memory properties,
+ * allowing direct CPU writes without explicit flush operations.
+ *
+ * Each buffer is persistently mapped to CPU-accessible memory for efficient updates
+ * during rendering. This eliminates the need for map/unmap operations every frame.
+ *
+ * @param physicalDevice The GPU used to query memory properties.
+ * @param logicalDevice The device used to create buffers and allocate memory.
+ *
+ * @throws std::runtime_error If buffer creation or memory allocation fails.
+ */
+void createUniformBuffers(
+    const sauce::PhysicalDevice& physicalDevice,
+    const sauce::LogicalDevice& logicalDevice
+) {
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
       vk::DeviceSize size = sizeof(UniformBufferObject);
       vk::raii::Buffer buf = nullptr;
@@ -198,11 +217,27 @@ struct Renderer {
       uniformBuffersMapped.emplace_back(uniformBuffersMemory[i].mapMemory(0, size));
     }
   }
-
-  void createVertexBuffer(
-      const sauce::PhysicalDevice& physicalDevice,
-      const sauce::LogicalDevice& logicalDevice
-      ) {
+/**
+ * @brief Creates and initializes the vertex buffer containing mesh geometry data.
+ *
+ * This function uses a staging buffer approach for optimal GPU performance:
+ * 1. Creates a host-visible staging buffer and copies vertex data from CPU memory.
+ * 2. Creates a device-local vertex buffer optimized for GPU access.
+ * 3. Issues a GPU copy command to transfer data from staging to device-local memory.
+ * 4. Staging buffer is automatically destroyed when it goes out of scope.
+ *
+ * Device-local memory provides faster access speeds for the GPU compared to
+ * host-visible memory, improving rendering performance.
+ *
+ * @param physicalDevice The GPU used to query memory properties.
+ * @param logicalDevice The device used to create buffers and issue transfer commands.
+ *
+ * @throws std::runtime_error If buffer creation or memory transfer fails.
+ */
+void createVertexBuffer(
+    const sauce::PhysicalDevice& physicalDevice,
+    const sauce::LogicalDevice& logicalDevice
+) {
     vk::DeviceSize bufferSize = sizeof(Vertex) * vertices.size();
 
     vk::raii::Buffer stagingBuffer = nullptr;
@@ -234,10 +269,27 @@ struct Renderer {
     sauce::BufferUtils::copyBuffer(logicalDevice, commandPool, *pQueue, stagingBuffer, vertexBuffer, bufferSize);
   }
 
-  void createIndexBuffer(
-      const sauce::PhysicalDevice& physicalDevice, 
-      const sauce::LogicalDevice& logicalDevice
-      ) {
+/**
+ * @brief Creates and initializes the index buffer for indexed drawing.
+ *
+ * This function mirrors the vertex buffer creation process with a staging approach:
+ * 1. Allocates a host-visible staging buffer and uploads index data from CPU memory.
+ * 2. Creates a device-local index buffer for optimal GPU read performance.
+ * 3. Transfers index data from the staging buffer to device-local memory via GPU copy.
+ * 4. Staging resources are cleaned up automatically after the transfer completes.
+ *
+ * Index buffers enable efficient mesh rendering by referencing vertices through indices
+ * rather than duplicating vertex data, reducing memory usage and bandwidth.
+ *
+ * @param physicalDevice The GPU used to determine appropriate memory types.
+ * @param logicalDevice The device used for buffer creation and copy operations.
+ *
+ * @throws std::runtime_error If buffer allocation or data transfer fails.
+ */
+void createIndexBuffer(
+    const sauce::PhysicalDevice& physicalDevice,
+    const sauce::LogicalDevice& logicalDevice
+){
     vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
     vk::raii::Buffer stagingBuffer = nullptr;
