@@ -54,6 +54,8 @@ private:
   sauce::PhysicalDevice physicalDevice = nullptr;
   sauce::LogicalDevice logicalDevice = nullptr;
 
+  std::unique_ptr<sauce::Scene> pScene;
+
   std::unique_ptr<sauce::Renderer> pRenderer;
 
   void initVulkan() {
@@ -65,7 +67,22 @@ private:
 
     physicalDevice = { *pInstance };
     logicalDevice = { physicalDevice, *pRenderSurface };
-    pRenderer = std::make_unique<sauce::Renderer>(physicalDevice, logicalDevice, *pRenderSurface, window);
+
+    sauce::CameraCreateInfo cameraCreateInfo {
+      .scrWidth = WIDTH,
+      .scrHeight = HEIGHT,
+    };
+
+    pScene = std::make_unique<sauce::Scene>( cameraCreateInfo );
+
+    sauce::RendererCreateInfo rendererCreateInfo {
+      .physicalDevice = physicalDevice,
+      .logicalDevice = logicalDevice,
+      .renderSurface = *pRenderSurface,
+      .window = window,
+    };
+
+    pRenderer = std::make_unique<sauce::Renderer>(rendererCreateInfo);
   }
 
   void initWindow() {
@@ -80,7 +97,7 @@ private:
   void mainLoop() {
     while (!glfwWindowShouldClose(window)) {
       glfwPollEvents();
-      pRenderer->drawFrame(logicalDevice);
+      pRenderer->drawFrame(logicalDevice, *pScene);
     }
 
     logicalDevice->waitIdle();

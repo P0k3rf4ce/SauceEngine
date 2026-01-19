@@ -14,6 +14,7 @@
 #include <app/Camera.hpp>
 #include <app/GraphicsPipeline.hpp>
 #include <app/LogicalDevice.hpp>
+#include <app/Scene.hpp>
 #include <app/SwapChain.hpp>
 
 namespace sauce {
@@ -29,31 +30,38 @@ const std::vector<uint16_t> indices {
   0, 1, 2, 2, 3, 0
 };
 
-struct Renderer {
+struct RendererCreateInfo {
+  const sauce::PhysicalDevice& physicalDevice;
+  const sauce::LogicalDevice& logicalDevice;
+  const sauce::RenderSurface& renderSurface;
+  GLFWwindow* window;
+};
 
+class Renderer {
+public:
   static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
-  Renderer(
-      const sauce::PhysicalDevice& physicalDevice,
-      const sauce::LogicalDevice& logicalDevice,
-      const sauce::RenderSurface& renderSurface,
-      GLFWwindow* window
-  ) {
-    queueIndex = logicalDevice.getQueueIndex();
-    pQueue = std::make_unique<vk::raii::Queue>(*logicalDevice, queueIndex, 0);
+  Renderer(const RendererCreateInfo& createInfo) {
+    queueIndex = createInfo.logicalDevice.getQueueIndex();
+    pQueue = std::make_unique<vk::raii::Queue>(*createInfo.logicalDevice, queueIndex, 0);
 
-    pSwapChain = std::make_unique<sauce::SwapChain>(physicalDevice, logicalDevice, renderSurface, window);
+    pSwapChain = std::make_unique<sauce::SwapChain>(
+        createInfo.physicalDevice, 
+        createInfo.logicalDevice, 
+        createInfo.renderSurface, 
+        createInfo.window
+    );
 
 
-    createDescriptorSetLayout(logicalDevice);
-    pPipeline = std::make_unique<sauce::GraphicsPipeline>(logicalDevice, descriptorSetLayout, *pSwapChain);
+    createDescriptorSetLayout(createInfo.logicalDevice);
+    pPipeline = std::make_unique<sauce::GraphicsPipeline>(createInfo.logicalDevice, descriptorSetLayout, *pSwapChain);
 
     vk::CommandPoolCreateInfo commandPoolCreateInfo {
       .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
       .queueFamilyIndex = queueIndex,
     };
 
-    commandPool = vk::raii::CommandPool { *logicalDevice, commandPoolCreateInfo };
+    commandPool = vk::raii::CommandPool { *createInfo.logicalDevice, commandPoolCreateInfo };
   
     vk::CommandBufferAllocateInfo allocInfo {
       .commandPool = commandPool,
@@ -61,22 +69,22 @@ struct Renderer {
       .commandBufferCount = MAX_FRAMES_IN_FLIGHT,
     };
 
-    commandBuffers = vk::raii::CommandBuffers(*logicalDevice, allocInfo);
+    commandBuffers = vk::raii::CommandBuffers(*createInfo.logicalDevice, allocInfo);
 
-    pCamera = std::make_unique<sauce::Camera>( pSwapChain->getExtent().width, pSwapChain->getExtent().height );
+    // pCamera = std::make_unique<sauce::Camera>( pSwapChain->getExtent().width, pSwapChain->getExtent().height );
 
-    createUniformBuffers(physicalDevice, logicalDevice);
-    createVertexBuffer(physicalDevice, logicalDevice);
-    createIndexBuffer(physicalDevice, logicalDevice);
+    createUniformBuffers(createInfo.physicalDevice, createInfo.logicalDevice);
+    createVertexBuffer(createInfo.physicalDevice, createInfo.logicalDevice);
+    createIndexBuffer(createInfo.physicalDevice, createInfo.logicalDevice);
 
-    createDescriptorSets(logicalDevice);
+    createDescriptorSets(createInfo.logicalDevice);
 
     for (size_t i = 0; i < pSwapChain->getImages().size(); ++i) {
-      renderFinishedSemaphores.emplace_back(*logicalDevice, vk::SemaphoreCreateInfo{});
+      renderFinishedSemaphores.emplace_back(*createInfo.logicalDevice, vk::SemaphoreCreateInfo{});
     }
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
-      presentCompleteSemaphores.emplace_back(*logicalDevice, vk::SemaphoreCreateInfo{});
-      inFlightFences.emplace_back(*logicalDevice, vk::FenceCreateInfo{ .flags = vk::FenceCreateFlagBits::eSignaled });
+      presentCompleteSemaphores.emplace_back(*createInfo.logicalDevice, vk::SemaphoreCreateInfo{});
+      inFlightFences.emplace_back(*createInfo.logicalDevice, vk::FenceCreateInfo{ .flags = vk::FenceCreateFlagBits::eSignaled });
     }
   }
 
@@ -342,7 +350,7 @@ struct Renderer {
    * * @param logicalDevice The device handle used to manage synchronization primitives.
    * @throws std::runtime_error If synchronization fails or the swapchain becomes invalid.
    */
-  void drawFrame(const sauce::LogicalDevice& logicalDevice){
+  void drawFrame(const sauce::LogicalDevice& logicalDevice, const sauce::Scene& scene){
     // Wait for the in-flight fence to be signaled, ensuring the previous frame finished rendering
     // This ensures the CPU doesn't submit additional frames while our previous frames are still rendering
     auto fenceResult = logicalDevice->waitForFences(*inFlightFences[frameIndex], vk::True, UINT64_MAX);
@@ -366,7 +374,7 @@ struct Renderer {
     recordCommandBuffer(imageIndex);
 
     // Update the uniform buffer with current transformation matrices
-    updateUniformBuffer(frameIndex);
+    updateUniformBuffer(frameIndex, scene);
 
     // Prepare submission: wait for image to be available before starting color attachment output
     vk::PipelineStageFlags waitDestinationStageMask { vk::PipelineStageFlagBits::eColorAttachmentOutput };
@@ -411,7 +419,7 @@ struct Renderer {
    *   manually compensates by flipping the Y-coordinate in the projection matrix.
    * * @param curImage The index of the current swapchain image/frame being processed.
    */
-  void updateUniformBuffer(uint32_t curImage) {
+  void updateUniformBuffer(uint32_t curImage, const sauce::Scene& scene) {
     // Record the start time on first call (static initialization)
     static auto startTime = std::chrono::high_resolution_clock::now();
 
@@ -423,8 +431,8 @@ struct Renderer {
     sauce::UniformBufferObject ubo {
       // Model matrix: rotates the object 90 degrees per second around the Z axis
       .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-      .view = pCamera->getViewMatrix(),
-      .proj = pCamera->getProjectionMatrix(),
+      .view = scene.getCameraRO().getViewMatrix(),
+      .proj = scene.getCameraRO().getProjectionMatrix(),
     };
     
     // Flip Y coordinate of projection matrix (Vulkan uses inverted Y compared to OpenGL)
@@ -465,8 +473,6 @@ private:
   std::vector<vk::raii::Buffer> uniformBuffers;
   std::vector<vk::raii::DeviceMemory> uniformBuffersMemory;
   std::vector<void *> uniformBuffersMapped;
-
-  std::unique_ptr<sauce::Camera> pCamera;
 };
 
 }

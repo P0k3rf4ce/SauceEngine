@@ -5,6 +5,27 @@
 
 namespace sauce {
 
+struct CameraCreateInfo {
+  float scrWidth;
+  float scrHeight;
+  glm::vec3 pos = { 0, 0, 1 };
+  glm::vec3 worldUp = { 0, 1, 0 };
+  float yaw = YAW_DEFAULT;
+  float pitch = PITCH_DEFAULT;
+  float fov = FOV_DEFAULT;
+  float movementSpeed = SPEED_DEFAULT;
+  float mouseSensitivity = SENSITIVITY_DEFAULT;
+
+  static constexpr float YAW_DEFAULT = -90.0f;
+  static constexpr float PITCH_DEFAULT = 0.0f;
+  static constexpr float SPEED_DEFAULT = 2.5f;
+  static constexpr float SENSITIVITY_DEFAULT = 0.1f;
+  static constexpr float FOV_DEFAULT = 90.0f;
+
+  static constexpr float PITCH_MIN = -89.0f;
+  static constexpr float PITCH_MAX = 89.0f;
+};
+
 class Camera {
 public:
     enum class Movement {
@@ -14,31 +35,14 @@ public:
         RIGHT
     };
 
-    static constexpr float YAW_DEFAULT = -90.0f;
-    static constexpr float PITCH_DEFAULT = 0.0f;
-    static constexpr float SPEED_DEFAULT = 2.5f;
-    static constexpr float SENSITIVITY_DEFAULT = 0.1f;
-    static constexpr float FOV_DEFAULT = 90.0f;
-
-    static constexpr float PITCH_MIN = -89.0f;
-    static constexpr float PITCH_MAX = 89.0f;
-
     /**
      * Camera constructor
      */
-    Camera(
-        float screenWidth,
-        float screenHeight,
-        glm::vec3 pos = { 0, 0, 1 },
-        glm::vec3 worldUp = { 0, 1, 0 },
-        float yaw = YAW_DEFAULT,
-        float pitch = PITCH_DEFAULT,
-        float fov = FOV_DEFAULT,
-        float movementSpeed = SPEED_DEFAULT,
-        float mouseSensitivity = SENSITIVITY_DEFAULT
-    ) : pos(pos), worldUp(worldUp), yaw(yaw), pitch(pitch), fov(fov),
-    movementSpeed(movementSpeed), mouseSensitivity(mouseSensitivity),
-    scrWidth(screenWidth), scrHeight(screenHeight)
+    Camera(const sauce::CameraCreateInfo& createInfo)
+      : pos(createInfo.pos), worldUp(createInfo.worldUp), 
+      yaw(createInfo.yaw), pitch(createInfo.pitch), fov(createInfo.fov),
+      movementSpeed(createInfo.movementSpeed), mouseSensitivity(createInfo.mouseSensitivity),
+      scrWidth(createInfo.scrWidth), scrHeight(createInfo.scrHeight)
     {
         updateView();
     }
@@ -71,7 +75,7 @@ public:
     /**
      * Get current FOV
      */
-    float getFOV() { return fov; }
+    float getFOV() const { return fov; }
 
     /**
      * Set camera FOV
@@ -83,7 +87,7 @@ public:
      *
      * @return the view matrix for this camera
      */
-    glm::mat4 getViewMatrix() {
+    glm::mat4 getViewMatrix() const {
       // TODO (Use glm::lookAt)
       return glm::mat4(1.0f);
     }
@@ -93,7 +97,7 @@ public:
      *
      * @return projection matrix for this camera
      */
-    glm::mat4 getProjectionMatrix() {
+    glm::mat4 getProjectionMatrix() const {
       // TODO (use glm::perspective)
       return glm::mat4(1.0f);
     }
