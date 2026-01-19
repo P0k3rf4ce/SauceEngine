@@ -57,7 +57,7 @@ struct BufferUtils {
   static void copyBuffer(
       const sauce::LogicalDevice& logicalDevice,
       const vk::raii::CommandPool& commandPool,
-      const vk::raii::Queue queue,
+      const vk::raii::Queue& queue,
       vk::raii::Buffer& src, 
       vk::raii::Buffer& dst, 
       vk::DeviceSize size

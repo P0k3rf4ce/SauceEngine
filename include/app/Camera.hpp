@@ -3,6 +3,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+namespace sauce {
+
 class Camera {
 public:
     enum class Movement {
@@ -91,8 +93,8 @@ public:
      *
      * @return projection matrix for this camera
      */
-    glm::mat4 getProjectionMatrix() { 
-      // TODO (Use glm::perspective)
+    glm::mat4 getProjectionMatrix() {
+      // TODO (use glm::perspective)
       return glm::mat4(1.0f);
     }
 
@@ -143,4 +145,6 @@ private:
       // TODO 
     }
 };
+
+}
 

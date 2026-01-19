@@ -11,6 +11,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <app/BufferUtils.hpp>
+#include <app/Camera.hpp>
 #include <app/GraphicsPipeline.hpp>
 #include <app/LogicalDevice.hpp>
 #include <app/SwapChain.hpp>
@@ -61,6 +62,8 @@ struct Renderer {
     };
 
     commandBuffers = vk::raii::CommandBuffers(*logicalDevice, allocInfo);
+
+    pCamera = std::make_unique<sauce::Camera>( pSwapChain->getExtent().width, pSwapChain->getExtent().height );
 
     createUniformBuffers(physicalDevice, logicalDevice);
     createVertexBuffer(physicalDevice, logicalDevice);
@@ -420,10 +423,8 @@ struct Renderer {
     sauce::UniformBufferObject ubo {
       // Model matrix: rotates the object 90 degrees per second around the Z axis
       .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-      // View matrix: camera positioned at (2, 2, 2) looking at the origin
-      .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.1f)),
-      // Projection matrix: 45-degree field of view with 0.1-10.0 clipping plane
-      .proj = glm::perspective(glm::radians(45.0f), static_cast<float>(pSwapChain->getExtent().width) / static_cast<float>(pSwapChain->getExtent().height), 0.1f, 10.0f),
+      .view = pCamera->getViewMatrix(),
+      .proj = pCamera->getProjectionMatrix(),
     };
     
     // Flip Y coordinate of projection matrix (Vulkan uses inverted Y compared to OpenGL)
@@ -464,6 +465,8 @@ private:
   std::vector<vk::raii::Buffer> uniformBuffers;
   std::vector<vk::raii::DeviceMemory> uniformBuffersMemory;
   std::vector<void *> uniformBuffersMapped;
+
+  std::unique_ptr<sauce::Camera> pCamera;
 };
 
 }

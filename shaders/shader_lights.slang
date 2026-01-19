@@ -37,8 +37,8 @@ struct SpotLight {
 };
 
 ConstantBuffer<PointLight[4]> pointLights;
-ConstantBuffer<DirLight> dirLight;
-ConstantBuffer<SpotLight> spotLights;
+ConstantBuffer<DirLight[4]> dirLight;
+ConstantBuffer<SpotLight[4]> spotLights;
 
 float3 computePoint(PointLight light) {
 	// TODO: return light contribution from a given point light
