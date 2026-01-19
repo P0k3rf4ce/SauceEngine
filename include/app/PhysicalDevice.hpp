@@ -8,6 +8,7 @@ namespace sauce {
 
 struct PhysicalDevice {
 
+  // ---------------------- constructors ---------------------- 
   PhysicalDevice(std::nullptr_t) {}
 
   PhysicalDevice(const sauce::Instance& instance) {
@@ -37,7 +38,10 @@ struct PhysicalDevice {
   PhysicalDevice(vk::raii::PhysicalDevice& device) {
     physicalDevice = device;
   }
+  //-----------------------------------------------------------
 
+  // checks if a device supports all the device level extensions requested. 
+  // ie, hardware ray tracing support. 
   static bool checkRequiredExtensions(const vk::raii::PhysicalDevice& device, const std::vector<const char *> requiredExtensions) {
     auto availableExtensionProps = device.enumerateDeviceExtensionProperties();
     return std::ranges::all_of(requiredExtensions, [&availableExtensionProps](const char* ext) {
@@ -47,6 +51,8 @@ struct PhysicalDevice {
     });
   }
 
+
+  // checks for all additional features that are required features for this project
   static bool checkRequiredFeatures(const vk::raii::PhysicalDevice& device) {
     auto availableFeatures = device.getFeatures2<
       vk::PhysicalDeviceFeatures2,
@@ -62,20 +68,26 @@ struct PhysicalDevice {
       availableFeatures.get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState;
   }
 
+
+  // checks if properties of the queue supports the given flags 
   static bool checkQueueFamilySupport(const std::vector<vk::QueueFamilyProperties>& qfProps, vk::QueueFlags mask) {
     return std::ranges::any_of(qfProps, [&mask](const vk::QueueFamilyProperties& qfProp){
       return !!(qfProp.queueFlags & mask);
     });
   }
 
+  // access the underlying PhysicalDevice (*device)
   const vk::raii::PhysicalDevice& operator*() const & noexcept{
     return physicalDevice;
   }
 
+  // access the underlying PhysicalDevice (device->field)
   const vk::raii::PhysicalDevice* operator->() const & noexcept {
     return &physicalDevice;
   }
 
+
+  // list of extensions used for this project
   std::vector<const char *> requiredExtensions = {
     vk::KHRSwapchainExtensionName,
     vk::KHRSpirv14ExtensionName,
