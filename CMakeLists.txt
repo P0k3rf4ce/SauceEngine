@@ -27,6 +27,7 @@ find_package(Boost REQUIRED COMPONENTS program_options)
 target_link_libraries(${PROJECT_NAME} PUBLIC Boost::program_options)
 
 find_package(Qt6Widgets CONFIG REQUIRED)
+find_package(glfw3 CONFIG REQUIRED) 
 
 target_include_directories(SauceEngine PRIVATE
   ${PROJECT_SOURCE_DIR}/include
@@ -58,7 +59,13 @@ add_dependencies(${EXEC_NAME} shadersTarget)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/launcher)
 
-target_link_libraries(${EXEC_NAME} PRIVATE launcherLib) 
+target_link_libraries(${EXEC_NAME} PRIVATE 
+    launcherLib 
+    glfw 
+    Qt6::Core 
+    Qt6::Gui 
+    Qt6::Widgets
+)
 
 if(APPLE)
     target_link_options(${EXEC_NAME} PRIVATE "LINKER:-no_warn_duplicate_libraries")
