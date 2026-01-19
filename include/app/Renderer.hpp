@@ -30,6 +30,22 @@ struct Renderer {
 
   static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
+  /**
+   * @brief Initializes the Renderer and allocates core Vulkan resources.
+   *
+   * This constructor sets up the entire rendering context. The initialization order is critical:
+   * 1.  **Queue & SwapChain:** Retrieves the graphics queue and creates the swapchain for presentation.
+   * 2.  **Pipeline Resources:** Creates the descriptor layout (resource signatures) and the graphics pipeline.
+   * 3.  **Command Resources:**Allocates a command pool and command buffers for recording draw calls.
+   * 4.  **Buffers:** Creates GPU-mapped buffers for Uniforms (UBO), Vertices, and Indices.
+   * 5.  **Descriptors:** Allocates and writes descriptor sets to bind UBOs to the shader.
+   * 6.  **Synchronization:** Creates semaphores (GPU-GPU sync) and fences (CPU-GPU sync) for the frame loop.
+   *
+   * @param physicalDevice The chosen GPU hardware handle.
+   * @param logicalDevice  The logical interface to the GPU.
+   * @param renderSurface  The surface abstraction (window) to render onto.
+   * @param window         The raw GLFW window handle.
+   */
   Renderer(
       const sauce::PhysicalDevice& physicalDevice,
       const sauce::LogicalDevice& logicalDevice,
@@ -75,6 +91,19 @@ struct Renderer {
     }
   }
 
+  /**
+   * @brief Defines the blueprint for resources accessible by the shaders.
+   *
+   * A Descriptor Set Layout describes the "shape" of the data that will be bound to the pipeline.
+   * It acts like a function signature for the shader.
+   *
+   * In this specific implementation, we define a single binding:
+   * - **Binding 0:** A Uniform Buffer Object (UBO).
+   * - **Stage:** Accessible in the Vertex Shader.
+   * - **Count:** 1 descriptor (single UBO struct).
+   *
+   * @param logicalDevice The device used to create the layout handle.
+   */
   void createDescriptorSetLayout(const sauce::LogicalDevice& logicalDevice) {
     vk::DescriptorSetLayoutBinding uboLayoutBinding {
       .binding = 0,
@@ -90,6 +119,18 @@ struct Renderer {
     descriptorSetLayout = vk::raii::DescriptorSetLayout{ *logicalDevice, dsLayoutInfo };
   }
 
+  /**
+   * @brief Allocates and configures descriptor sets to bind specific buffers to the layout.
+   *
+   * This function performs three main steps:
+   * 1. **Create Pool:** Creates a `vk::DescriptorPool` large enough to hold the descriptors for all frames in flight.
+   * 2. **Allocate Sets:** Allocates one `vk::DescriptorSet` per frame using the layout defined in `createDescriptorSetLayout`.
+   * 3. **Update Sets:** Populates the allocated sets by pointing them to the actual `uniformBuffers` created in memory.
+   *
+   * This links the logical "Binding 0" in the shader to the specific memory address of the UBO on the GPU.
+   *
+   * @param logicalDevice The device used for pool creation and set allocation/updating.
+   */
   void createDescriptorSets(const sauce::LogicalDevice& logicalDevice) {
     vk::DescriptorPoolSize poolSize {
       .type = vk::DescriptorType::eUniformBuffer,
