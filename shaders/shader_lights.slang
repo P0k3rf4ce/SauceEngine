@@ -33,7 +33,14 @@ struct DirLight {
 };
 
 struct SpotLight {
-	// TODO: add required data
+	float3 position;
+	float intensity;
+	float3 direction;
+	float innerConeAngle;
+	float3 color;
+	float outerConeAngle;
+	float range;
+	float padding;
 };
 
 ConstantBuffer<PointLight[4]> pointLights;
@@ -48,8 +55,43 @@ float3 computeDir(DirLight light) {
 	// TODO: return light contribution from a given directional light
 }
 
-float3 computeSpot(SpotLight light) {
-	// TODO: return light contribution from a given spot light
+float3 computeSpot(SpotLight light, float3 fragPos, float3 normal, float3 viewPos) {
+  // not sure what "current fragment" is in the issue description
+  // assuming that the params will be determined at function call and that it isnt something defined globally
+
+	// Direction from fragment to light
+	float3 lightDir = light.position - fragPos;
+	float distance = length(lightDir);
+	lightDir = normalize(lightDir);
+	
+	// Distance attenuation
+	float attenuation = 1.0 / max(distance * distance, 0.0001); // this is incase distance is 0
+	attenuation *= smoothstep(light.range, 0.0, distance);
+	
+	// Spotlight cone attenuation
+	float theta = dot(lightDir, -normalize(light.direction));
+	float cosInner = cos(light.innerConeAngle);
+	float cosOuter = cos(light.outerConeAngle);
+	float spotIntensity = smoothstep(cosOuter, cosInner, theta);
+	
+	// Blinn-Phong lighting components
+	float3 norm = normalize(normal);
+	float3 viewDir = normalize(viewPos - fragPos);
+	
+	// Diffuse
+	float diff = max(dot(norm, lightDir), 0.0);
+	float3 diffuse = diff * light.color;
+	
+	// Specular 
+	float3 halfDir = normalize(lightDir + viewDir);
+	float spec = pow(max(dot(norm, halfDir), 0.0), 32.0);
+	float3 specular = spec * light.color;
+	
+	// Ambient
+	float3 ambient = 0.1 * light.color;
+	
+	float3 result = (ambient + diffuse + specular) * light.intensity * spotIntensity * attenuation;
+	return result;
 }
 
 [shader("fragment")]
