@@ -12,7 +12,7 @@ int main(int argc, const char *argv[]) {
     return 1;
   }
 
-  SauceEngineApp mainApp;
+  sauce::SauceEngineApp mainApp;
   try {
     mainApp.run();
   } catch (std::exception& e) {
