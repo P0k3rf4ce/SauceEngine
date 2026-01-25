@@ -84,7 +84,7 @@ float3 computeSpot(SpotLight light, float3 fragPos, float3 normal, float3 viewPo
 	
 	// Specular 
 	float3 halfDir = normalize(lightDir + viewDir);
-	float spec = pow(max(dot(norm, halfDir), 0.0), 32.0);
+	float spec = pow(max(dot(norm, halfDir), 0.0), 32.0); // not sure if this should just be constant 32 or a param
 	float3 specular = spec * light.color;
 	
 	// Ambient
