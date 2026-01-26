@@ -2,6 +2,8 @@
 
 #include <vector>
 #include <memory>
+#include <iterator>
+#include <utility>
 
 #include <app/Component.hpp>
 
@@ -24,7 +26,9 @@ public:
 	 */
 	template <typename T, typename... Args>
 	void addComponent(Args &&...args) {
-		// TODO
+		auto component = std::make_unique<T>(std::forward<Args>(args)...);
+		component->setOwner(this);
+		components.push_back(std::move(component));
 	}
 
 	/**
@@ -32,7 +36,12 @@ public:
 	 */
 	template <typename T>
 	void removeComponent() {
-		// TODO
+		for (auto it = components.rbegin(); it != components.rend(); ++it) {
+			if (dynamic_cast<T*>(it->get()) != nullptr) {
+				components.erase(std::next(it).base());
+				return;
+			}
+		}
 	}
 
 	/**
@@ -42,7 +51,13 @@ public:
 	 */
   template <typename T>
 	void removeComponent(const std::string& name) {
-		// TODO
+		for (auto it = components.rbegin(); it != components.rend(); ++it) {
+			auto* component = dynamic_cast<T*>(it->get());
+			if (component != nullptr && component->name == name) {
+				components.erase(std::next(it).base());
+				return;
+			}
+		}
 	}
 
 	/**
@@ -50,7 +65,13 @@ public:
 	 */
 	template <typename T>
 	T* getComponent() {
-		// TODO
+		for (auto it = components.rbegin(); it != components.rend(); ++it) {
+			auto* component = dynamic_cast<T*>(it->get());
+			if (component != nullptr) {
+				return component;
+			}
+		}
+		return nullptr;
 	}
 
 	/*
@@ -60,7 +81,13 @@ public:
 	 */
 	template <typename T>
 	T* getComponent(const std::string& name) {
-
+		for (auto it = components.rbegin(); it != components.rend(); ++it) {
+			auto* component = dynamic_cast<T*>(it->get());
+			if (component != nullptr && component->name == name) {
+				return component;
+			}
+		}
+		return nullptr;
   }
 
 private:
