@@ -40,15 +40,15 @@ ConstantBuffer<PointLight[4]> pointLights;
 ConstantBuffer<DirLight[4]> dirLight;
 ConstantBuffer<SpotLight[4]> spotLights;
 
-float3 computePoint(PointLight light) {
+float3 computePoint(PointLight light, float3 fragPos, float3 normal, float3 viewDir) {
 	// TODO: return light contribution from a given point light
 }
 
-float3 computeDir(DirLight light) {
+float3 computeDir(DirLight light, float3 fragPos, float3 normal, float3 viewDir) {
 	// TODO: return light contribution from a given directional light
 }
 
-float3 computeSpot(SpotLight light) {
+float3 computeSpot(SpotLight light, float3 fragPos, float3 normal, float3 viewDir) {
 	// TODO: return light contribution from a given spot light
 }
 
