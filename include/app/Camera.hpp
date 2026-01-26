@@ -63,16 +63,17 @@ public:
      * @param offs - offset by which to translate the camera
      */
     void translate(glm::vec3 offs) {
-		this->pos+=offs;
-		updateView();
+		translate(offs.x, offs.y, offs.z);
 	}
 
     /**
      * Translates the camera position by (x, y, z)
      */
     void translate(float x, float y, float z) {
-		glm::vec3 offs={x, y, z};
-		this->translate(offs);
+		this->pos.x+=x;
+		this->pos.y+=y;
+		this->pos.z+=z;
+		updateView();
     }
 
     /**
@@ -91,7 +92,7 @@ public:
      * @return the view matrix for this camera
      */
     glm::mat4 getViewMatrix() const {
-		return glm::lookAt(this->pos, this->pos+this->front, this->worldUp);
+		return glm::lookAt(this->pos, this->front, this->worldUp);
 	}
 
 	/**
@@ -134,8 +135,8 @@ public:
 	 * Processes mouse movements by offsetting yaw and pitch by xoffset and yoffset, resp.
 	 * If constrainPitch is true, pitch gets clamped to PITCH_MIN or PITCH_MAX when out of bounds.
 	 *
-	 * @param xoffset - offset for yaw 
-	 * @param yoffset - offset for pitch 
+	 * @param xoffset - offset for yaw
+	 * @param yoffset - offset for pitch
 	 * @param constrainPitch - whether or not to clamp pitch when out of bounds
 	 */
 	void processMouseMovement(float xoffset, float yoffset, bool constrainPitch = true) {
@@ -147,7 +148,7 @@ private:
 
     /* view orientation vectors */
     glm::vec3 front, up, right;
-    
+
     /* Used to get the right vector from front vector */
     glm::vec3 worldUp;
 
