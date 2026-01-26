@@ -22,6 +22,9 @@
 #include <app/RenderSurface.hpp>
 #include <app/SwapChain.hpp>
 #include <app/ImGuiRenderer.hpp>
+#include <app/ui/ImGuiComponentManager.hpp>
+#include <app/ui/components/HelloWorldWindow.hpp>
+#include <app/ui/components/DebugStatsWindow.hpp>
 
 
 #ifdef NDEBUG
@@ -61,6 +64,8 @@ private:
   std::unique_ptr<sauce::Renderer> pRenderer;
 
   std::unique_ptr<sauce::ImGuiRenderer> pImGuiRenderer;
+
+  std::unique_ptr<sauce::ui::ImGuiComponentManager> pImGuiComponentManager;
 
   void initVulkan() {
     uint32_t glfwExtensionsCount = 0;
@@ -103,6 +108,11 @@ private:
     };
 
     pImGuiRenderer = std::make_unique<sauce::ImGuiRenderer>(imguiCreateInfo);
+
+    // Initialize UI component system
+    pImGuiComponentManager = std::make_unique<sauce::ui::ImGuiComponentManager>();
+    pImGuiComponentManager->addComponent(std::make_unique<sauce::ui::HelloWorldWindow>());
+    pImGuiComponentManager->addComponent(std::make_unique<sauce::ui::DebugStatsWindow>());
   }
 
   void initWindow() {
@@ -128,14 +138,7 @@ private:
   }
 
   void buildExampleUI() {
-    ImGui::Begin("SauceEngine Debug");
-    ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-    ImGui::Text("Frame Time: %.3f ms", 1000.0f / ImGui::GetIO().Framerate);
-    ImGui::End();
-
-    // Show ImGui demo window for testing
-    static bool showDemo = true;
-    ImGui::ShowDemoWindow(&showDemo);
+    pImGuiComponentManager->renderAll();
   }
 };
 

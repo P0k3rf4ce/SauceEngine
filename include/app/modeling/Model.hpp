@@ -23,6 +23,9 @@ public:
     const std::vector<std::shared_ptr<Mesh>>& getAllMeshes() const { return allMeshes; }
     const std::vector<std::shared_ptr<Material>>& getAllMaterials() const { return allMaterials; }
 
+    // Get all mesh-material pairs by traversing the scene graph
+    std::vector<MeshMaterialPair> getAllMeshMaterialPairs() const;
+
     // Metadata access (for scene-level GLTF extensions)
     const std::unordered_map<std::string, PropertyValue>& getMetadata() const { return metadata; }
     void setMetadata(const std::string& key, const PropertyValue& value);
@@ -39,6 +42,7 @@ private:
 
     // Helper for tree traversal
     void traverseNode(std::shared_ptr<ModelNode> node);
+    void collectPairsFromNode(std::shared_ptr<ModelNode> node, std::vector<MeshMaterialPair>& pairs) const;
 };
 
 } // namespace modeling

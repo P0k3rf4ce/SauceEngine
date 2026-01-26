@@ -53,16 +53,33 @@ public:
      * @param pos - position to move the camera to
      */
     void setPos(glm::vec3 pos) {
-      // TODO
+      this->pos = pos;
+      updateView();
     }
 
     /**
-     * Translates the camera position by offset 
+     * Sets camera to look at target from position
+     *
+     * @param position - camera position
+     * @param target - target to look at
+     * @param upVec - up vector
+     */
+    void lookAt(const glm::vec3& position, const glm::vec3& target, const glm::vec3& upVec) {
+      pos = position;
+      worldUp = upVec;
+      glm::vec3 direction = glm::normalize(target - position);
+      yaw = glm::degrees(atan2(direction.z, direction.x));
+      pitch = glm::degrees(asin(direction.y));
+      updateView();
+    }
+
+    /**
+     * Translates the camera position by offset
      *
      * @param offs - offset by which to translate the camera
      */
     void translate(glm::vec3 offs) {
-      // TODO 
+      // TODO
     }
 
     /**
@@ -88,8 +105,7 @@ public:
      * @return the view matrix for this camera
      */
     glm::mat4 getViewMatrix() const {
-      // TODO (Use glm::lookAt)
-      return glm::mat4(1.0f);
+      return glm::lookAt(pos, pos + front, up);
     }
 
     /**
@@ -98,8 +114,8 @@ public:
      * @return projection matrix for this camera
      */
     glm::mat4 getProjectionMatrix() const {
-      // TODO (use glm::perspective)
-      return glm::mat4(1.0f);
+      float aspect = static_cast<float>(scrWidth) / static_cast<float>(scrHeight);
+      return glm::perspective(glm::radians(fov), aspect, 0.1f, 100.0f);
     }
 
     /**
@@ -146,7 +162,13 @@ private:
      * This should be called any time the camera position or angle is changed.
      */
     void updateView() {
-      // TODO 
+      glm::vec3 newFront;
+      newFront.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+      newFront.y = sin(glm::radians(pitch));
+      newFront.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+      front = glm::normalize(newFront);
+      right = glm::normalize(glm::cross(front, worldUp));
+      up = glm::normalize(glm::cross(right, front));
     }
 };
 
