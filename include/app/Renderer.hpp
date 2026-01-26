@@ -20,10 +20,11 @@
 namespace sauce {
 
 const std::vector<Vertex> vertices {
-  { {-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f} },
-  { {0.5f, -0.5f}, {0.0f, 1.0f, 0.0f} },
-  { {0.5f, 0.5f}, {0.0f, 0.0f, 1.0f} },
-  { {-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f} }
+  // position (vec3), normal (vec3), texCoords (vec2), color (vec3), tangent (vec4)
+  { {-0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f} },
+  { {0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f} },
+  { {0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f} },
+  { {-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f} }
 };
 
 const std::vector<uint16_t> indices {

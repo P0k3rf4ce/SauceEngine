@@ -29,8 +29,25 @@ target_link_libraries(${EXEC_NAME} PUBLIC Boost::program_options)
 find_package(glfw3 CONFIG REQUIRED)
 target_link_libraries(${EXEC_NAME} PRIVATE glfw)
 
+find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
+target_include_directories(${EXEC_NAME} PRIVATE ${TINYGLTF_INCLUDE_DIRS})
+
 target_include_directories(SauceEngine PRIVATE
   ${PROJECT_SOURCE_DIR}/include
+)
+
+target_sources(${EXEC_NAME} PRIVATE
+  src/app/modeling/Transform.cpp
+  src/app/modeling/Texture.cpp
+  src/app/modeling/TextureCache.cpp
+  src/app/modeling/Material.cpp
+  src/app/modeling/Mesh.cpp
+  src/app/modeling/ModelNode.cpp
+  src/app/modeling/Model.cpp
+  src/app/modeling/GLTFLoader.cpp
+  src/app/components/TransformComponent.cpp
+  src/app/components/MeshRendererComponent.cpp
+  src/app/Scene.cpp
 )
 
 set (SHADERS_DIR ${CMAKE_CURRENT_LIST_DIR}/shaders)
@@ -53,12 +70,20 @@ function (add_slang_shader_target TARGET)
   add_custom_target (${TARGET} DEPENDS ${SHADERS_DIR}/slang.spv)
 endfunction()
 
-add_slang_shader_target(shadersTarget SOURCES ${SHADERS_DIR}/shader.slang)
-add_dependencies(${EXEC_NAME} shadersTarget)
+find_program(SLANGC_EXECUTABLE slangc)
+if(SLANGC_EXECUTABLE)
+  message(STATUS "Found slangc: ${SLANGC_EXECUTABLE}")
+  add_slang_shader_target(shadersTarget SOURCES ${SHADERS_DIR}/shader.slang)
+  add_dependencies(${EXEC_NAME} shadersTarget)
+else()
+  message(WARNING "slangc not found - skipping shader compilation. Install from: https://github.com/shader-slang/slang/releases")
+  # Create empty shader target so build doesn't fail
+  add_custom_target(shadersTarget)
+endif()
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/launcher)
 
-target_link_libraries(${EXEC_NAME} PRIVATE launcherLib) 
+target_link_libraries(${EXEC_NAME} PRIVATE launcherLib)
 
 if(APPLE)
     target_link_options(${EXEC_NAME} PRIVATE "LINKER:-no_warn_duplicate_libraries")

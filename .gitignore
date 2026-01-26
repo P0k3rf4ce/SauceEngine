@@ -18,3 +18,9 @@ coverage*
 .cache
 shaders/slang.spv
 
+# Test assets
+assets/models/
+
+# Experimental/temporary files
+ModelLoader.cpp
+
