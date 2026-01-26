@@ -29,6 +29,9 @@ target_link_libraries(${EXEC_NAME} PUBLIC Boost::program_options)
 find_package(glfw3 CONFIG REQUIRED)
 target_link_libraries(${EXEC_NAME} PRIVATE glfw)
 
+find_package(imgui CONFIG REQUIRED)
+target_link_libraries(${EXEC_NAME} PRIVATE imgui::imgui)
+
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
 target_include_directories(${EXEC_NAME} PRIVATE ${TINYGLTF_INCLUDE_DIRS})
 
@@ -48,6 +51,7 @@ target_sources(${EXEC_NAME} PRIVATE
   src/app/components/TransformComponent.cpp
   src/app/components/MeshRendererComponent.cpp
   src/app/Scene.cpp
+  src/app/ImGuiRenderer.cpp
 )
 
 set (SHADERS_DIR ${CMAKE_CURRENT_LIST_DIR}/shaders)
