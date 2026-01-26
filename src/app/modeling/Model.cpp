@@ -55,8 +55,7 @@ void Model::traverseNode(std::shared_ptr<ModelNode> node) {
         traverseNode(child);
     }
 
-    // Clear sets after complete traversal (this is a static, so we need to clean up)
-    // This works because traverseNode is called from rebuildFlatLists which is the entry point
+    // Clear static sets after complete traversal
     if (node == rootNode) {
         meshSet.clear();
         materialSet.clear();

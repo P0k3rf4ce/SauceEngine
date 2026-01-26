@@ -30,7 +30,7 @@ bool Mesh::isValid() const {
 
     // Check that indices count is a multiple of 3 (triangles)
     if (indices.size() % 3 != 0) {
-        // Warning: index count is not a multiple of 3
+        // TODO: Log warning or handle invalid index count
     }
 
     return true;

@@ -18,13 +18,7 @@ void MeshRendererComponent::render() {
         return;
     }
 
-    // TODO: Implement actual rendering logic
-    // This will be called by the renderer and should:
-    // 1. Bind the material (textures, shader uniforms, etc.)
-    // 2. Bind the mesh's vertex/index buffers
-    // 3. Issue draw call
-    //
-    // For now, this is a placeholder
+    // TODO: Bind material, mesh buffers, and issue draw call
 }
 
 } // namespace sauce

@@ -27,8 +27,7 @@ ImGuiRenderer::~ImGuiRenderer() {
 }
 
 void ImGuiRenderer::createDescriptorPool(const sauce::LogicalDevice& logicalDevice) {
-  // Create descriptor pool for ImGui
-  // ImGui needs a pool with eFreeDescriptorSet flag to allow freeing individual descriptor sets
+  // Descriptor pool with eFreeDescriptorSet flag for dynamic descriptor allocation
   std::array<vk::DescriptorPoolSize, 11> poolSizes = {{
     { vk::DescriptorType::eSampler, 1000 },
     { vk::DescriptorType::eCombinedImageSampler, 1000 },
@@ -82,7 +81,7 @@ void ImGuiRenderer::initImGui(const ImGuiRendererCreateInfo& createInfo) {
   initInfo.MinImageCount = createInfo.imageCount;
   initInfo.ImageCount = createInfo.imageCount;
   initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-  initInfo.UseDynamicRendering = true;  // CRITICAL: Enable dynamic rendering
+  initInfo.UseDynamicRendering = true;  // Enable dynamic rendering
   initInfo.PipelineRenderingCreateInfo = pipelineRenderingCreateInfo;
 
   if (!ImGui_ImplVulkan_Init(&initInfo)) {

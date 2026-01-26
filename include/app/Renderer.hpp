@@ -362,14 +362,13 @@ public:
    * @throws std::runtime_error If synchronization fails or the swapchain becomes invalid.
    */
   void drawFrame(const sauce::LogicalDevice& logicalDevice, const sauce::Scene& scene, sauce::ImGuiRenderer* imguiRenderer = nullptr){
-    // Wait for the in-flight fence to be signaled, ensuring the previous frame finished rendering
-    // This ensures the CPU doesn't submit additional frames while our previous frames are still rendering
+    // Wait for the previous frame to finish rendering before submitting the next frame
     auto fenceResult = logicalDevice->waitForFences(*inFlightFences[frameIndex], vk::True, UINT64_MAX);
     if (fenceResult != vk::Result::eSuccess) {
       throw std::runtime_error("Failed to wait for fence!");
     }
 
-    // Request the next available image from the swap chain (our display engine)
+    // Request the next available image from the swap chain
     auto [result, imageIndex] = (*pSwapChain)->acquireNextImage(UINT64_MAX, *presentCompleteSemaphores[frameIndex], nullptr);
 
     // Verify the swap chain image was acquired successfully (suboptimal is acceptable)
