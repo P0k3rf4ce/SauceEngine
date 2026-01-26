@@ -53,23 +53,26 @@ public:
      * @param pos - position to move the camera to
      */
     void setPos(glm::vec3 pos) {
-      // TODO
-    }
+		this->pos=pos;
+		updateView();
+	}
 
     /**
-     * Translates the camera position by offset 
+     * Translates the camera position by offset
      *
      * @param offs - offset by which to translate the camera
      */
     void translate(glm::vec3 offs) {
-      // TODO 
-    }
+		this->pos+=offs;
+		updateView();
+	}
 
     /**
      * Translates the camera position by (x, y, z)
      */
     void translate(float x, float y, float z) {
-      // TODO
+		glm::vec3 offs={x, y, z};
+		this->translate(offs);
     }
 
     /**
@@ -88,41 +91,56 @@ public:
      * @return the view matrix for this camera
      */
     glm::mat4 getViewMatrix() const {
-      // TODO (Use glm::lookAt)
-      return glm::mat4(1.0f);
-    }
+		return glm::lookAt(this->pos, this->pos+this->front, this->worldUp);
+	}
 
-    /**
-     * Get the projection matrix for this camera
-     *
-     * @return projection matrix for this camera
-     */
-    glm::mat4 getProjectionMatrix() const {
-      // TODO (use glm::perspective)
-      return glm::mat4(1.0f);
-    }
+	/**
+	 * Get the projection matrix for this camera
+	 *
+	 * @return projection matrix for this camera
+	 */
+	glm::mat4 getProjectionMatrix() const {
+		return glm::perspective(this->fov, scrWidth/scrHeight, 0.1f, 100.f);
+	}
 
-    /**
-     * Processes direction input, normalized by deltatime and camera velocity
-     *
-     * @param direction - direction in which to move the camera 
-     * @param deltatime - the time passed
-     */
-    void processDirection(Movement direction, double deltatime) {
-      // TODO 
-    }
+	/**
+	 * Processes direction input, normalized by deltatime and camera velocity
+	 *
+	 * @param direction - direction in which to move the camera
+	 * @param deltatime - the time passed
+	 */
+	void processDirection(Movement direction, double deltatime) {
+		glm::vec3 move;
 
-    /**
-     * Processes mouse movements by offsetting yaw and pitch by xoffset and yoffset, resp.
-     * If constrainPitch is true, pitch gets clamped to PITCH_MIN or PITCH_MAX when out of bounds.
-     *
-     * @param xoffset - offset for yaw 
-     * @param yoffset - offset for pitch 
-     * @param constrainPitch - whether or not to clamp pitch when out of bounds
-     */
-    void processMouseMovement(float xoffset, float yoffset, bool constrainPitch = true) {
-      // TODO
-    }
+		switch (direction) {
+		case Movement::FORWARD:
+			move=this->front;
+		    break;
+  	    case Movement::BACKWARD:
+			move=-1.f*this->front;
+		    break;
+	    case Movement::LEFT:
+			move=-1.f*this->right;
+		    break;
+	    case Movement::RIGHT:
+			move=this->right;
+		    break;
+	    }
+		move*=deltatime*this->movementSpeed;
+		this->translate(move);
+	}
+
+	/**
+	 * Processes mouse movements by offsetting yaw and pitch by xoffset and yoffset, resp.
+	 * If constrainPitch is true, pitch gets clamped to PITCH_MIN or PITCH_MAX when out of bounds.
+	 *
+	 * @param xoffset - offset for yaw 
+	 * @param yoffset - offset for pitch 
+	 * @param constrainPitch - whether or not to clamp pitch when out of bounds
+	 */
+	void processMouseMovement(float xoffset, float yoffset, bool constrainPitch = true) {
+	  // TODO
+	}
 
 private:
     glm::vec3 pos;
@@ -146,7 +164,11 @@ private:
      * This should be called any time the camera position or angle is changed.
      */
     void updateView() {
-      // TODO 
+		front.x=cos(pitch)*cos(yaw);
+		front.y=sin(pitch);
+		front.z=cos(pitch)*sin(yaw);
+		right=glm::normalize(glm::cross(worldUp, front));
+		up=glm::normalize(glm::cross(front, right));
     }
 };
 
