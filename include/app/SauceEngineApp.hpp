@@ -50,8 +50,8 @@ public:
 private:
   GLFWwindow *window;
 
+  std::chrono::steady_clock::time_point lastFrameTime = std::chrono::steady_clock::now();
   float deltaTime = 0.0f;
-  float lastFrame = 0.0f;
 
   float lastX = 0.0f;
   float lastY = 0.0f;
@@ -158,9 +158,9 @@ private:
 
   void mainLoop() {
     while (!glfwWindowShouldClose(window)) {
-      float currentFrame = static_cast<float>(glfwGetTime());
-      deltaTime = currentFrame - lastFrame;
-      lastFrame = currentFrame;
+      auto currentFrameTime = std::chrono::steady_clock::now();
+      deltaTime = std::chrono::duration<float>(currentFrameTime - lastFrameTime).count();
+      lastFrameTime = currentFrameTime;
 
       glfwPollEvents();
       processInput(deltaTime);
