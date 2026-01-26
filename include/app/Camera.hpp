@@ -92,7 +92,7 @@ public:
      * @return the view matrix for this camera
      */
     glm::mat4 getViewMatrix() const {
-		return glm::lookAt(this->pos, this->front, this->worldUp);
+		return glm::lookAt(this->pos, this->front, this->up);
 	}
 
 	/**
@@ -140,7 +140,14 @@ public:
 	 * @param constrainPitch - whether or not to clamp pitch when out of bounds
 	 */
 	void processMouseMovement(float xoffset, float yoffset, bool constrainPitch = true) {
-	  // TODO
+		xoffset=glm::radians(xoffset);
+		yoffset=glm::radians(yoffset);
+		if (constrainPitch) {
+			yoffset=(yoffset>CameraCreateInfo::PITCH_MAX)? CameraCreateInfo::PITCH_MAX : ((yoffset<CameraCreateInfo::PITCH_MIN)? CameraCreateInfo::PITCH_MIN : yoffset);
+		}
+
+		yaw+=glm::radians(xoffset);
+		pitch+=glm::radians(yoffset);
 	}
 
 private:
