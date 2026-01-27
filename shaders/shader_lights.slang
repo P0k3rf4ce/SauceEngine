@@ -55,7 +55,7 @@ float3 computeDir(DirLight light, float3 fragPos, float3 normal, float3 viewDir)
 	float diffStrength = max(dot(n, l), 0.0);
 
 	float3 halfwayDir = normalize(l + v);
-	const float shininess = 32.0;
+	const float shininess = 32.0; // NOTE: change 32.0 to a 'shininess' param when switching to textures (blinn-phong only)
 	float specStrength = pow(max(dot(n, halfwayDir), 0.0), shininess);
 
 	float3 ambient = light.ambient;
