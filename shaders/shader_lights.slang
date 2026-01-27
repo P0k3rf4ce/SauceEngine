@@ -72,7 +72,26 @@ float3 computeSpot(SpotLight light, float3 fragPos, float3 normal, float3 viewDi
 
 [shader("fragment")]
 float4 fragMain(VSOutput vertIn) : SV_TARGET {
-  // TODO: change to properly compute light
-  return float4(vertIn.colour, 1.0);
+  float3 finalColor = float3(0.0, 0.0, 0.0);
+  
+  // Accumulate all point light contributions
+  for (int i = 0; i < 4; i++) {
+    finalColor += computePoint(pointLights[i]);
+  }
+  
+  // Accumulate all directional light contributions
+  for (int i = 0; i < 4; i++) {
+    finalColor += computeDir(dirLight[i]);
+  }
+  
+  // Accumulate all spot light contributions
+  for (int i = 0; i < 4; i++) {
+    finalColor += computeSpot(spotLights[i]);
+  }
+  
+  // Multiply accumulated lighting by the base vertex color (material color)
+  finalColor *= vertIn.colour;
+  
+  return float4(finalColor, 1.0);
 }
 
