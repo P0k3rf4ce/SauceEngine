@@ -29,7 +29,10 @@ struct PointLight {
 };
 
 struct DirLight {
-	// TODO: add required data
+	float3 direction;
+	float3 ambient;
+	float3 diffuse;
+	float3 specular;
 };
 
 struct SpotLight {
@@ -45,7 +48,21 @@ float3 computePoint(PointLight light, float3 fragPos, float3 normal, float3 view
 }
 
 float3 computeDir(DirLight light, float3 fragPos, float3 normal, float3 viewDir) {
-	// TODO: return light contribution from a given directional light
+	float3 n = normalize(normal);
+	float3 v = normalize(viewDir);
+	float3 l = normalize(-light.direction);
+
+	float diffStrength = max(dot(n, l), 0.0);
+
+	float3 halfwayDir = normalize(l + v);
+	const float shininess = 32.0;
+	float specStrength = pow(max(dot(n, halfwayDir), 0.0), shininess);
+
+	float3 ambient = light.ambient;
+	float3 diffuse = light.diffuse * diffStrength;
+	float3 specular = light.specular * specStrength;
+
+	return ambient + diffuse + specular;
 }
 
 float3 computeSpot(SpotLight light, float3 fragPos, float3 normal, float3 viewDir) {
