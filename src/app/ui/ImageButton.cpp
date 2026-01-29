@@ -1,4 +1,4 @@
-#include <app/ui/components/Text.hpp>
+#include <app/ui/components/ImageButton.hpp>
 #include <algorithm>
 #include <string>
 
@@ -9,7 +9,7 @@ ImageButton::ImageButton(const std::string& name, ImTextureID texture, const ImV
 
 void ImageButton::render() { 
     if (!enabled) return;
-    if (ImGui::ImageButton(texture, size)){
+    if (ImGui::ImageButton(name.c_str(), texture, size)){
         if (onClick){
             onClick();
         }

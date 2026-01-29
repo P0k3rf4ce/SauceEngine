@@ -1,4 +1,4 @@
-#include <app/ui/components/Text.hpp>
+#include <app/ui/components/Image.hpp>
 #include <algorithm>
 #include <string>
 

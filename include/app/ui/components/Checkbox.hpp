@@ -8,7 +8,7 @@
 namespace sauce::ui {
 class Checkbox : public ImGuiComponent {
 public:
-    using Callback = std::function<void()>;
+    using Callback = std::function<void(bool)>;
 
     Checkbox(const std::string& name, const std::string& label, bool* checked, Callback onChanged = nullptr);
 

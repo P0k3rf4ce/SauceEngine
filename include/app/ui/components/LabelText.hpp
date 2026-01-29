@@ -8,7 +8,7 @@ namespace sauce::ui {
 class LabelText : public Text {
 public:
 
-    Text(const std::string& name, const std::string& label, const std::string& text);
+    LabelText(const std::string& name, const std::string& label, const std::string& text);
 
     void render() override;
 

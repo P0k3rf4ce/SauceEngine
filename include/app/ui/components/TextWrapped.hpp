@@ -6,7 +6,7 @@ namespace sauce::ui {
 class TextWrapped : public Text {
 public:
 
-    TextWarapped(const std::string& name, const std::string& text);
+    TextWrapped(const std::string& name, const std::string& text);
 
     void render() override;
 };

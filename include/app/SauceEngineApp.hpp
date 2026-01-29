@@ -25,7 +25,16 @@
 #include <app/ui/ImGuiComponentManager.hpp>
 #include <app/ui/components/HelloWorldWindow.hpp>
 #include <app/ui/components/DebugStatsWindow.hpp>
-
+#include <app/ui/components/BulletText.hpp>
+#include <app/ui/components/Button.hpp>
+#include <app/ui/components/Checkbox.hpp>
+#include <app/ui/components/Image.hpp>
+#include <app/ui/components/ImageButton.hpp>
+#include <app/ui/components/LabelText.hpp>
+#include <app/ui/components/RadioButton.hpp>
+#include <app/ui/components/Text.hpp>
+#include <app/ui/components/TextColored.hpp>
+#include <app/ui/components/TextWrapped.hpp>
 
 #ifdef NDEBUG
 constexpr bool enableValidationLayers = false;
@@ -113,6 +122,98 @@ private:
     pImGuiComponentManager = std::make_unique<sauce::ui::ImGuiComponentManager>();
     pImGuiComponentManager->addComponent(std::make_unique<sauce::ui::HelloWorldWindow>());
     pImGuiComponentManager->addComponent(std::make_unique<sauce::ui::DebugStatsWindow>());
+    pImGuiComponentManager->addComponent(std::make_unique<sauce::ui::Text>("textlabel", "Hi I am some text"));
+    pImGuiComponentManager->addComponent(std::make_unique<sauce::ui::BulletText>("bullet1", "This is a bullet point"));
+    pImGuiComponentManager->addComponent(std::make_unique<sauce::ui::BulletText>("bullet1", "This is another bullet point"));
+    pImGuiComponentManager->addComponent(
+        std::make_unique<sauce::ui::Button>(
+            "myButton",
+            "Click Me",
+            []() {
+                std::cout << "Button clicked!\n";
+            }
+        )
+    );
+    static bool myCheck = false;
+
+    pImGuiComponentManager->addComponent(
+        std::make_unique<sauce::ui::Checkbox>(
+            "myCheckbox",
+            "Enable Feature",
+            &myCheck,
+            [](bool newValue) {
+                std::cout << "Checkbox changed: " << newValue << "\n";
+            }
+        )
+    );
+    pImGuiComponentManager->addComponent(
+    std::make_unique<sauce::ui::LabelText>(
+        "fpsLabel",
+        "FPS",
+        "144"
+    )
+    );
+  static int selectedOption = 0;
+
+  pImGuiComponentManager->addComponent(
+      std::make_unique<sauce::ui::RadioButton>(
+          "optionA",
+          "Option A",
+          &selectedOption,
+          0,
+          [](int v) { std::cout << "Selected: " << v << "\n"; }
+      )
+  );
+
+  pImGuiComponentManager->addComponent(
+      std::make_unique<sauce::ui::RadioButton>(
+          "optionB",
+          "Option B",
+          &selectedOption,
+          1,
+          [](int v) { std::cout << "Selected: " << v << "\n"; }
+      )
+  );
+
+
+  pImGuiComponentManager->addComponent(
+      std::make_unique<sauce::ui::TextColored>(
+          "warningText",
+          "Warning: Low memory!",
+          ImVec4(1.0f, 0.2f, 0.2f, 1.0f)
+      )
+  );
+
+  pImGuiComponentManager->addComponent(
+      std::make_unique<sauce::ui::TextWrapped>(
+          "longText",
+          "This is a long block of text that will automatically wrap inside the ImGui window."
+      )
+  );
+
+  ImTextureID fontTex = ImGui::GetIO().Fonts->TexID;
+
+  pImGuiComponentManager->addComponent(
+      std::make_unique<sauce::ui::Image>(
+          "testImage",
+          fontTex,
+          ImVec2(128, 128)
+      )
+  );
+  pImGuiComponentManager->addComponent(
+    std::make_unique<sauce::ui::ImageButton>(
+        "testImageButton",
+        fontTex,
+        ImVec2(64, 64),
+        []() {
+            std::cout << "ImageButton clicked!\n";
+        }
+    )
+  );
+
+
+
+
   }
 
   void initWindow() {

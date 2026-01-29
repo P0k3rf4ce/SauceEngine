@@ -8,7 +8,7 @@
 namespace sauce::ui {
 class RadioButton : public ImGuiComponent {
 public:
-    using Callback = std::function<void()>;
+    using Callback = std::function<void(int)>;
 
     RadioButton(const std::string& name, const std::string& label, int* selected, int value, Callback onChanged = nullptr);
 
