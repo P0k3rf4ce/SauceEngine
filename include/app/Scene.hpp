@@ -2,8 +2,15 @@
 
 #include <app/Camera.hpp>
 #include <app/Entity.hpp>
+#include <memory>
+#include <unordered_map>
 
 namespace sauce {
+
+namespace modeling {
+  class ModelNode;
+  class Model;
+}
 
 class SauceEngineApp;
 
@@ -23,6 +30,23 @@ public:
   }
 
   /**
+   * Adds an entity to the scene
+   */
+  void addEntity(sauce::Entity&& entity);
+
+  /**
+   * Gets an entity by name (returns nullptr if not found)
+   */
+  sauce::Entity* getEntity(const std::string& name);
+
+  /**
+   * Loads a GLTF model and creates entities with components
+   * @param filePath - path to the GLTF file
+   * @param preserveHierarchy - if true, creates entity tree; if false, flattens to single level
+   */
+  void loadGLTFModel(const std::string& filePath, bool preserveHierarchy = true);
+
+  /**
    * Returns a const ref to camera
    */
   const sauce::Camera& getCameraRO() const noexcept {
@@ -33,6 +57,12 @@ private:
   std::vector<sauce::Entity> entities;
 
   std::unique_ptr<sauce::Camera> pCamera;
+
+  // Helper functions for GLTF loading
+  void loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
+                             Entity* parentEntity,
+                             std::unordered_map<modeling::ModelNode*, Entity*>& nodeToEntityMap);
+  void loadGLTFFlattened(std::shared_ptr<modeling::Model> model);
 
   /**
    * Returns a non-const ref to camera
