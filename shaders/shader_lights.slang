@@ -81,7 +81,8 @@ float3 computeSpot(SpotLight light, float3 fragPos, float3 normal, float3 viewDi
 	
 	// Specular 
 	float3 halfDir = normalize(lightDir + viewDir);
-	float spec = pow(max(dot(norm, halfDir), 0.0), 32.0); // not sure if this should just be constant 32 or a param
+	// NOTE: change 32.0 to a 'shininess' param when switching to textures (blinn-phong only)
+	float spec = pow(max(dot(norm, halfDir), 0.0), 32.0);
 	float3 specular = spec * light.color;
 	
 	// Ambient
