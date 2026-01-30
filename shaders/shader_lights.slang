@@ -40,7 +40,6 @@ struct SpotLight {
 	float3 color;
 	float outerConeAngle;
 	float range;
-	float padding;
 };
 
 ConstantBuffer<PointLight[4]> pointLights;
@@ -55,20 +54,17 @@ float3 computeDir(DirLight light) {
 	// TODO: return light contribution from a given directional light
 }
 
-float3 computeSpot(SpotLight light, float3 fragPos, float3 normal, float3 viewPos) {
-  // not sure what "current fragment" is in the issue description
-  // assuming that the params will be determined at function call and that it isnt something defined globally
-
+float3 computeSpot(SpotLight light, float3 fragPos, float3 normal, float3 viewDir) {
 	// Direction from fragment to light
 	float3 lightDir = light.position - fragPos;
 	float distance = length(lightDir);
 	lightDir = normalize(lightDir);
 	
 	// Distance attenuation
-	float attenuation = 1.0 / max(distance * distance, 0.0001); // this is incase distance is 0
+	float attenuation = 1.0 / max(200 * 200 * distance * distance, 0.0001); // Incase distance is 0
 	
-	// in this step, we start choking the light after it has travelled at least 80% of the distance
-	attenuation *= smoothstep(light.range, light.range * 0.8, distance); 
+	// We may start choking the light after it has travelled at least 80% of the distance
+	// attenuation *= smoothstep(light.range, light.range * 0.8, distance); 
 	
 	// Spotlight cone attenuation
 	float theta = dot(lightDir, -normalize(light.direction));
@@ -78,7 +74,6 @@ float3 computeSpot(SpotLight light, float3 fragPos, float3 normal, float3 viewPo
 	
 	// Blinn-Phong lighting components
 	float3 norm = normalize(normal);
-	float3 viewDir = normalize(viewPos - fragPos);
 	
 	// Diffuse
 	float diff = max(dot(norm, lightDir), 0.0);
