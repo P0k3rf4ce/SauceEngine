@@ -79,7 +79,7 @@ float3 computeSpot(SpotLight light, float3 fragPos, float3 normal, float3 viewDi
 	lightDir = normalize(lightDir);
 	
 	// Distance attenuation
-	float attenuation = 1.0 / max(200 * 200 * distance * distance, 0.0001); // Incase distance is 0
+	float attenuation = (light.range * light.range) / max(200 * 200 * distance * distance, 0.0001); // Incase distance is 0
 	
 	// We may start choking the light after it has travelled at least 80% of the distance
 	// attenuation *= smoothstep(light.range, light.range * 0.8, distance); 
