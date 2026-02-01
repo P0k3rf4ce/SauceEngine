@@ -25,7 +25,16 @@
 #include <app/ui/ImGuiComponentManager.hpp>
 #include <app/ui/components/HelloWorldWindow.hpp>
 #include <app/ui/components/DebugStatsWindow.hpp>
-
+#include <app/ui/components/BulletText.hpp>
+#include <app/ui/components/Button.hpp>
+#include <app/ui/components/Checkbox.hpp>
+#include <app/ui/components/Image.hpp>
+#include <app/ui/components/ImageButton.hpp>
+#include <app/ui/components/LabelText.hpp>
+#include <app/ui/components/RadioButton.hpp>
+#include <app/ui/components/Text.hpp>
+#include <app/ui/components/TextColored.hpp>
+#include <app/ui/components/TextWrapped.hpp>
 
 #ifdef NDEBUG
 constexpr bool enableValidationLayers = false;
