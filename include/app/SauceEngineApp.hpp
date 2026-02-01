@@ -47,16 +47,10 @@ constexpr uint32_t HEIGHT = 720;
 
 class SauceEngineApp {
 public:
-  void run() {
-    initWindow();
-    initVulkan();
-    mainLoop();
-  }
+  SauceEngineApp(); // Constructor to initialize pImGuiComponentManager
+  void run();
 
-  ~SauceEngineApp() {
-    glfwDestroyWindow(window);
-    glfwTerminate();
-  }
+  ~SauceEngineApp();
 
 private:
   GLFWwindow *window;
@@ -75,79 +69,16 @@ private:
   std::unique_ptr<sauce::ImGuiRenderer> pImGuiRenderer;
 
   std::unique_ptr<sauce::ui::ImGuiComponentManager> pImGuiComponentManager;
+  std::function<void(sauce::ui::ImGuiComponentManager&)> pCustomUIBuilder;
 
-  void initVulkan() {
-    uint32_t glfwExtensionsCount = 0;
-    const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionsCount);
-    pInstance = std::make_unique<sauce::Instance>(glfwExtensions, glfwExtensionsCount);
+  void initVulkan();
+  void initWindow();
+  void mainLoop();
 
-    pRenderSurface = std::make_unique<sauce::RenderSurface>(*pInstance, window);
+  void buildExampleUI();
 
-    physicalDevice = { *pInstance };
-    logicalDevice = { physicalDevice, *pRenderSurface };
-
-    sauce::CameraCreateInfo cameraCreateInfo {
-      .scrWidth = WIDTH,
-      .scrHeight = HEIGHT,
-    };
-
-    pScene = std::make_unique<sauce::Scene>( cameraCreateInfo );
-
-    sauce::RendererCreateInfo rendererCreateInfo {
-      .physicalDevice = physicalDevice,
-      .logicalDevice = logicalDevice,
-      .renderSurface = *pRenderSurface,
-      .window = window,
-    };
-
-    pRenderer = std::make_unique<sauce::Renderer>(rendererCreateInfo);
-
-    // Initialize ImGui
-    sauce::ImGuiRendererCreateInfo imguiCreateInfo{
-      .instance = **pInstance,
-      .physicalDevice = physicalDevice,
-      .logicalDevice = logicalDevice,
-      .queueFamilyIndex = logicalDevice.getQueueIndex(),
-      .window = window,
-      .queue = pRenderer->getQueue(),
-      .commandPool = pRenderer->getCommandPool(),
-      .swapChain = pRenderer->getSwapChain(),
-      .imageCount = static_cast<uint32_t>(pRenderer->getSwapChain().getImages().size()),
-      .swapChainFormat = pRenderer->getSwapChain().getSurfaceFormat().format,
-    };
-
-    pImGuiRenderer = std::make_unique<sauce::ImGuiRenderer>(imguiCreateInfo);
-
-    // Initialize UI component system
-    pImGuiComponentManager = std::make_unique<sauce::ui::ImGuiComponentManager>();
-    pImGuiComponentManager->addComponent(std::make_unique<sauce::ui::HelloWorldWindow>());
-    pImGuiComponentManager->addComponent(std::make_unique<sauce::ui::DebugStatsWindow>());
-  }
-
-  void initWindow() {
-    glfwInit();
-
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
-    window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan Playground", nullptr, nullptr);
-  }
-
-  void mainLoop() {
-    while (!glfwWindowShouldClose(window)) {
-      glfwPollEvents();
-
-      pImGuiRenderer->newFrame();
-      buildExampleUI();
-
-      pRenderer->drawFrame(logicalDevice, *pScene, pImGuiRenderer.get());
-    }
-
-    logicalDevice->waitIdle();
-  }
-
-  void buildExampleUI() {
-    pImGuiComponentManager->renderAll();
-  }
+public:
+  sauce::ui::ImGuiComponentManager& getImGuiManager() { return *pImGuiComponentManager; }
+  void setCustomUIBuilder(std::function<void(sauce::ui::ImGuiComponentManager&)> builder);
 };
 
