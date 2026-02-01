@@ -39,10 +39,6 @@ target_include_directories(SauceEngine PRIVATE
   ${PROJECT_SOURCE_DIR}/include
 )
 
-file(GLOB_RECURSE UI_COMPONENT_SOURCES
-  "${PROJECT_SOURCE_DIR}/src/app/ui/*.cpp" 
-) 
-
 target_sources(${EXEC_NAME} PRIVATE
   src/app/modeling/Transform.cpp
   src/app/modeling/Texture.cpp
@@ -57,7 +53,6 @@ target_sources(${EXEC_NAME} PRIVATE
   src/app/Scene.cpp
   src/app/ImGuiRenderer.cpp
   src/app/ui/ImGuiComponentManager.cpp
-  ${UI_COMPONENT_SOURCES}
 )
 
 set (SHADERS_DIR ${CMAKE_CURRENT_LIST_DIR}/shaders)
