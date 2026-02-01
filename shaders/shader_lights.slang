@@ -45,7 +45,13 @@ struct DirLight {
 };
 
 struct SpotLight {
-	// TODO: add required data
+	float3 position;
+	float intensity;
+	float3 direction;
+	float innerConeAngle;
+	float3 color;
+	float outerConeAngle;
+	float range;
 };
 
 ConstantBuffer<PointLight[4]> pointLights;
@@ -76,8 +82,41 @@ float3 computeDir(DirLight light, float3 fragPos, float3 normal, float3 viewDir)
 }
 
 float3 computeSpot(SpotLight light, float3 fragPos, float3 normal, float3 viewDir) {
-	// TODO: return light contribution from a given spot light
-  return float3(0.0, 0.0, 0.0);
+	// Direction from fragment to light
+	float3 lightDir = light.position - fragPos;
+	float distance = length(lightDir);
+	lightDir = normalize(lightDir);
+	
+	// Distance attenuation
+	float attenuation = (light.range * light.range) / max(200 * 200 * distance * distance, 0.0001); // Incase distance is 0
+	
+	// We may start choking the light after it has travelled at least 80% of the distance
+	// attenuation *= smoothstep(light.range, light.range * 0.8, distance); 
+	
+	// Spotlight cone attenuation
+	float theta = dot(lightDir, -normalize(light.direction));
+	float cosInner = cos(light.innerConeAngle);
+	float cosOuter = cos(light.outerConeAngle);
+	float spotIntensity = smoothstep(cosOuter, cosInner, theta);
+	
+	// Blinn-Phong lighting components
+	float3 norm = normalize(normal);
+	
+	// Diffuse
+	float diff = max(dot(norm, lightDir), 0.0);
+	float3 diffuse = diff * light.color;
+	
+	// Specular 
+	float3 halfDir = normalize(lightDir + viewDir);
+	// NOTE: change 32.0 to a 'shininess' param when switching to textures (blinn-phong only)
+	float spec = pow(max(dot(norm, halfDir), 0.0), 32.0);
+	float3 specular = spec * light.color;
+	
+	// Ambient
+	float3 ambient = 0.1 * light.color;
+	
+	float3 result = (ambient + diffuse + specular) * light.intensity * spotIntensity * attenuation;
+	return result;
 }
 
 [shader("fragment")]
