@@ -50,36 +50,8 @@ target_sources(${EXEC_NAME} PRIVATE
   src/app/Scene.cpp
 )
 
-set (SHADERS_DIR ${CMAKE_CURRENT_LIST_DIR}/shaders)
-
-function (add_slang_shader_target TARGET)
-  cmake_parse_arguments ("SHADER" "" "" "SOURCES" ${ARGN})
-  set (ENTRY_POINTS -entry vertMain -entry fragMain)
-  add_custom_command (
-          OUTPUT ${SHADERS_DIR}
-          COMMAND ${CMAKE_COMMAND} -E make_directory ${SHADERS_DIR}
-  )
-  add_custom_command (
-          OUTPUT  ${SHADERS_DIR}/slang.spv
-          COMMAND slangc ${SHADER_SOURCES} -verbose-paths -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name ${ENTRY_POINTS} -o slang.spv
-          WORKING_DIRECTORY ${SHADERS_DIR}
-          DEPENDS ${SHADERS_DIR} ${SHADER_SOURCES}
-          COMMENT "Compiling Slang Shaders"
-          VERBATIM
-  )
-  add_custom_target (${TARGET} DEPENDS ${SHADERS_DIR}/slang.spv)
-endfunction()
-
-find_program(SLANGC_EXECUTABLE slangc)
-if(SLANGC_EXECUTABLE)
-  message(STATUS "Found slangc: ${SLANGC_EXECUTABLE}")
-  add_slang_shader_target(shadersTarget SOURCES ${SHADERS_DIR}/shader.slang)
-  add_dependencies(${EXEC_NAME} shadersTarget)
-else()
-  message(WARNING "slangc not found - skipping shader compilation. Install from: https://github.com/shader-slang/slang/releases")
-  # Create empty shader target so build doesn't fail
-  add_custom_target(shadersTarget)
-endif()
+add_subdirectory(${PROJECT_SOURCE_DIR}/shaders)
+add_dependencies(${EXEC_NAME} shaders)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/launcher)
 

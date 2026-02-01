@@ -8,8 +8,8 @@ namespace sauce {
 struct CameraCreateInfo {
   float scrWidth;
   float scrHeight;
-  glm::vec3 pos = { 0, 0, 1 };
-  glm::vec3 worldUp = { 0, 1, 0 };
+  glm::vec3 pos = { 2.0f, 2.0f, 2.0f };
+  glm::vec3 worldUp = { 0.0f, 0.0f, 1.0f };
   float yaw = YAW_DEFAULT;
   float pitch = PITCH_DEFAULT;
   float fov = FOV_DEFAULT;
@@ -44,55 +44,59 @@ public:
       movementSpeed(createInfo.movementSpeed), mouseSensitivity(createInfo.mouseSensitivity),
       scrWidth(createInfo.scrWidth), scrHeight(createInfo.scrHeight)
     {
-        updateView();
+      updateView();
     }
 
-    /**
-     * Sets camera position
-     *
-     * @param pos - position to move the camera to
-     */
-    void setPos(glm::vec3 pos) {
-		this->pos=pos;
-		updateView();
-	}
+  /**
+   * Sets camera position
+   *
+   * @param pos - position to move the camera to
+   */
+  void setPos(glm::vec3 pos) {
+    this->pos=pos;
+    updateView();
+  }
 
-    /**
-     * Translates the camera position by offset
-     *
-     * @param offs - offset by which to translate the camera
-     */
-    void translate(glm::vec3 offs) {
-		translate(offs.x, offs.y, offs.z);
-	}
+  glm::vec3 getPos() const {
+    return this->pos;
+  }
 
-    /**
-     * Translates the camera position by (x, y, z)
-     */
-    void translate(float x, float y, float z) {
+  /**
+   * Translates the camera position by offset
+   *
+   * @param offs - offset by which to translate the camera
+   */
+  void translate(glm::vec3 offs) {
+    translate(offs.x, offs.y, offs.z);
+  }
+
+  /**
+   * Translates the camera position by (x, y, z)
+   */
+  void translate(float x, float y, float z) {
 		this->pos.x+=x;
 		this->pos.y+=y;
 		this->pos.z+=z;
 		updateView();
-    }
+  }
 
-    /**
-     * Get current FOV
-     */
-    float getFOV() const { return fov; }
+  /**
+   * Get current FOV
+   */
+  float getFOV() const { return fov; }
 
-    /**
-     * Set camera FOV
-     */
-    void setFOV(float fov) { this->fov=fov; }
+  /**
+   * Set camera FOV
+   */
+  void setFOV(float fov) { this->fov=fov; }
 
-    /**
-     * Get view matrix from the current view vectors
-     *
-     * @return the view matrix for this camera
-     */
-    glm::mat4 getViewMatrix() const {
-		return glm::lookAt(this->pos, this->front, this->up);
+  /**
+   * Get view matrix from the current view vectors
+   *
+   * @return the view matrix for this camera
+   */
+  glm::mat4 getViewMatrix() const {
+		return glm::lookAt(this->pos, this->pos + this->front, this->worldUp);
 	}
 
 	/**
@@ -101,7 +105,7 @@ public:
 	 * @return projection matrix for this camera
 	 */
 	glm::mat4 getProjectionMatrix() const {
-		return glm::perspective(this->fov, scrWidth/scrHeight, 0.1f, 100.f);
+		return glm::perspective(glm::radians(this->fov), scrWidth/scrHeight, 0.1f, 100.f);
 	}
 
 	/**
@@ -140,44 +144,48 @@ public:
 	 * @param constrainPitch - whether or not to clamp pitch when out of bounds
 	 */
 	void processMouseMovement(float xoffset, float yoffset, bool constrainPitch = true) {
-		xoffset=glm::radians(xoffset);
-		yoffset=glm::radians(yoffset);
+    yaw += xoffset;
+		pitch += yoffset;
+
 		if (constrainPitch) {
-			yoffset=(yoffset>CameraCreateInfo::PITCH_MAX)? CameraCreateInfo::PITCH_MAX : ((yoffset<CameraCreateInfo::PITCH_MIN)? CameraCreateInfo::PITCH_MIN : yoffset);
+			pitch = std::max(std::min(pitch, CameraCreateInfo::PITCH_MAX), CameraCreateInfo::PITCH_MIN);
 		}
 
-		yaw+=glm::radians(xoffset);
-		pitch+=glm::radians(yoffset);
+    updateView();
 	}
 
 private:
-    glm::vec3 pos;
+  glm::vec3 pos;
 
-    /* view orientation vectors */
-    glm::vec3 front, up, right;
+  /* view orientation vectors */
+  glm::vec3 front, up, right;
 
-    /* Used to get the right vector from front vector */
-    glm::vec3 worldUp;
+  /* Used to get the right vector from front vector */
+  glm::vec3 worldUp;
 
-    float movementSpeed, mouseSensitivity;
+  float movementSpeed, mouseSensitivity;
 
-    // euler Angles
-    float yaw, pitch;
+  // euler Angles
+  float yaw, pitch;
 
-    float fov;
-    float scrWidth, scrHeight;
+  float fov;
+  float scrWidth, scrHeight;
 
-    /**
-     * Sets the front, right, and up vectors using the current values for yaw and pitch.
-     * This should be called any time the camera position or angle is changed.
-     */
-    void updateView() {
-		front.x=cos(pitch)*cos(yaw);
-		front.y=sin(pitch);
-		front.z=cos(pitch)*sin(yaw);
-		right=glm::normalize(glm::cross(worldUp, front));
-		up=glm::normalize(glm::cross(front, right));
-    }
+  /**
+   * Sets the front, right, and up vectors using the current values for yaw and pitch.
+   * This should be called any time the camera position or angle is changed.
+   */
+  void updateView() {
+    float pitchRad = glm::radians(pitch);
+    float yawRad = glm::radians(yaw);
+
+		front.x = cos(pitchRad) * sin(yawRad);
+		front.y = cos(pitchRad) * cos(yawRad);
+    front.z = sin(pitchRad);
+
+		right=glm::normalize(glm::cross(front, worldUp));
+		up=glm::normalize(glm::cross(right, front));
+  }
 };
 
 }
