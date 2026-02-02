@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎮 SauceEngine Races!</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎮 SauceEngine Races 🏇</h1>
+            <p class="subtitle">Fair & Random! Let the best racer shine. 🎯</p>
+            <p class="fairness-badge">✅ Cryptographically shuffled start order • Equal probability for all racers</p>
+        </header>
+
+        <div class="setup-panel" id="setupPanel">
+            <h2>⚙️ Race Setup</h2>
+            
+            <div class="setup-grid">
+                <div class="setup-item">
+                    <label for="numParticipants">🎭 Racers (2-12):</label>
+                    <input type="number" id="numParticipants" min="2" max="12" value="12">
+                </div>
+                <div class="setup-item">
+                    <label for="raceSpeed">💨 Speed:</label>
+                    <select id="raceSpeed">
+                        <option value="slow">🐌 Sleepy Sunday</option>
+                        <option value="normal" selected>🏃 Normal</option>
+                        <option value="fast">🚀 Turbo</option>
+                        <option value="insane">☄️ ABSOLUTE CHAOS</option>
+                    </select>
+                </div>
+                <div class="setup-item">
+                    <label for="animalVariant">🎪 Creature Type:</label>
+                    <select id="animalVariant">
+                        <option value="horses" selected>🐴 Classic Horses</option>
+                        <option value="unicorns">🦄 Magical Unicorns</option>
+                        <option value="dragons">🐲 Fire Dragons</option>
+                        <option value="chickens">🐔 Speedy Chickens</option>
+                        <option value="snails">🐌 Turbo Snails</option>
+                        <option value="aliens">👽 Space Aliens</option>
+                        <option value="food">🍕 Racing Food</option>
+                        <option value="vehicles">🚗 Tiny Vehicles</option>
+                        <option value="chaos">🎲 RANDOM CHAOS!</option>
+                    </select>
+                </div>
+                <div class="setup-item">
+                    <label for="weatherEffect">🌤️ Weather:</label>
+                    <select id="weatherEffect">
+                        <option value="none">☀️ Clear Skies</option>
+                        <option value="rain">🌧️ Rainy</option>
+                        <option value="snow">❄️ Snowy</option>
+                        <option value="disco">🪩 DISCO MODE</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="participants-setup">
+                <h3>🏷️ Name Your Racers</h3>
+                <div id="participantsInput" class="participants-grid"></div>
+            </div>
+
+            <button class="btn-start" id="startRaceBtn">
+                <span class="btn-text">🏁 LET'S RACE! 🏁</span>
+                <span class="btn-subtext">May the odds be ever in your favor</span>
+            </button>
+        </div>
+
+        <div class="race-container" id="raceContainer" style="display: none;">
+            <div class="race-header">
+                <div class="race-status" id="raceStatus">🏁 GET READY...</div>
+                <div class="timer" id="raceTimer">0.00s</div>
+            </div>
+
+            <div class="weather-overlay" id="weatherOverlay"></div>
+            
+            <div class="race-track" id="raceTrack">
+                <div class="track-decorations">
+                    <div class="crowd">👥👤👥👤👥👤👥👤👥👤👥👤👥👤👥</div>
+                </div>
+                <div class="lanes-container" id="lanesContainer"></div>
+                <div class="finish-line">
+                    <span class="finish-text">🏆 FINISH 🏆</span>
+                </div>
+            </div>
+
+            <div class="live-commentary" id="commentary">
+                <span class="comment-text">And they're off!</span>
+            </div>
+
+            <div class="results-panel" id="resultsPanel" style="display: none;">
+                <div class="results-header">
+                    <h2>🎉 RACE COMPLETE! 🎉</h2>
+                    <div class="confetti-container" id="confetti"></div>
+                </div>
+                
+                <div class="podium">
+                    <div class="podium-place second" id="podium2">
+                        <div class="podium-emoji"></div>
+                        <div class="podium-name"></div>
+                        <div class="podium-block">🥈</div>
+                    </div>
+                    <div class="podium-place first" id="podium1">
+                        <div class="podium-emoji"></div>
+                        <div class="podium-name"></div>
+                        <div class="podium-block">🥇</div>
+                    </div>
+                    <div class="podium-place third" id="podium3">
+                        <div class="podium-emoji"></div>
+                        <div class="podium-name"></div>
+                        <div class="podium-block">🥉</div>
+                    </div>
+                </div>
+
+                <div class="full-results" id="fullResults"></div>
+
+                <div class="action-buttons">
+                    <button class="btn-rematch" id="rematchBtn">🔄 REMATCH!</button>
+                    <button class="btn-new" id="newRaceBtn">🆕 New Setup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="startSound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleVZljuq/gUMsFWuN3MKcdFNXfbTwwn1CExGIms3Nl3ZdXoq69bthJAAAm4fDz5J0YGiOq/K0XDMJAGT/9MmFaWNniqPssm9JAAAA" type="audio/wav">
+    </audio>
+
+    <script src="script.js"></script>
+</body>
+</html>
