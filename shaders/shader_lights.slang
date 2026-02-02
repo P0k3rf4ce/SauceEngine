@@ -33,7 +33,14 @@ VSOutput vertMain(VSInput input) {
 
 
 struct PointLight {
-	// TODO: add required data
+	float3 position;
+    float3 color;
+    float3 ambient;
+    float3 diffuse;
+    float3 specular;
+    float constant;
+    float linear;
+    float quadratic;
 };
 
 struct DirLight {
@@ -59,8 +66,33 @@ ConstantBuffer<DirLight[4]> dirLight;
 ConstantBuffer<SpotLight[4]> spotLights;
 
 float3 computePoint(PointLight light, float3 fragPos, float3 normal, float3 viewDir) {
-	// TODO: return light contribution from a given point light
-  return float3(0.0, 0.0, 0.0);
+	float3 n = normalize(normal);
+    float3 v = normalize(viewDir);
+
+    float3 l = light.position - fragPos;
+    float distance = length(l);
+    l = normalize(l);
+
+    float diffStrength = max(dot(n, l), 0.0);
+
+    float3 halfwayDir = normalize(l + v);
+    const float shininess = 32.0;
+    float specStrength = pow(max(dot(n, halfwayDir), 0.0), shininess);
+
+    float attenuation =
+        1.0 / (light.constant +
+               light.linear * distance +
+               light.quadratic * distance * distance);
+
+    float3 ambient  = light.ambient  * light.color;
+    float3 diffuse  = light.diffuse  * diffStrength * light.color;
+    float3 specular = light.specular * specStrength * light.color;
+
+    ambient  *= attenuation;
+    diffuse  *= attenuation;
+    specular *= attenuation;
+
+    return ambient + diffuse + specular;
 }
 
 float3 computeDir(DirLight light, float3 fragPos, float3 normal, float3 viewDir) {
