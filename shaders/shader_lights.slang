@@ -79,10 +79,7 @@ float3 computePoint(PointLight light, float3 fragPos, float3 normal, float3 view
     const float shininess = 32.0;
     float specStrength = pow(max(dot(n, halfwayDir), 0.0), shininess);
 
-    float attenuation =
-        1.0 / (light.constant +
-               light.linear * distance +
-               light.quadratic * distance * distance);
+    float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * distance * distance);
 
     float3 ambient  = light.ambient  * light.color;
     float3 diffuse  = light.diffuse  * diffStrength * light.color;
