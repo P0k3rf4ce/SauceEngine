@@ -45,7 +45,7 @@ void Mesh::initVulkanResources(const sauce::LogicalDevice& logicalDevice, vk::ra
 void Mesh::bind(vk::raii::CommandBuffer& commandBuffer) {
     vk::Buffer vertexBuffers[] = { **vertexBuffer };
     vk::DeviceSize offsets[] = { 0 };
-    commandBuffer.bindVertexBuffers(0, *vertexBuffers, 0);
+    commandBuffer.bindVertexBuffers(0, *vertexBuffers, {0});
     commandBuffer.bindIndexBuffer(**indexBuffer, 0, vk::IndexType::eUint32);
 }
 void Mesh::draw(vk::raii::CommandBuffer& commandBuffer) {
