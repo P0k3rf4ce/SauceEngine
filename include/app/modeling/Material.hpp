@@ -6,6 +6,8 @@
 #include <string>
 #include <unordered_map>
 #include <memory>
+#include <vulkan/vulkan_raii.hpp>
+#include <vector>
 
 namespace sauce {
 namespace modeling {
@@ -34,6 +36,22 @@ struct MaterialProperties {
     bool doubleSided = false;
 };
 
+// GPU-side UBO layout matching MaterialProperties (std140-friendly)
+struct MaterialUBO {
+    glm::vec4 baseColorFactor;
+    float metallicFactor;
+    float roughnessFactor;
+    float normalScale;
+    float occlusionStrength;
+    glm::vec4 emissiveFactor_alphaCutoff; // xyz = emissive, w = alphaCutoff
+};
+
+struct MaterialDescriptorInfo {
+    vk::DescriptorBufferInfo bufferInfo;
+    std::vector<vk::DescriptorImageInfo> imageInfos;
+};
+
+
 class Material {
 public:
     Material(const std::string& name = "");
@@ -54,11 +72,25 @@ public:
     void setMetadata(const std::string& key, const PropertyValue& value);
     bool hasMetadata(const std::string& key) const;
 
+    // Vulkan resource management
+    void initVulkanResources(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice);
+    MaterialDescriptorInfo getDescriptorInfo() const;
+
 private:
     std::string name;
     MaterialProperties properties;
     std::unordered_map<TextureType, std::shared_ptr<Texture>> textures;
     std::unordered_map<std::string, PropertyValue> metadata;
+
+    // Vulkan resources
+    std::unique_ptr<vk::raii::Buffer> uniformBuffer;
+    std::unique_ptr<vk::raii::DeviceMemory> uniformBufferMemory;
+
+    // Helpers
+    uint32_t findMemoryType(const vk::raii::PhysicalDevice& physicalDevice,
+                            uint32_t typeFilter,
+                            vk::MemoryPropertyFlags propertyFlags) const;
+    void updateUniformBuffer() const;
 };
 
 } // namespace modeling
