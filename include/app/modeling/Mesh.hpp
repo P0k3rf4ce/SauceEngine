@@ -8,6 +8,7 @@
 #include <vulkan/vulkan_raii.hpp>
 
 namespace sauce {
+struct LogicalDevice;
 namespace modeling {
 
 class Mesh {
@@ -41,7 +42,9 @@ public:
     void generateTangents();
 
     // Optional GPU upload (Phase 6)
-    // void uploadToGPU(vk::raii::Device& device, vk::raii::PhysicalDevice& physicalDevice);
+    void initVulkanResources(const sauce::LogicalDevice& logicalDevice, vk::raii::PhysicalDevice& physicalDevice, vk::raii::CommandPool& commandPool, vk::raii::Queue& queue);
+    void bind(vk::raii::CommandBuffer& commandBuffer);
+    void draw(vk::raii::CommandBuffer& commandBuffer);
 
 private:
     std::vector<sauce::Vertex> vertices;
