@@ -1,30 +1,28 @@
-
-
 #include <glm/glm.hpp>
 
 namespace physics {
 
-struct SphereCollider;
+struct Collider;
 
 struct ContactInfo {
 
   ContactInfo(
       glm::vec3 contactPoint,
       glm::vec3 contactNormal,
-      std::shared_ptr<SphereCollider> sphere1,
-      std::shared_ptr<SphereCollider> sphere2,
+      std::shared_ptr<Collider> pCollider1,
+      std::shared_ptr<Collider> pCollider2,
       float depth,
       float restitution = 1.0f,
       float friction = 0.0f
       ) : 
     contactPoint(contactPoint), contactNormal(contactNormal),
-    sphere1(sphere1), sphere2(sphere2), depth(depth), restitution(restitution), friction(friction)
+    pCollider1(pCollider1), pCollider2(pCollider2), depth(depth), restitution(restitution), friction(friction)
   {}
 
   glm::vec3 contactPoint;
   glm::vec3 contactNormal;
 
-  std::shared_ptr<SphereCollider> sphere1, sphere2;
+  std::shared_ptr<Collider> pCollider1, pCollider2;
 
   float depth;
   float restitution;
