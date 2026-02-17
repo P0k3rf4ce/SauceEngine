@@ -1,5 +1,7 @@
 #pragma once
 
+#include <app/components/RigidBodyComponent.hpp>
+
 #include <physics/Vertex.hpp>
 #include <physics/constraints/Constraint.hpp>
 
@@ -13,6 +15,8 @@ struct XPBDSolver {
   // Number of Gauss-Seidel iterations per substep (default 10)
   // we can probably hook up imgui to this at some point for tuning
   int solverIterations = 10;
+
+  void solvePositions(std::vector<sauce::RigidBodyComponent>& rigidBodies, std::vector<Constraint>& constraints, float deltatime);
 
   void projectConstraints(
       std::vector<Vertex>& vertices,
@@ -33,6 +37,8 @@ struct XPBDSolver {
       }
     }
   }
+
+  std::vector<Constraint> generateCollisionConstraints(std::vector<sauce::RigidBodyComponent>& rigidBodies);
 };
 
 }
