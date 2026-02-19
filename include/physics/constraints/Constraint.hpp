@@ -1,19 +1,19 @@
+#pragma once
+
 #include <physics/Vertex.hpp>
 
-#include <glm/glm.hpp>
+#include <vector>
 
 namespace physics {
 
 struct Constraint {
+  virtual ~Constraint() = default;
+  virtual void solve(std::vector<Vertex>& vertices, float deltatime) = 0;
+  void resetLambda() { lambda = 0.0f; }
+  float compliance = 0.0f;
 
-  virtual void solve(
-      std::vector<Vertex>& vertices, 
-      std::vector<glm::vec3>& lagrangeMultipliers, 
-      float deltatime
-  ) const = 0;
-
-  float compliance;
-
+protected:
+  float lambda = 0.0f;
 };
 
 }

@@ -27,6 +27,23 @@ public:
     externalForces += force;
   }
 
+  const glm::vec3& getPosition()                    const { return position; }
+  const glm::vec3& getVelocity()                    const { return velocity; }
+  const glm::quat& getOrientation()                 const { return orientation; }
+  const glm::vec3& getAngularVelocity()             const { return angularVelocity; }
+  const glm::vec3& getExternalForces()              const { return externalForces; }
+  float            getInvMass()                     const { return invMass; }
+  const glm::mat3& getInvInertiaTensor()            const { return invInertiaTensor; }
+
+  void setPosition(const glm::vec3& p)              { position = p; }
+  void setVelocity(const glm::vec3& v)              { velocity = v; }
+  void setOrientation(const glm::quat& q)           { orientation = q; }
+  void setAngularVelocity(const glm::vec3& w)       { angularVelocity = w; }
+  void setExternalForces(const glm::vec3& f)        { externalForces = f; }
+  void setInvMass(float w)                          { invMass = w; }
+  void setInvInertiaTensor(const glm::mat3& I)      { invInertiaTensor = I; }
+  void clearExternalForces()                        { externalForces = glm::vec3(0.0f); }
+
   // No implementation for this for now
   virtual void render() override;
 
