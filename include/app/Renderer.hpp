@@ -86,7 +86,26 @@ public:
 
 
     createDescriptorSetLayout(createInfo.logicalDevice);
-    pPipeline = std::make_unique<sauce::GraphicsPipeline>(createInfo.physicalDevice, createInfo.logicalDevice, descriptorSetLayout, *pSwapChain);
+    
+    sauce::GraphicsPipelineConfig mainPipelineConfig {
+      .physicalDevice = createInfo.physicalDevice,
+      .logicalDevice = createInfo.logicalDevice,
+      .descriptorSetLayout = descriptorSetLayout,
+      .colorFormat = pSwapChain->getSurfaceFormat().format,
+      .shaderPath = "shaders/shader_lights.spv",
+    };
+    pPipeline = std::make_unique<sauce::GraphicsPipeline>(mainPipelineConfig);
+
+    sauce::GraphicsPipelineConfig postProcessPipelineConfig {
+      .physicalDevice = createInfo.physicalDevice,
+      .logicalDevice = createInfo.logicalDevice,
+      .descriptorSetLayout = postProcessDescriptorSetLayout,
+      .colorFormat = pSwapChain->getSurfaceFormat().format,
+      .shaderPath = "shaders/post_process.spv",
+      .useVertexInput = false,
+      .useDepthTest = false,
+    };
+    pPostProcessPipeline = std::make_unique<sauce::GraphicsPipeline>(postProcessPipelineConfig);
 
     vk::CommandPoolCreateInfo commandPoolCreateInfo {
       .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -96,6 +115,7 @@ public:
     commandPool = vk::raii::CommandPool { *createInfo.logicalDevice, commandPoolCreateInfo };
 
     createDepthResources(createInfo.physicalDevice, createInfo.logicalDevice);
+    createOffscreenResources(createInfo.physicalDevice, createInfo.logicalDevice);
   
     vk::CommandBufferAllocateInfo allocInfo {
       .commandPool = commandPool,
@@ -112,6 +132,7 @@ public:
     createIndexBuffer(createInfo.physicalDevice, createInfo.logicalDevice);
 
     createDescriptorSets(createInfo.logicalDevice);
+    createPostProcessDescriptorSets(createInfo.logicalDevice);
 
     for (size_t i = 0; i < pSwapChain->getImages().size(); ++i) {
       renderFinishedSemaphores.emplace_back(*createInfo.logicalDevice, vk::SemaphoreCreateInfo{});
@@ -135,19 +156,31 @@ public:
     };
 
     descriptorSetLayout = vk::raii::DescriptorSetLayout{ *logicalDevice, dsLayoutInfo };
+
+    vk::DescriptorSetLayoutBinding samplerLayoutBinding {
+      .binding = 0,
+      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+      .descriptorCount = 1,
+      .stageFlags = vk::ShaderStageFlagBits::eFragment,
+    };
+    vk::DescriptorSetLayoutCreateInfo ppDsLayoutInfo {
+      .bindingCount = 1,
+      .pBindings = &samplerLayoutBinding,
+    };
+    postProcessDescriptorSetLayout = vk::raii::DescriptorSetLayout{ *logicalDevice, ppDsLayoutInfo };
   }
 
   void createDescriptorSets(const sauce::LogicalDevice& logicalDevice) {
-    vk::DescriptorPoolSize poolSize {
-      .type = vk::DescriptorType::eUniformBuffer,
-      .descriptorCount = sauce::Renderer::MAX_FRAMES_IN_FLIGHT,
+    std::vector<vk::DescriptorPoolSize> poolSizes {
+      { .type = vk::DescriptorType::eUniformBuffer, .descriptorCount = sauce::Renderer::MAX_FRAMES_IN_FLIGHT },
+      { .type = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = sauce::Renderer::MAX_FRAMES_IN_FLIGHT }
     };
 
     vk::DescriptorPoolCreateInfo poolCreateInfo {
       .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-      .maxSets = sauce::Renderer::MAX_FRAMES_IN_FLIGHT,
-      .poolSizeCount = 1,
-      .pPoolSizes = &poolSize,
+      .maxSets = sauce::Renderer::MAX_FRAMES_IN_FLIGHT * 2,
+      .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+      .pPoolSizes = poolSizes.data(),
     };
 
     descriptorPool = vk::raii::DescriptorPool{ *logicalDevice, poolCreateInfo };
@@ -181,6 +214,36 @@ public:
     }
   }
 
+  void createPostProcessDescriptorSets(const sauce::LogicalDevice& logicalDevice) {
+    std::vector<vk::DescriptorSetLayout> layouts{ MAX_FRAMES_IN_FLIGHT, *postProcessDescriptorSetLayout };
+    vk::DescriptorSetAllocateInfo dsAllocInfo {
+      .descriptorPool = descriptorPool,
+      .descriptorSetCount = static_cast<uint32_t>(layouts.size()),
+      .pSetLayouts = layouts.data()
+    };
+
+    postProcessDescriptorSets = logicalDevice->allocateDescriptorSets(dsAllocInfo);
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+      vk::DescriptorImageInfo imageInfo {
+        .sampler = *offscreenSampler,
+        .imageView = *offscreenImageView,
+        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+      };
+
+      vk::WriteDescriptorSet descriptorWrite {
+        .dstSet = postProcessDescriptorSets[i],
+        .dstBinding = 0,
+        .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+        .pImageInfo = &imageInfo,
+      };
+
+      logicalDevice->updateDescriptorSets(descriptorWrite, {});
+    }
+  }
+
 
   void createDepthResources(const sauce::PhysicalDevice& physicalDevice, const sauce::LogicalDevice& logicalDevice) {
     vk::Format depthFormat = GraphicsPipeline::findDepthFormat(physicalDevice);
@@ -197,6 +260,42 @@ public:
         depthImageMemory
     );
     depthImageView = ImageUtils::createImageView(logicalDevice, depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth);
+  }
+
+  void createOffscreenResources(const sauce::PhysicalDevice& physicalDevice, const sauce::LogicalDevice& logicalDevice) {
+    vk::Format colorFormat = pSwapChain->getSurfaceFormat().format;
+    ImageUtils::createImage(
+        physicalDevice,
+        logicalDevice,
+        pSwapChain->getExtent().width,
+        pSwapChain->getExtent().height,
+        colorFormat,
+        vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        offscreenImage,
+        offscreenImageMemory
+    );
+    offscreenImageView = ImageUtils::createImageView(logicalDevice, offscreenImage, colorFormat, vk::ImageAspectFlagBits::eColor);
+
+    vk::SamplerCreateInfo samplerInfo {
+      .magFilter = vk::Filter::eLinear,
+      .minFilter = vk::Filter::eLinear,
+      .mipmapMode = vk::SamplerMipmapMode::eLinear,
+      .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+      .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+      .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+      .mipLodBias = 0.0f,
+      .anisotropyEnable = vk::False,
+      .maxAnisotropy = 1.0f,
+      .compareEnable = vk::False,
+      .compareOp = vk::CompareOp::eAlways,
+      .minLod = 0.0f,
+      .maxLod = 0.0f,
+      .borderColor = vk::BorderColor::eIntOpaqueBlack,
+      .unnormalizedCoordinates = vk::False,
+    };
+    offscreenSampler = vk::raii::Sampler(*logicalDevice, samplerInfo);
   }
 
   void createUniformBuffers(
@@ -334,8 +433,9 @@ public:
   void recordCommandBuffer(uint32_t imageIndex){
     commandBuffers[frameIndex].begin({});
 
+    // Transition offscreen image for rendering
     transitionImageLayout(
-      pSwapChain->getImages()[imageIndex],
+      *offscreenImage,
       vk::ImageLayout::eUndefined,
       vk::ImageLayout::eColorAttachmentOptimal,
       {},
@@ -344,7 +444,6 @@ public:
       vk::PipelineStageFlagBits2::eColorAttachmentOutput,
       vk::ImageAspectFlagBits::eColor
     );
-
 
     transitionImageLayout(
         *depthImage,
@@ -360,8 +459,9 @@ public:
     vk::ClearValue clearColor = vk::ClearColorValue { 0.0f, 0.0f, 0.0f, 1.0f };
     vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
 
+    // Pass 1: Render Scene to Offscreen Image
     vk::RenderingAttachmentInfo colorAttachmentInfo = {
-      .imageView = pSwapChain->getImageViews()[imageIndex],
+      .imageView = *offscreenImageView,
       .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
       .loadOp = vk::AttachmentLoadOp::eClear,
       .storeOp = vk::AttachmentStoreOp::eStore,
@@ -399,7 +499,65 @@ public:
         static_cast<float>(pSwapChain->getExtent().height), 0.0f, 1.0f));
     commandBuffers[frameIndex].setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), pSwapChain->getExtent()));
 
-    commandBuffers[frameIndex].drawIndexed(indices.size(), 1, 0, 0, 0);
+    commandBuffers[frameIndex].drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
+    commandBuffers[frameIndex].endRendering();
+
+    // Transition offscreen image for sampling
+    transitionImageLayout(
+      *offscreenImage,
+      vk::ImageLayout::eColorAttachmentOptimal,
+      vk::ImageLayout::eShaderReadOnlyOptimal,
+      vk::AccessFlagBits2::eColorAttachmentWrite,
+      vk::AccessFlagBits2::eShaderRead,
+      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+      vk::PipelineStageFlagBits2::eFragmentShader,
+      vk::ImageAspectFlagBits::eColor
+    );
+
+    // Transition swapchain image for rendering
+    transitionImageLayout(
+      pSwapChain->getImages()[imageIndex],
+      vk::ImageLayout::eUndefined,
+      vk::ImageLayout::eColorAttachmentOptimal,
+      {},
+      vk::AccessFlagBits2::eColorAttachmentWrite,
+      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+      vk::ImageAspectFlagBits::eColor
+    );
+
+    // Pass 2: Render Post-processing to Swapchain Image
+    vk::RenderingAttachmentInfo ppColorAttachmentInfo = {
+      .imageView = pSwapChain->getImageViews()[imageIndex],
+      .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+      .loadOp = vk::AttachmentLoadOp::eClear,
+      .storeOp = vk::AttachmentStoreOp::eStore,
+      .clearValue = clearColor,
+    };
+
+    vk::RenderingInfo ppRenderingInfo {
+      .renderArea = { 
+        .offset = { 0, 0 }, 
+        .extent = pSwapChain->getExtent(),
+      },
+      .layerCount = 1,
+      .colorAttachmentCount = 1,
+      .pColorAttachments = &ppColorAttachmentInfo,
+    };
+
+    commandBuffers[frameIndex].beginRendering(ppRenderingInfo);
+
+    commandBuffers[frameIndex].bindPipeline(vk::PipelineBindPoint::eGraphics, **pPostProcessPipeline);
+    commandBuffers[frameIndex].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pPostProcessPipeline->getLayout(), 0, *postProcessDescriptorSets[frameIndex], nullptr);
+
+    commandBuffers[frameIndex].setViewport(
+        0, vk::Viewport(0.0f, 0.0f, static_cast<float>(pSwapChain->getExtent().width), 
+        static_cast<float>(pSwapChain->getExtent().height), 0.0f, 1.0f));
+    commandBuffers[frameIndex].setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), pSwapChain->getExtent()));
+
+    // Draw fullscreen quad (3 vertices)
+    commandBuffers[frameIndex].draw(3, 1, 0, 0);
 
     commandBuffers[frameIndex].endRendering();
 
@@ -540,10 +698,13 @@ private:
   uint32_t queueIndex = ~0;
 
   std::unique_ptr<sauce::GraphicsPipeline> pPipeline;
+  std::unique_ptr<sauce::GraphicsPipeline> pPostProcessPipeline;
 
   vk::raii::DescriptorSetLayout descriptorSetLayout = nullptr;
+  vk::raii::DescriptorSetLayout postProcessDescriptorSetLayout = nullptr;
   vk::raii::DescriptorPool descriptorPool = nullptr;
   std::vector<vk::raii::DescriptorSet> descriptorSets;
+  std::vector<vk::raii::DescriptorSet> postProcessDescriptorSets;
 
 
   vk::raii::Buffer vertexBuffer = nullptr;
@@ -559,6 +720,11 @@ private:
   vk::raii::Image depthImage = nullptr;
   vk::raii::DeviceMemory depthImageMemory = nullptr;
   vk::raii::ImageView depthImageView = nullptr;
+
+  vk::raii::Image offscreenImage = nullptr;
+  vk::raii::DeviceMemory offscreenImageMemory = nullptr;
+  vk::raii::ImageView offscreenImageView = nullptr;
+  vk::raii::Sampler offscreenSampler = nullptr;
 };
 
 }

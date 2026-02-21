@@ -13,24 +13,31 @@
 
 namespace sauce {
 
+struct GraphicsPipelineConfig {
+    const sauce::PhysicalDevice& physicalDevice;
+    const sauce::LogicalDevice& logicalDevice;
+    const vk::raii::DescriptorSetLayout& descriptorSetLayout;
+    vk::Format colorFormat;
+    std::string shaderPath;
+    std::string vertEntryPoint = "vertMain";
+    std::string fragEntryPoint = "fragMain";
+    bool useVertexInput = true;
+    bool useDepthTest = true;
+};
+
 struct GraphicsPipeline {
 
-  GraphicsPipeline(
-      const sauce::PhysicalDevice& physicalDevice, 
-      const sauce::LogicalDevice& logicalDevice, 
-      const vk::raii::DescriptorSetLayout& descriptorSetLayout, 
-      const sauce::SwapChain& swapChain
-      ) {
-    vk::raii::ShaderModule shaderModule = createShaderModule(logicalDevice, readBinaryFile("shaders/shader_lights.spv"));
+  GraphicsPipeline(const GraphicsPipelineConfig& config) {
+    vk::raii::ShaderModule shaderModule = createShaderModule(config.logicalDevice, readBinaryFile(config.shaderPath));
     vk::PipelineShaderStageCreateInfo vertShaderCreateInfo {
       .stage = vk::ShaderStageFlagBits::eVertex,
       .module = shaderModule,
-      .pName = "vertMain",
+      .pName = config.vertEntryPoint.c_str(),
     };
     vk::PipelineShaderStageCreateInfo fragShaderCreateInfo {
       .stage = vk::ShaderStageFlagBits::eFragment,
       .module = shaderModule,
-      .pName = "fragMain",
+      .pName = config.fragEntryPoint.c_str(),
     };
     vk::PipelineShaderStageCreateInfo shaderStages[] = {
       vertShaderCreateInfo,
@@ -40,10 +47,10 @@ struct GraphicsPipeline {
     auto bindingDescription = Vertex::getBindingDescription();
     auto attributeDescriptions = Vertex::getAttributeDescription();
     vk::PipelineVertexInputStateCreateInfo vertexInputInfo {
-      .vertexBindingDescriptionCount = 1,
-      .pVertexBindingDescriptions = &bindingDescription,
-      .vertexAttributeDescriptionCount = attributeDescriptions.size(),
-      .pVertexAttributeDescriptions = attributeDescriptions.data(),
+      .vertexBindingDescriptionCount = config.useVertexInput ? 1u : 0u,
+      .pVertexBindingDescriptions = config.useVertexInput ? &bindingDescription : nullptr,
+      .vertexAttributeDescriptionCount = config.useVertexInput ? static_cast<uint32_t>(attributeDescriptions.size()) : 0u,
+      .pVertexAttributeDescriptions = config.useVertexInput ? attributeDescriptions.data() : nullptr,
     };
 
     vk::PipelineInputAssemblyStateCreateInfo inputAssemblyInfo {
@@ -73,8 +80,8 @@ struct GraphicsPipeline {
 
 
     vk::PipelineDepthStencilStateCreateInfo depthStencil {
-      .depthTestEnable = vk::True,
-      .depthWriteEnable = vk::True,
+      .depthTestEnable = config.useDepthTest ? vk::True : vk::False,
+      .depthWriteEnable = config.useDepthTest ? vk::True : vk::False,
       .depthCompareOp = vk::CompareOp::eLess,
       .depthBoundsTestEnable = vk::False,
       .stencilTestEnable = vk::False,
@@ -104,19 +111,19 @@ struct GraphicsPipeline {
 
     vk::PipelineLayoutCreateInfo pipelineLayoutInfo {
       .setLayoutCount = 1,
-      .pSetLayouts = &*descriptorSetLayout,
+      .pSetLayouts = &*config.descriptorSetLayout,
       .pushConstantRangeCount = 0,
     };
 
-    layout = vk::raii::PipelineLayout { *logicalDevice, pipelineLayoutInfo };
+    layout = vk::raii::PipelineLayout { *config.logicalDevice, pipelineLayoutInfo };
 
 
-    vk::Format depthFormat = findDepthFormat(physicalDevice);
+    vk::Format depthFormat = findDepthFormat(config.physicalDevice);
 
     vk::PipelineRenderingCreateInfo renderingCreateInfo {
       .colorAttachmentCount = 1,
-      .pColorAttachmentFormats = &swapChain.getSurfaceFormat().format,
-      .depthAttachmentFormat = depthFormat,
+      .pColorAttachmentFormats = &config.colorFormat,
+      .depthAttachmentFormat = config.useDepthTest ? depthFormat : vk::Format::eUndefined,
     };
 
     vk::GraphicsPipelineCreateInfo pipelineInfo {
@@ -135,7 +142,7 @@ struct GraphicsPipeline {
       .renderPass = nullptr,
     };
 
-    pipeline = vk::raii::Pipeline { *logicalDevice, nullptr, pipelineInfo };
+    pipeline = vk::raii::Pipeline { *config.logicalDevice, nullptr, pipelineInfo };
   }
 
   const vk::raii::Pipeline& operator*() const & noexcept {
