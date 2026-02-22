@@ -68,6 +68,7 @@ void SauceEngineApp::initVulkan() {
       .swapChain = pRenderer->getSwapChain(),
       .imageCount = static_cast<uint32_t>(pRenderer->getSwapChain().getImages().size()),
       .swapChainFormat = pRenderer->getSwapChain().getSurfaceFormat().format,
+      .depthFormat = sauce::GraphicsPipeline::findDepthFormat(physicalDevice),
     };
 
     pImGuiRenderer = std::make_unique<sauce::ImGuiRenderer>(imguiCreateInfo);

@@ -25,6 +25,7 @@ struct ImGuiRendererCreateInfo {
   const sauce::SwapChain& swapChain;
   uint32_t imageCount;
   vk::Format swapChainFormat;
+  vk::Format depthFormat;
 };
 
 class ImGuiRenderer {

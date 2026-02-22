@@ -66,10 +66,13 @@ void ImGuiRenderer::initImGui(const ImGuiRendererCreateInfo& createInfo) {
   // Initialize Vulkan backend with dynamic rendering
   VkFormat colorAttachmentFormat = static_cast<VkFormat>(createInfo.swapChainFormat);
 
+  VkFormat depthFormat = static_cast<VkFormat>(createInfo.depthFormat);
+
   VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo{};
   pipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
   pipelineRenderingCreateInfo.colorAttachmentCount = 1;
   pipelineRenderingCreateInfo.pColorAttachmentFormats = &colorAttachmentFormat;
+  pipelineRenderingCreateInfo.depthAttachmentFormat = depthFormat;
 
   ImGui_ImplVulkan_InitInfo initInfo{};
   initInfo.Instance = *createInfo.instance;
