@@ -14,22 +14,53 @@
 #include <app/Camera.hpp>
 #include <app/GraphicsPipeline.hpp>
 #include <app/ImGuiRenderer.hpp>
+#include <app/ImageUtils.hpp>
 #include <app/LogicalDevice.hpp>
 #include <app/Scene.hpp>
 #include <app/SwapChain.hpp>
 
 namespace sauce {
 
+
 const std::vector<Vertex> vertices {
-  // position (vec3), normal (vec3), texCoords (vec2), color (vec3), tangent (vec4)
-  { {-0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f} },
-  { {0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f} },
-  { {0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f} },
-  { {-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f} }
+  {{ -0.5f, -0.5f, -0.5f, }, { 0.0f,  0.0f, -1.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, }, 
+  {{  0.5f, -0.5f, -0.5f, }, { 0.0f,  0.0f, -1.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, }, 
+  {{  0.5f,  0.5f, -0.5f, }, { 0.0f,  0.0f, -1.0f, }, { 0.0f, 0.0f, }, { 0.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{ -0.5f,  0.5f, -0.5f, }, { 0.0f,  0.0f, -1.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+                                                                       
+  {{ -0.5f, -0.5f,  0.5f, }, { 0.0f,  0.0f,  1.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{  0.5f, -0.5f,  0.5f, }, { 0.0f,  0.0f,  1.0f, }, { 0.0f, 0.0f, }, { 0.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{  0.5f,  0.5f,  0.5f, }, { 0.0f,  0.0f,  1.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{ -0.5f,  0.5f,  0.5f, }, { 0.0f,  0.0f,  1.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+                                                                       
+  {{ -0.5f,  0.5f,  0.5f, }, {-1.0f,  0.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{ -0.5f,  0.5f, -0.5f, }, {-1.0f,  0.0f,  0.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{ -0.5f, -0.5f, -0.5f, }, {-1.0f,  0.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{ -0.5f, -0.5f,  0.5f, }, {-1.0f,  0.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+                                                                       
+  {{  0.5f,  0.5f,  0.5f, }, { 1.0f,  0.0f,  0.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{  0.5f,  0.5f, -0.5f, }, { 1.0f,  0.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{  0.5f, -0.5f, -0.5f, }, { 1.0f,  0.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{  0.5f, -0.5f,  0.5f, }, { 1.0f,  0.0f,  0.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+                                                                       
+  {{ -0.5f, -0.5f, -0.5f, }, { 0.0f, -1.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{  0.5f, -0.5f, -0.5f, }, { 0.0f, -1.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{  0.5f, -0.5f,  0.5f, }, { 0.0f, -1.0f,  0.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{ -0.5f, -0.5f,  0.5f, }, { 0.0f, -1.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+                                                                       
+  {{ -0.5f,  0.5f, -0.5f, }, { 0.0f,  1.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{  0.5f,  0.5f, -0.5f, }, { 0.0f,  1.0f,  0.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{  0.5f,  0.5f,  0.5f, }, { 0.0f,  1.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{ -0.5f,  0.5f,  0.5f, }, { 0.0f,  1.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
 };
 
 const std::vector<uint16_t> indices {
-  0, 1, 2, 2, 3, 0
+  1, 0, 2, 2, 0, 3,
+  4, 5, 6, 6, 7, 4,
+  8, 9, 10, 10, 11, 8,
+  13, 12, 14, 15, 14, 12,
+  16, 17, 18, 18, 19, 16,
+  21, 20, 22, 23, 22, 20,
 };
 
 struct RendererCreateInfo {
@@ -56,7 +87,7 @@ public:
 
 
     createDescriptorSetLayout(createInfo.logicalDevice);
-    pPipeline = std::make_unique<sauce::GraphicsPipeline>(createInfo.logicalDevice, descriptorSetLayout, *pSwapChain);
+    pPipeline = std::make_unique<sauce::GraphicsPipeline>(createInfo.physicalDevice, createInfo.logicalDevice, descriptorSetLayout, *pSwapChain);
 
     vk::CommandPoolCreateInfo commandPoolCreateInfo {
       .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -64,6 +95,8 @@ public:
     };
 
     commandPool = vk::raii::CommandPool { *createInfo.logicalDevice, commandPoolCreateInfo };
+
+    createDepthResources(createInfo.physicalDevice, createInfo.logicalDevice);
   
     vk::CommandBufferAllocateInfo allocInfo {
       .commandPool = commandPool,
@@ -151,6 +184,24 @@ public:
 
       logicalDevice->updateDescriptorSets(descriptorWrite, {});
     }
+  }
+
+
+  void createDepthResources(const sauce::PhysicalDevice& physicalDevice, const sauce::LogicalDevice& logicalDevice) {
+    vk::Format depthFormat = GraphicsPipeline::findDepthFormat(physicalDevice);
+    ImageUtils::createImage(
+        physicalDevice,
+        logicalDevice,
+        pSwapChain->getExtent().width, 
+        pSwapChain->getExtent().height, 
+        depthFormat, 
+        vk::ImageTiling::eOptimal, 
+        vk::ImageUsageFlagBits::eDepthStencilAttachment,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        depthImage,
+        depthImageMemory
+    );
+    depthImageView = ImageUtils::createImageView(logicalDevice, depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth);
   }
 
   void createUniformBuffers(
@@ -248,13 +299,14 @@ public:
   }
 
   void transitionImageLayout(
-    uint32_t imageIndex,
+    vk::Image image,
     vk::ImageLayout oldLayout,
     vk::ImageLayout newLayout,
     vk::AccessFlags2 srcAccessMask,
     vk::AccessFlags2 dstAccessMask,
     vk::PipelineStageFlags2 srcStageMask,
-    vk::PipelineStageFlags2 dstStageMask
+    vk::PipelineStageFlags2 dstStageMask,
+    vk::ImageAspectFlags imageAspectFlags
   ) {
     vk::ImageMemoryBarrier2 barrier {
       .srcStageMask = srcStageMask,
@@ -265,9 +317,9 @@ public:
       .newLayout = newLayout,
       .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
       .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-      .image = pSwapChain->getImages()[imageIndex],
+      .image = image,
       .subresourceRange = {
-        .aspectMask = vk::ImageAspectFlagBits::eColor,
+        .aspectMask = imageAspectFlags,
         .baseMipLevel = 0,
         .levelCount = 1,
         .baseArrayLayer = 0,
@@ -288,22 +340,45 @@ public:
     commandBuffers[frameIndex].begin({});
 
     transitionImageLayout(
-      imageIndex,
+      pSwapChain->getImages()[imageIndex],
       vk::ImageLayout::eUndefined,
       vk::ImageLayout::eColorAttachmentOptimal,
       {},
       vk::AccessFlagBits2::eColorAttachmentWrite,
       vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-      vk::PipelineStageFlagBits2::eColorAttachmentOutput
+      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+      vk::ImageAspectFlagBits::eColor
+    );
+
+
+    transitionImageLayout(
+        *depthImage,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eDepthAttachmentOptimal,
+        vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+        vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+        vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+        vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+        vk::ImageAspectFlagBits::eDepth
     );
 
     vk::ClearValue clearColor = vk::ClearColorValue { 0.0f, 0.0f, 0.0f, 1.0f };
-    vk::RenderingAttachmentInfo attachmentInfo = {
+    vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
+
+    vk::RenderingAttachmentInfo colorAttachmentInfo = {
       .imageView = pSwapChain->getImageViews()[imageIndex],
       .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
       .loadOp = vk::AttachmentLoadOp::eClear,
       .storeOp = vk::AttachmentStoreOp::eStore,
       .clearValue = clearColor,
+    };
+
+    vk::RenderingAttachmentInfo depthAttachmentInfo {
+      .imageView = depthImageView,
+      .imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+      .loadOp = vk::AttachmentLoadOp::eClear,
+      .storeOp = vk::AttachmentStoreOp::eDontCare,
+      .clearValue = clearDepth,
     };
 
     vk::RenderingInfo renderingInfo {
@@ -313,7 +388,8 @@ public:
       },
       .layerCount = 1,
       .colorAttachmentCount = 1,
-      .pColorAttachments = &attachmentInfo,
+      .pColorAttachments = &colorAttachmentInfo,
+      .pDepthAttachment = &depthAttachmentInfo,
     };
 
     commandBuffers[frameIndex].beginRendering(renderingInfo);
@@ -338,13 +414,14 @@ public:
     commandBuffers[frameIndex].endRendering();
 
     transitionImageLayout(
-      imageIndex,
+      pSwapChain->getImages()[imageIndex],
       vk::ImageLayout::eColorAttachmentOptimal,
       vk::ImageLayout::ePresentSrcKHR,
       vk::AccessFlagBits2::eColorAttachmentWrite,
       {},
       vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-      vk::PipelineStageFlagBits2::eBottomOfPipe
+      vk::PipelineStageFlagBits2::eBottomOfPipe,
+      vk::ImageAspectFlagBits::eColor
     );
 
     commandBuffers[frameIndex].end();
@@ -441,8 +518,11 @@ public:
     sauce::UniformBufferObject ubo {
       // Model matrix: rotates the object 90 degrees per second around the Z axis
       .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+      // .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.1f)),
+      // .proj = glm::perspective(glm::radians(45.0f), static_cast<float>(WIDTH) / static_cast<float>(HEIGHT), 0.1f, 10.0f),
       .view = scene.getCameraRO().getViewMatrix(),
       .proj = scene.getCameraRO().getProjectionMatrix(),
+      .cameraPos = scene.getCameraRO().getPos(),
     };
     
     // Flip Y coordinate of projection matrix (Vulkan uses inverted Y compared to OpenGL)
@@ -483,6 +563,11 @@ private:
   std::vector<vk::raii::Buffer> uniformBuffers;
   std::vector<vk::raii::DeviceMemory> uniformBuffersMemory;
   std::vector<void *> uniformBuffersMapped;
+
+
+  vk::raii::Image depthImage = nullptr;
+  vk::raii::DeviceMemory depthImageMemory = nullptr;
+  vk::raii::ImageView depthImageView = nullptr;
 };
 
 }

@@ -15,8 +15,13 @@ namespace sauce {
 
 struct GraphicsPipeline {
 
-  GraphicsPipeline(const sauce::LogicalDevice& logicalDevice, const vk::raii::DescriptorSetLayout& descriptorSetLayout, const sauce::SwapChain& swapChain, const std::string& shaderPath = "shaders/slang.spv") {
-    vk::raii::ShaderModule shaderModule = createShaderModule(logicalDevice, readBinaryFile(shaderPath));
+  GraphicsPipeline(
+      const sauce::PhysicalDevice& physicalDevice,
+      const sauce::LogicalDevice& logicalDevice,
+      const vk::raii::DescriptorSetLayout& descriptorSetLayout,
+      const sauce::SwapChain& swapChain
+      ) {
+    vk::raii::ShaderModule shaderModule = createShaderModule(logicalDevice, readBinaryFile("shaders/shader_lights.spv"));
     vk::PipelineShaderStageCreateInfo vertShaderCreateInfo {
       .stage = vk::ShaderStageFlagBits::eVertex,
       .module = shaderModule,
@@ -100,6 +105,15 @@ private:
       .sampleShadingEnable = vk::False,
     };
 
+
+    vk::PipelineDepthStencilStateCreateInfo depthStencil {
+      .depthTestEnable = vk::True,
+      .depthWriteEnable = vk::True,
+      .depthCompareOp = vk::CompareOp::eLess,
+      .depthBoundsTestEnable = vk::False,
+      .stencilTestEnable = vk::False,
+    };
+
     vk::PipelineColorBlendAttachmentState colorBlendAttachment {
       .blendEnable = vk::False,
       .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
@@ -130,9 +144,13 @@ private:
 
     layout = vk::raii::PipelineLayout { *logicalDevice, pipelineLayoutInfo };
 
+
+    vk::Format depthFormat = findDepthFormat(physicalDevice);
+
     vk::PipelineRenderingCreateInfo renderingCreateInfo {
       .colorAttachmentCount = 1,
       .pColorAttachmentFormats = &swapChain.getSurfaceFormat().format,
+      .depthAttachmentFormat = depthFormat,
     };
 
     vk::GraphicsPipelineCreateInfo pipelineInfo {
@@ -144,6 +162,7 @@ private:
       .pViewportState = &viewportStateInfo,
       .pRasterizationState = &rasterizerInfo,
       .pMultisampleState = &multisamplingInfo,
+      .pDepthStencilState = &depthStencil,
       .pColorBlendState = &colorBlendInfo,
       .pDynamicState = &dynamicStateInfo,
       .layout = layout,
@@ -164,6 +183,15 @@ public:
 
   const vk::raii::PipelineLayout& getLayout() const noexcept {
     return layout;
+  }
+  
+  static vk::Format findDepthFormat(const sauce::PhysicalDevice& physicalDevice) {
+    return findSupportedFormat(
+        physicalDevice,
+        {vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint},
+        vk::ImageTiling::eOptimal,
+        vk::FormatFeatureFlagBits::eDepthStencilAttachment
+    );
   }
 
 private:
@@ -191,6 +219,25 @@ private:
     };
 
     return { *logicalDevice, shaderModuleCreateInfo };
+  }
+
+
+  static vk::Format findSupportedFormat(const sauce::PhysicalDevice& physicalDevice, const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) {
+    for (const auto format: candidates) {
+      vk::FormatProperties props = physicalDevice->getFormatProperties(format);
+      if (tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features){
+        return format;
+      }
+      if (tiling == vk::ImageTiling::eOptimal && (props.optimalTilingFeatures & features) == features) {
+        return format;
+      }
+    }
+
+    throw std::runtime_error("Failed to find supported format!");
+  }
+
+  bool hasStencilComponent(vk::Format format) {
+    return format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eD24UnormS8Uint;
   }
 
 };

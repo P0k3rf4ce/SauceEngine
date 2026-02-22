@@ -3,7 +3,13 @@
 #include <string>
 #include <vector>
 #include <memory>
+
+#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan_raii.hpp>
+
+namespace sauce {
+    struct LogicalDevice;
+}
 
 namespace sauce {
 namespace modeling {
@@ -39,8 +45,16 @@ public:
     // Get CPU-side texture data (loads from file if necessary)
     const std::vector<unsigned char>& getData();
 
-    // Optional GPU upload (Phase 6)
-    // void uploadToGPU(vk::raii::Device& device, vk::raii::PhysicalDevice& physicalDevice);
+    // Initialize Vulkan GPU resources
+    void initVulkanResources(
+        const sauce::LogicalDevice& logicalDevice,
+        vk::raii::PhysicalDevice& physicalDevice,
+        vk::raii::CommandPool& commandPool,
+        vk::raii::Queue& queue
+    );
+
+    // Get descriptor info
+    vk::DescriptorImageInfo getDescriptorInfo() const;
 
 private:
     std::string path;

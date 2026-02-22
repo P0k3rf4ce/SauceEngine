@@ -39,7 +39,7 @@ struct LogicalDevice {
       vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
     > featureChain 
     {
-      {},
+      {.features = {.samplerAnisotropy = true }},
       { .shaderDrawParameters = true },
       { .synchronization2 = true, .dynamicRendering = true, },
       { .extendedDynamicState = true },

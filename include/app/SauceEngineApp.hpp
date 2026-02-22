@@ -15,6 +15,7 @@
 
 #include <app/BufferUtils.hpp>
 #include <app/GraphicsPipeline.hpp>
+#include <app/Scene.hpp>
 #include <app/Instance.hpp>
 #include <app/PhysicalDevice.hpp>
 #include <app/LogicalDevice.hpp>
@@ -45,6 +46,8 @@ constexpr bool enableValidationLayers = true;
 constexpr uint32_t WIDTH = 1280;
 constexpr uint32_t HEIGHT = 720;
 
+namespace sauce {
+
 class SauceEngineApp {
 public:
   SauceEngineApp(); // Constructor to initialize pImGuiComponentManager
@@ -54,6 +57,13 @@ public:
 
 private:
   GLFWwindow *window;
+
+  std::chrono::steady_clock::time_point lastFrameTime = std::chrono::steady_clock::now();
+  float deltaTime = 0.0f;
+
+  float lastX = 0.0f;
+  float lastY = 0.0f;
+  bool firstMouse = true;
 
   std::unique_ptr<sauce::Instance> pInstance;
 
@@ -80,5 +90,106 @@ private:
 public:
   sauce::ui::ImGuiComponentManager& getImGuiManager() { return *pImGuiComponentManager; }
   void setCustomUIBuilder(std::function<void(sauce::ui::ImGuiComponentManager&)> builder);
+
+  void initVulkan() {
+    pInstance = std::make_unique<sauce::Instance>();
+    pRenderSurface = std::make_unique<sauce::RenderSurface>(*pInstance, window);
+
+    physicalDevice = sauce::PhysicalDevice { *pInstance, *pRenderSurface };
+    logicalDevice = sauce::LogicalDevice { physicalDevice };
+
+    sauce::CameraCreateInfo cameraCreateInfo {
+      .scrWidth = WIDTH,
+      .scrHeight = HEIGHT,
+    };
+
+    pScene = std::make_unique<sauce::Scene>( cameraCreateInfo );
+
+    sauce::RendererCreateInfo rendererCreateInfo {
+      .physicalDevice = physicalDevice,
+      .logicalDevice = logicalDevice,
+      .renderSurface = *pRenderSurface,
+      .window = window,
+    };
+
+    pRenderer = std::make_unique<sauce::Renderer>(rendererCreateInfo);
+  }
+
+  void initWindow() {
+    glfwInit();
+
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+
+    window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan Playground", nullptr, nullptr);
+
+    glfwSetWindowUserPointer(window, this);
+    glfwSetCursorPosCallback(window, mouseCallback);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  }
+
+  void processInput(float deltaTime) {
+    if (!pScene) {
+      return;
+    }
+
+    auto& camera = pScene->getCameraRW();
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+      camera.processDirection(Camera::Movement::FORWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+      camera.processDirection(Camera::Movement::BACKWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+      camera.processDirection(Camera::Movement::LEFT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+      camera.processDirection(Camera::Movement::RIGHT, deltaTime);
+
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+      glfwSetWindowShouldClose(window, true);
+  }
+
+  static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn) {
+    auto* app = static_cast<SauceEngineApp*>(glfwGetWindowUserPointer(window));
+    if (!app) {
+      return;
+    }
+
+    float xpos = static_cast<float>(xposIn);
+    float ypos = static_cast<float>(yposIn);
+
+    if (app->firstMouse) {
+      app->lastX = xpos;
+      app->lastY = ypos;
+      app->firstMouse = false;
+    }
+
+    float xoffset = xpos - app->lastX;
+    float yoffset = app->lastY - ypos;
+
+    app->lastX = xpos;
+    app->lastY = ypos;
+
+    if (!app->pScene) {
+      return;
+    }
+
+    app->pScene->getCameraRW().processMouseMovement(xoffset, yoffset);
+  }
+
+  void mainLoop() {
+    while (!glfwWindowShouldClose(window)) {
+      auto currentFrameTime = std::chrono::steady_clock::now();
+      deltaTime = std::chrono::duration<float>(currentFrameTime - lastFrameTime).count();
+      lastFrameTime = currentFrameTime;
+
+      glfwPollEvents();
+      processInput(deltaTime);
+      pRenderer->drawFrame(logicalDevice, *pScene);
+    }
+
+    logicalDevice->waitIdle();
+  }
 };
+
+}
 

@@ -3,10 +3,6 @@ file(GLOB LAUNCHER_HDR_FILES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/include/la
 
 add_library(launcherLib SHARED ${LAUNCHER_SRC_FILES} ${LAUNCHER_HDR_FILES})
 
-set_target_properties(launcherLib PROPERTIES
-  AUTOMOC ON
-)
-
 target_include_directories(launcherLib PRIVATE
   ${PROJECT_SOURCE_DIR}/include
 )
