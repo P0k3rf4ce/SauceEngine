@@ -37,11 +37,11 @@ struct GraphicsPipeline {
       fragShaderCreateInfo,
     };
 
-    initPipeline(logicalDevice, descriptorSetLayout, swapChain, shaderStages);
+    initPipeline(physicalDevice, logicalDevice, descriptorSetLayout, swapChain, shaderStages);
   }
 
   // Constructor for separate GLSL vertex and fragment shaders
-  GraphicsPipeline(const sauce::LogicalDevice& logicalDevice, const vk::raii::DescriptorSetLayout& descriptorSetLayout, const sauce::SwapChain& swapChain, const std::string& vertShaderPath, const std::string& fragShaderPath) {
+  GraphicsPipeline(const sauce::PhysicalDevice& physicalDevice, const sauce::LogicalDevice& logicalDevice, const vk::raii::DescriptorSetLayout& descriptorSetLayout, const sauce::SwapChain& swapChain, const std::string& vertShaderPath, const std::string& fragShaderPath) {
     vertShaderModule = createShaderModule(logicalDevice, readBinaryFile(vertShaderPath));
     fragShaderModule = createShaderModule(logicalDevice, readBinaryFile(fragShaderPath));
 
@@ -60,7 +60,7 @@ struct GraphicsPipeline {
       fragShaderCreateInfo,
     };
 
-    initPipeline(logicalDevice, descriptorSetLayout, swapChain, shaderStages);
+    initPipeline(physicalDevice, logicalDevice, descriptorSetLayout, swapChain, shaderStages);
   }
 
 private:
@@ -69,7 +69,7 @@ private:
   vk::raii::ShaderModule vertShaderModule = nullptr;
   vk::raii::ShaderModule fragShaderModule = nullptr;
 
-  void initPipeline(const sauce::LogicalDevice& logicalDevice, const vk::raii::DescriptorSetLayout& descriptorSetLayout, const sauce::SwapChain& swapChain, vk::PipelineShaderStageCreateInfo* shaderStages) {
+  void initPipeline(const sauce::PhysicalDevice& physicalDevice, const sauce::LogicalDevice& logicalDevice, const vk::raii::DescriptorSetLayout& descriptorSetLayout, const sauce::SwapChain& swapChain, vk::PipelineShaderStageCreateInfo* shaderStages) {
     
     auto bindingDescription = Vertex::getBindingDescription();
     auto attributeDescriptions = Vertex::getAttributeDescription();
