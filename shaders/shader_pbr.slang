@@ -39,16 +39,16 @@
 //     float3 emissiveFactor        offset 32 (align 16)
 //     float  _pad0                 offset 44
 //
-//   Light (std430, 64 bytes):
-//     float3 position              offset  0
-//     uint   type                  offset 12
-//     float3 direction             offset 16
-//     float  intensity             offset 28
-//     float3 color                 offset 32
-//     float  range                 offset 44
-//     float  innerConeAngle        offset 48
-//     float  outerConeAngle        offset 52
-//     float2 _padding              offset 56
+//   Light (std430, 80 bytes):
+//     float3 position              offset  0  // occupies 16 bytes (std430 vec3 alignment)
+//     uint   type                  offset 16
+//     float3 direction             offset 32
+//     float  intensity             offset 44
+//     float3 color                 offset 48
+//     float  range                 offset 60
+//     float  innerConeAngle        offset 64
+//     float  outerConeAngle        offset 68
+//     float2 _padding              offset 72
 // ============================================================================
 
 static const float PI = 3.14159265359;
