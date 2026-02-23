@@ -26,24 +26,29 @@ struct XPBDSolver {
 
 	  for (auto& r : rigidBodies) {
 		  /* get vertices of r */
-		  auto o = r->getOwner();
+		  auto o = r.getOwner();
 		  auto m = o->getComponent<sauce::MeshRendererComponent>();
 		  /* skip rigid bodies with no mesh, we cannot generate their constraints */
 		  if (m == nullptr)
 			  continue;
-		  auto v=m->getVertices();
+		  auto v=m->getMesh()->getVertices();
 
 		  /* do physics */
-		  w=r->getInvMass();
-		  velocity=r->getVelocity() + deltatime*(w*r->getExternalForces());
+		  w=r.getInvMass();
+		  velocity=r.getVelocity() + deltatime*(w*r.getExternalForces());
 		  /*
 		   * you could damp velocities here
 		   */
-		  r->setPosition(r->getPosition + velocity*deltatime);
+		  r.setPosition(r.getPosition() + velocity*deltatime);
 		  auto constraints=generateCollisionConstraints(rigidBodies);
 
 		  for (int i=0; i<solverIterations; i++) {
-			  projectConstraints(v, constraints);
+			  /*
+			   * TODO
+			   * generate center of mass from BVH spheres
+			   * also label all the physics::Vertex instances explicitly wherever they appear
+			   */
+			  //projectConstraints(v, constraints, deltatime);
 		  }
 	  }
   }
