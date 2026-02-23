@@ -22,8 +22,8 @@
 //
 // Notes:
 //   - No IBL (task 10). Constant ambient (0.03) is used as a placeholder.
-//   - Outputs linear HDR. Tonemapping and gamma correction are handled
-//     by the post-processing pass (postprocess.slang).
+//   - Applies Reinhard tonemapping and gamma correction in fragMain.
+//     Outputs LDR color in sRGB space suitable for direct display.
 //   - Normal transform assumes uniform scale. For non-uniform scale,
 //     pass transpose(inverse(model)) as a normal matrix from CPU.
 //   - glTF metallic-roughness packing: G=roughness, B=metallic.
