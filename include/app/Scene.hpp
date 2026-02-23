@@ -14,6 +14,10 @@ namespace modeling {
 
 class SauceEngineApp;
 
+namespace editor {
+  class EditorApp;
+}
+
 class Scene {
 public:
   /**
@@ -53,6 +57,10 @@ public:
     return *pCamera;
   }
 
+  std::vector<sauce::Entity>& getEntitiesMut() {
+    return entities;
+  }
+
 private:
   std::vector<sauce::Entity> entities;
 
@@ -72,6 +80,7 @@ private:
   }
 
   friend class sauce::SauceEngineApp; // This gives the app class full access to entities and camera for user interaction
+  friend class sauce::editor::EditorApp;
 };
 
 }

@@ -15,8 +15,9 @@ public:
 	Entity(const std::string& name) : name(name) {}
 
 	std::string get_name() const { return name; }
+	void set_name(const std::string& newName) { name = newName; }
 	bool getActive() const { return active; }
-	void setActive(bool active);
+	void setActive(bool active) { this->active = active; }
 
 
 	/**

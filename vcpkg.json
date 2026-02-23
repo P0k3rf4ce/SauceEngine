@@ -12,7 +12,7 @@
     "boost-program-options",
     {
       "name": "imgui",
-      "features": ["glfw-binding", "vulkan-binding"]
+      "features": ["glfw-binding", "vulkan-binding", "docking-experimental"]
     }
   ]
 }

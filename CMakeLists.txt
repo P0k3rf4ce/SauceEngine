@@ -118,6 +118,47 @@ target_link_libraries(modelviewer PRIVATE imgui::imgui)
 
 add_dependencies(modelviewer shaders)
 
+# SauceEditor executable
+add_executable(sauceeditor src/editor/main.cpp)
+
+target_include_directories(sauceeditor PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${TINYGLTF_INCLUDE_DIRS}
+)
+
+if (!WIN32)
+    target_compile_options(sauceeditor PUBLIC -Wall -Wpedantic -Wextra -Wreorder-init-list -g -O2)
+endif()
+
+file(GLOB_RECURSE EDITOR_SOURCES
+    "${PROJECT_SOURCE_DIR}/src/editor/*.cpp"
+)
+
+target_sources(sauceeditor PRIVATE
+    ${EDITOR_SOURCES}
+    src/app/modeling/Transform.cpp
+    src/app/modeling/Texture.cpp
+    src/app/modeling/TextureCache.cpp
+    src/app/modeling/Material.cpp
+    src/app/modeling/Mesh.cpp
+    src/app/modeling/ModelNode.cpp
+    src/app/modeling/Model.cpp
+    src/app/modeling/GLTFLoader.cpp
+    src/app/components/TransformComponent.cpp
+    src/app/components/MeshRendererComponent.cpp
+    src/app/Scene.cpp
+    src/app/ImGuiRenderer.cpp
+)
+
+target_link_libraries(sauceeditor PUBLIC Vulkan::Vulkan)
+target_link_libraries(sauceeditor PRIVATE glfw)
+target_link_libraries(sauceeditor PRIVATE imgui::imgui)
+
+# Editor only needs GLSL shaders, not the Slang ones
+if(TARGET editorGridVert)
+  add_dependencies(sauceeditor editorGridVert editorGridFrag editorUnlitVert editorUnlitFrag)
+endif()
+
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/launcher)
 
 target_link_libraries(${EXEC_NAME} PRIVATE launcherLib)
