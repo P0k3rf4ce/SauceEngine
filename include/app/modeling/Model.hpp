@@ -25,9 +25,8 @@ public:
 
     void rebuildFlatLists() {
         meshMaterialPairs.clear();
-        if (rootNode) {
-            traverseNode(rootNode);
-        }
+        descriptorSets.clear();
+        if (rootNode) traverseNode(rootNode);
     }
 
     void initVulkanResources(
@@ -42,7 +41,7 @@ public:
         }
 
         std::vector<vk::DescriptorSetLayout> layouts(meshMaterialPairs.size(), *layout);
-
+        
         vk::DescriptorSetAllocateInfo allocInfo{};
         allocInfo.descriptorPool = *pool;
         allocInfo.descriptorSetCount = static_cast<uint32_t>(layouts.size());
