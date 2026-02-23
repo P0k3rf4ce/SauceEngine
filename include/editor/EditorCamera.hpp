@@ -46,6 +46,9 @@ public:
 
   Ray screenToWorldRay(float localX, float localY, float vpWidth, float vpHeight) const;
 
+  glm::vec3 getOrbitTarget() const { return orbitTarget; }
+  float getFOV() const { return fov; }
+
   void setScreenSize(float width, float height) { scrWidth = width; scrHeight = height; }
 
 private:

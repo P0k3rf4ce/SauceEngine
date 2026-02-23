@@ -75,6 +75,17 @@ public:
 		return nullptr;
 	}
 
+	template <typename T>
+	const T* getComponent() const {
+		for (auto it = components.rbegin(); it != components.rend(); ++it) {
+			auto* component = dynamic_cast<const T*>(it->get());
+			if (component != nullptr) {
+				return component;
+			}
+		}
+		return nullptr;
+	}
+
 	/**
 	 * Returns raw pointers to all components of a specified type
 	 */
@@ -83,6 +94,16 @@ public:
 		std::vector<T*> result;
 		for (auto& comp : components) {
 			auto* c = dynamic_cast<T*>(comp.get());
+			if (c) result.push_back(c);
+		}
+		return result;
+	}
+
+	template <typename T>
+	std::vector<const T*> getComponents() const {
+		std::vector<const T*> result;
+		for (const auto& comp : components) {
+			auto* c = dynamic_cast<const T*>(comp.get());
 			if (c) result.push_back(c);
 		}
 		return result;

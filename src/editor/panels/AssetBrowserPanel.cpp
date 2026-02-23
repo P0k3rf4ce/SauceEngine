@@ -217,6 +217,10 @@ void AssetBrowserPanel::drawFileList() {
 
         // Context menu for GLTF files
         if (isGltf && ImGui::BeginPopupContextItem()) {
+          if (ImGui::MenuItem("Open as Scene")) {
+            app.openScene(entry.path().string());
+          }
+          ImGui::Separator();
           if (ImGui::MenuItem("Import to Scene")) {
             importGLTF(entry.path());
           }

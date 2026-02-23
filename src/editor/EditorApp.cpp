@@ -16,6 +16,7 @@
 #include <iostream>
 #include <filesystem>
 #include <cmath>
+#include <cstring>
 
 namespace sauce::editor {
 
@@ -340,6 +341,44 @@ void EditorApp::importGLTFToScene(const std::string& path) {
                      " (" + std::to_string(added) + " entities)");
   } catch (const std::exception& e) {
     setStatusMessage("Import failed: " + std::string(e.what()));
+  }
+}
+
+void EditorApp::openScene(const std::string& path) {
+  try {
+    logicalDevice->waitIdle();
+    selectionManager.deselect();
+    if (pScene->loadFromFile(path)) {
+      setStatusMessage("Opened: " + std::filesystem::path(path).filename().string());
+    } else {
+      setStatusMessage("Failed to open scene: " + path);
+    }
+  } catch (const std::exception& e) {
+    setStatusMessage("Open failed: " + std::string(e.what()));
+  }
+}
+
+void EditorApp::saveScene() {
+  if (pScene->hasFilePath()) {
+    saveSceneAs(pScene->getCurrentFilePath());
+  } else {
+    // Open Save As dialog
+    std::string defaultPath = (std::filesystem::current_path() / "assets" / "scene.gltf").string();
+    std::strncpy(dialogPathBuf, defaultPath.c_str(), sizeof(dialogPathBuf) - 1);
+    dialogPathBuf[sizeof(dialogPathBuf) - 1] = '\0';
+    showSaveAsDialog = true;
+  }
+}
+
+void EditorApp::saveSceneAs(const std::string& path) {
+  try {
+    if (pScene->saveToFile(path)) {
+      setStatusMessage("Saved: " + std::filesystem::path(path).filename().string());
+    } else {
+      setStatusMessage("Failed to save scene: " + path);
+    }
+  } catch (const std::exception& e) {
+    setStatusMessage("Save failed: " + std::string(e.what()));
   }
 }
 
@@ -759,8 +798,29 @@ void EditorApp::buildEditorUI() {
       if (ImGui::MenuItem("New Scene", "Ctrl+N")) {
         logicalDevice->waitIdle();
         pScene->getEntitiesMut().clear();
+        pScene->setCurrentFilePath("");
         selectionManager.deselect();
         setStatusMessage("New scene created");
+      }
+      if (ImGui::MenuItem("Open Scene...", "Ctrl+O")) {
+        std::string defaultPath = pScene->hasFilePath()
+          ? pScene->getCurrentFilePath()
+          : (std::filesystem::current_path() / "assets" / "scene.gltf").string();
+        std::strncpy(dialogPathBuf, defaultPath.c_str(), sizeof(dialogPathBuf) - 1);
+        dialogPathBuf[sizeof(dialogPathBuf) - 1] = '\0';
+        showOpenDialog = true;
+      }
+      ImGui::Separator();
+      if (ImGui::MenuItem("Save Scene", "Ctrl+S")) {
+        saveScene();
+      }
+      if (ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S")) {
+        std::string defaultPath = pScene->hasFilePath()
+          ? pScene->getCurrentFilePath()
+          : (std::filesystem::current_path() / "assets" / "scene.gltf").string();
+        std::strncpy(dialogPathBuf, defaultPath.c_str(), sizeof(dialogPathBuf) - 1);
+        dialogPathBuf[sizeof(dialogPathBuf) - 1] = '\0';
+        showSaveAsDialog = true;
       }
       ImGui::Separator();
       if (ImGui::MenuItem("Exit", "Esc")) {
@@ -847,6 +907,48 @@ void EditorApp::buildEditorUI() {
     }
 
     ImGui::End();
+  }
+
+  // Open Scene dialog
+  if (showOpenDialog) {
+    ImGui::OpenPopup("Open Scene");
+    showOpenDialog = false;
+  }
+  if (ImGui::BeginPopupModal("Open Scene", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::Text("File path:");
+    ImGui::SetNextItemWidth(400);
+    ImGui::InputText("##openpath", dialogPathBuf, sizeof(dialogPathBuf));
+    ImGui::Spacing();
+    if (ImGui::Button("Open", ImVec2(120, 0))) {
+      openScene(dialogPathBuf);
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
+  }
+
+  // Save Scene As dialog
+  if (showSaveAsDialog) {
+    ImGui::OpenPopup("Save Scene As");
+    showSaveAsDialog = false;
+  }
+  if (ImGui::BeginPopupModal("Save Scene As", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::Text("File path (.gltf or .glb):");
+    ImGui::SetNextItemWidth(400);
+    ImGui::InputText("##savepath", dialogPathBuf, sizeof(dialogPathBuf));
+    ImGui::Spacing();
+    if (ImGui::Button("Save", ImVec2(120, 0))) {
+      saveSceneAs(dialogPathBuf);
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
   }
 }
 
@@ -1043,9 +1145,51 @@ void EditorApp::scrollCallback(GLFWwindow* window, double /*xoffset*/, double yo
   app->editorCamera.zoom(static_cast<float>(yoffset));
 }
 
-void EditorApp::keyCallback(GLFWwindow* window, int key, int /*scancode*/, int action, int /*mods*/) {
+void EditorApp::keyCallback(GLFWwindow* window, int key, int /*scancode*/, int action, int mods) {
   auto* app = static_cast<EditorApp*>(glfwGetWindowUserPointer(window));
   if (!app) return;
+
+  bool ctrl = (mods & GLFW_MOD_CONTROL) != 0;
+  bool shift = (mods & GLFW_MOD_SHIFT) != 0;
+
+  // Global shortcuts that work even when ImGui wants keyboard
+  if (action == GLFW_PRESS && ctrl) {
+    if (key == GLFW_KEY_S && shift) {
+      // Ctrl+Shift+S = Save As
+      std::string defaultPath = app->pScene->hasFilePath()
+        ? app->pScene->getCurrentFilePath()
+        : (std::filesystem::current_path() / "assets" / "scene.gltf").string();
+      std::strncpy(app->dialogPathBuf, defaultPath.c_str(), sizeof(app->dialogPathBuf) - 1);
+      app->dialogPathBuf[sizeof(app->dialogPathBuf) - 1] = '\0';
+      app->showSaveAsDialog = true;
+      return;
+    }
+    if (key == GLFW_KEY_S) {
+      app->saveScene();
+      return;
+    }
+    if (key == GLFW_KEY_O) {
+      std::string defaultPath = app->pScene->hasFilePath()
+        ? app->pScene->getCurrentFilePath()
+        : (std::filesystem::current_path() / "assets" / "scene.gltf").string();
+      std::strncpy(app->dialogPathBuf, defaultPath.c_str(), sizeof(app->dialogPathBuf) - 1);
+      app->dialogPathBuf[sizeof(app->dialogPathBuf) - 1] = '\0';
+      app->showOpenDialog = true;
+      return;
+    }
+    if (key == GLFW_KEY_N) {
+      app->logicalDevice->waitIdle();
+      app->pScene->getEntitiesMut().clear();
+      app->pScene->setCurrentFilePath("");
+      app->selectionManager.deselect();
+      app->setStatusMessage("New scene created");
+      return;
+    }
+    if (key == GLFW_KEY_D) {
+      app->selectionManager.deselect();
+      return;
+    }
+  }
 
   if (ImGui::GetIO().WantCaptureKeyboard) return;
 
@@ -1084,24 +1228,8 @@ void EditorApp::keyCallback(GLFWwindow* window, int key, int /*scancode*/, int a
     }
   }
 
-  // Ctrl+D to deselect
-  if (key == GLFW_KEY_D && action == GLFW_PRESS &&
-      glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
-    app->selectionManager.deselect();
-  }
-
-  // Ctrl+N for new scene
-  if (key == GLFW_KEY_N && action == GLFW_PRESS &&
-      glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
-    app->logicalDevice->waitIdle();
-    app->pScene->getEntitiesMut().clear();
-    app->selectionManager.deselect();
-    app->setStatusMessage("New scene created");
-  }
-
   // W/E/R for gizmo mode switching (only when not in fly mode and no modifier keys)
-  if (action == GLFW_PRESS && app->editorCamera.getMode() != EditorCamera::Mode::Fly &&
-      glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) != GLFW_PRESS) {
+  if (action == GLFW_PRESS && app->editorCamera.getMode() != EditorCamera::Mode::Fly && !ctrl) {
     if (key == GLFW_KEY_W) {
       app->activeGizmoMode = GizmoType::Translate;
       if (app->pGizmoRenderer) app->pGizmoRenderer->setActiveGizmo(GizmoType::Translate);

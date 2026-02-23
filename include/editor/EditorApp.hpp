@@ -75,6 +75,10 @@ public:
 
   void importGLTFToScene(const std::string& path);
 
+  void openScene(const std::string& path);
+  void saveScene();
+  void saveSceneAs(const std::string& path);
+
 private:
   void initWindow();
   void initVulkan();
@@ -148,6 +152,11 @@ private:
 
   std::string statusMessage;
   float statusTimer = 0.0f;
+
+  // File dialog state
+  bool showOpenDialog = false;
+  bool showSaveAsDialog = false;
+  char dialogPathBuf[512] = {};
 };
 
 } // namespace sauce::editor

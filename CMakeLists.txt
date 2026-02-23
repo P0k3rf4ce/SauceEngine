@@ -52,6 +52,7 @@ target_sources(${EXEC_NAME} PRIVATE
   src/app/modeling/ModelNode.cpp
   src/app/modeling/Model.cpp
   src/app/modeling/GLTFLoader.cpp
+  src/app/modeling/GLTFExporter.cpp
   src/app/components/TransformComponent.cpp
   src/app/components/MeshRendererComponent.cpp
   src/app/Scene.cpp
@@ -144,6 +145,7 @@ target_sources(sauceeditor PRIVATE
     src/app/modeling/ModelNode.cpp
     src/app/modeling/Model.cpp
     src/app/modeling/GLTFLoader.cpp
+    src/app/modeling/GLTFExporter.cpp
     src/app/components/TransformComponent.cpp
     src/app/components/MeshRendererComponent.cpp
     src/app/Scene.cpp
