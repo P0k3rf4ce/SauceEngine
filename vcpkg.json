@@ -9,6 +9,10 @@
     "stb",
     "tinygltf",
     "tinyobjloader",
-    "boost-program-options"
+    "boost-program-options",
+    {
+      "name": "imgui",
+      "features": ["glfw-binding", "vulkan-binding"]
+    }
   ]
 }

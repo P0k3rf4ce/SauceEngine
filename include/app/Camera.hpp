@@ -62,6 +62,18 @@ public:
   }
 
   /**
+   * Sets camera to look at target from position
+   */
+  void lookAt(const glm::vec3& position, const glm::vec3& target, const glm::vec3& upVec) {
+    pos = position;
+    worldUp = upVec;
+    glm::vec3 direction = glm::normalize(target - position);
+    yaw = glm::degrees(atan2(direction.z, direction.x));
+    pitch = glm::degrees(asin(direction.y));
+    updateView();
+  }
+
+  /**
    * Translates the camera position by offset
    *
    * @param offs - offset by which to translate the camera

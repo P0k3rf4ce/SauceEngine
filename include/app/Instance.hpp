@@ -21,15 +21,18 @@ struct Instance {
     auto extensions = getRequiredExtensions(glfwExtensions, glfwExtensionCount);
     checkRequiredExtensions(extensions);
 
-    checkRequiredLayers(validationLayers);
-    
+    auto validationLayers = getValidationLayers();
+    if (!validationLayers.empty()) {
+      checkRequiredLayers(validationLayers);
+    }
+
    vk::InstanceCreateInfo createInfo {
 #ifdef __APPLE__
       .flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR,
-#endif 
+#endif
       .pApplicationInfo = &appInfo,
       .enabledLayerCount = static_cast<uint32_t>(validationLayers.size()),
-      .ppEnabledLayerNames = validationLayers.data(),
+      .ppEnabledLayerNames = validationLayers.empty() ? nullptr : validationLayers.data(),
       .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
       .ppEnabledExtensionNames = extensions.data(),
     };
@@ -58,9 +61,12 @@ private:
   constexpr static bool enableValidationLayers = true;
 #endif
 
-  const std::vector<char const *> validationLayers = {
-    "VK_LAYER_KHRONOS_validation"
-  };
+  std::vector<char const *> getValidationLayers() const {
+    if (enableValidationLayers) {
+      return { "VK_LAYER_KHRONOS_validation" };
+    }
+    return {};
+  }
 
   static std::vector<const char *> getRequiredExtensions(const char** glfwExtensions, uint32_t glfwExtensionCount) {
     std::vector<const char *> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
