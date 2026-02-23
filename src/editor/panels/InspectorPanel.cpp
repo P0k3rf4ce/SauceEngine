@@ -182,70 +182,79 @@ void InspectorPanel::drawTransformSection(sauce::Entity& entity) {
 }
 
 void InspectorPanel::drawMeshRendererSection(sauce::Entity& entity) {
-  auto* mrc = entity.getComponent<MeshRendererComponent>();
-  if (!mrc) return;
+  auto mrcs = entity.getComponents<MeshRendererComponent>();
+  if (mrcs.empty()) return;
 
-  if (ImGui::CollapsingHeader("Mesh Renderer", ImGuiTreeNodeFlags_DefaultOpen)) {
-    auto mesh = mrc->getMesh();
-    auto material = mrc->getMaterial();
+  for (size_t i = 0; i < mrcs.size(); ++i) {
+    auto* mrc = mrcs[i];
+    ImGui::PushID(static_cast<int>(i));
 
-    if (mesh) {
-      ImGui::Text("Vertices: %zu", mesh->getVertexCount());
-      ImGui::SameLine(0, 20);
-      ImGui::Text("Indices: %zu", mesh->getIndexCount());
+    std::string headerLabel = (mrcs.size() == 1)
+      ? "Mesh Renderer"
+      : "Mesh " + std::to_string(i);
 
-      const auto& meshMeta = mesh->getMetadata();
-      if (!meshMeta.empty()) {
-        drawMetadataSection("Mesh Metadata", meshMeta);
-      }
-    } else {
-      ImGui::TextDisabled("No mesh assigned");
-      ImGui::TextDisabled("Drag a .gltf/.glb file here");
-      if (ImGui::BeginDragDropTarget()) {
-        if (auto* payload = ImGui::AcceptDragDropPayload("ASSET_FILE")) {
-          std::string path(static_cast<const char*>(payload->Data));
-          std::string ext = std::filesystem::path(path).extension().string();
-          if (ext == ".gltf" || ext == ".glb") {
-            loadAndAssignModel(path, *mrc);
-            app.setStatusMessage("Assigned model from " +
-                                 std::filesystem::path(path).filename().string());
+    if (ImGui::CollapsingHeader(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+      auto mesh = mrc->getMesh();
+      auto material = mrc->getMaterial();
+
+      if (mesh) {
+        ImGui::Text("Vertices: %zu", mesh->getVertexCount());
+        ImGui::SameLine(0, 20);
+        ImGui::Text("Indices: %zu", mesh->getIndexCount());
+
+        const auto& meshMeta = mesh->getMetadata();
+        if (!meshMeta.empty()) {
+          drawMetadataSection("Mesh Metadata", meshMeta);
+        }
+      } else {
+        ImGui::TextDisabled("No mesh assigned");
+        ImGui::TextDisabled("Drag a .gltf/.glb file here");
+        if (ImGui::BeginDragDropTarget()) {
+          if (auto* payload = ImGui::AcceptDragDropPayload("ASSET_FILE")) {
+            std::string path(static_cast<const char*>(payload->Data));
+            std::string ext = std::filesystem::path(path).extension().string();
+            if (ext == ".gltf" || ext == ".glb") {
+              loadAndAssignModel(path, *mrc);
+              app.setStatusMessage("Assigned model from " +
+                                   std::filesystem::path(path).filename().string());
+            }
           }
+          ImGui::EndDragDropTarget();
         }
-        ImGui::EndDragDropTarget();
+      }
+
+      ImGui::Spacing();
+
+      if (material) {
+        ImGui::Text("Material: %s", material->getName().c_str());
+        auto& props = material->getProperties();
+
+        glm::vec4 color = props.baseColorFactor;
+        if (ImGui::ColorEdit4("Base Color", glm::value_ptr(color), ImGuiColorEditFlags_Float)) {
+          props.baseColorFactor = color;
+        }
+
+        if (ImGui::SliderFloat("Metallic", &props.metallicFactor, 0.0f, 1.0f, "%.2f")) {}
+        if (ImGui::SliderFloat("Roughness", &props.roughnessFactor, 0.0f, 1.0f, "%.2f")) {}
+
+        if (ImGui::TreeNode("Emissive")) {
+          glm::vec3 emissive = props.emissiveFactor;
+          if (ImGui::ColorEdit3("Emissive", glm::value_ptr(emissive))) {
+            props.emissiveFactor = emissive;
+          }
+          ImGui::TreePop();
+        }
+
+        const auto& matMeta = material->getMetadata();
+        if (!matMeta.empty()) {
+          drawMetadataSection("Material Metadata", matMeta);
+        }
+      } else {
+        ImGui::TextDisabled("No material assigned");
       }
     }
 
-    ImGui::Spacing();
-
-    if (material) {
-      ImGui::Text("Material: %s", material->getName().c_str());
-      auto& props = material->getProperties();
-
-      // Editable color
-      glm::vec4 color = props.baseColorFactor;
-      if (ImGui::ColorEdit4("Base Color", glm::value_ptr(color), ImGuiColorEditFlags_Float)) {
-        props.baseColorFactor = color;
-      }
-
-      // Editable metallic/roughness
-      if (ImGui::SliderFloat("Metallic", &props.metallicFactor, 0.0f, 1.0f, "%.2f")) {}
-      if (ImGui::SliderFloat("Roughness", &props.roughnessFactor, 0.0f, 1.0f, "%.2f")) {}
-
-      if (ImGui::TreeNode("Emissive")) {
-        glm::vec3 emissive = props.emissiveFactor;
-        if (ImGui::ColorEdit3("Emissive", glm::value_ptr(emissive))) {
-          props.emissiveFactor = emissive;
-        }
-        ImGui::TreePop();
-      }
-
-      const auto& matMeta = material->getMetadata();
-      if (!matMeta.empty()) {
-        drawMetadataSection("Material Metadata", matMeta);
-      }
-    } else {
-      ImGui::TextDisabled("No material assigned");
-    }
+    ImGui::PopID();
   }
 }
 

@@ -1,4 +1,5 @@
 #include <editor/gizmos/GizmoRenderer.hpp>
+#include <editor/EditorApp.hpp>
 #include <editor/OffscreenFramebuffer.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -21,7 +22,7 @@ GizmoRenderer::GizmoRenderer(
     .depthWrite = false,
     .depthTestEnable = false,
     .hasPushConstants = true,
-    .pushConstantSize = sizeof(glm::mat4),
+    .pushConstantSize = sizeof(MeshPushConstants),
   };
 
   pipeline = std::make_unique<sauce::GraphicsPipeline>(
@@ -95,8 +96,13 @@ void GizmoRenderer::render(
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, **pipeline);
   cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
     pipeline->getLayout(), 0, *descriptorSet, nullptr);
-  cmd.pushConstants<glm::mat4>(pipeline->getLayout(),
-    vk::ShaderStageFlagBits::eVertex, 0, model);
+  MeshPushConstants pushData {};
+  pushData.model = model;
+  pushData.baseColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+  pushData.metallic = 0.0f;
+  pushData.roughness = 0.0f;
+  cmd.pushConstants<MeshPushConstants>(pipeline->getLayout(),
+    vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, pushData);
 
   auto& cmdRef = const_cast<vk::raii::CommandBuffer&>(cmd);
   mesh->bind(cmdRef);

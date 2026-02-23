@@ -75,6 +75,19 @@ public:
 		return nullptr;
 	}
 
+	/**
+	 * Returns raw pointers to all components of a specified type
+	 */
+	template <typename T>
+	std::vector<T*> getComponents() {
+		std::vector<T*> result;
+		for (auto& comp : components) {
+			auto* c = dynamic_cast<T*>(comp.get());
+			if (c) result.push_back(c);
+		}
+		return result;
+	}
+
 	/*
 	 * Returns a raw pointer to the most recently added component of a specified type and name
 	 *

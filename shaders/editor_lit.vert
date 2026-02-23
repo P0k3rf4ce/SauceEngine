@@ -25,14 +25,15 @@ layout(location = 0) out vec3 fragNormal;
 layout(location = 1) out vec3 fragColor;
 layout(location = 2) out vec3 fragWorldPos;
 layout(location = 3) out vec4 fragBaseColor;
+layout(location = 4) out vec3 fragCameraPos;
 
 void main() {
     vec4 worldPos = push.model * vec4(inPosition, 1.0);
     gl_Position = ubo.proj * ubo.view * worldPos;
 
-    // Transform normal to world space (using upper-left 3x3 of model matrix)
     fragNormal = normalize(mat3(transpose(inverse(push.model))) * inNormal);
     fragColor = inColor;
     fragWorldPos = worldPos.xyz;
     fragBaseColor = push.baseColor;
+    fragCameraPos = ubo.cameraPos;
 }

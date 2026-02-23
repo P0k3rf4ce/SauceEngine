@@ -8,6 +8,7 @@
 #include <app/GraphicsPipeline.hpp>
 #include <app/components/TransformComponent.hpp>
 #include <app/components/MeshRendererComponent.hpp>
+#include <app/modeling/Material.hpp>
 
 #include <glm/gtc/quaternion.hpp>
 #include <imgui.h>
@@ -36,6 +37,7 @@ EditorApp::~EditorApp() {
   pGizmoRenderer.reset();
   pGridPipeline.reset();
   pUnlitPipeline.reset();
+  pLitPipeline.reset();
   pOffscreenFB.reset();
 
   pImGuiRenderer.reset();
@@ -159,7 +161,7 @@ void EditorApp::initVulkan() {
     .enableCulling = true,
     .depthWrite = true,
     .hasPushConstants = true,
-    .pushConstantSize = sizeof(glm::mat4),
+    .pushConstantSize = sizeof(MeshPushConstants),
   };
   pUnlitPipeline = std::make_unique<sauce::GraphicsPipeline>(
     physicalDevice, logicalDevice,
@@ -168,6 +170,24 @@ void EditorApp::initVulkan() {
     "shaders/editor_unlit.vert.spv",
     "shaders/editor_unlit.frag.spv",
     unlitConfig
+  );
+
+  // Create lit pipeline (same config, PBR shaders)
+  sauce::GraphicsPipelineConfig litConfig {
+    .hasVertexInput = true,
+    .enableBlending = false,
+    .enableCulling = true,
+    .depthWrite = true,
+    .hasPushConstants = true,
+    .pushConstantSize = sizeof(MeshPushConstants),
+  };
+  pLitPipeline = std::make_unique<sauce::GraphicsPipeline>(
+    physicalDevice, logicalDevice,
+    pRenderer->getDescriptorSetLayout(),
+    OffscreenFramebuffer::COLOR_FORMAT,
+    "shaders/editor_lit.vert.spv",
+    "shaders/editor_lit.frag.spv",
+    litConfig
   );
 
   // Create gizmo renderer
@@ -325,16 +345,16 @@ void EditorApp::importGLTFToScene(const std::string& path) {
 
 void EditorApp::uploadMeshGPUResources() {
   for (auto& entity : pScene->getEntitiesMut()) {
-    auto* mrc = entity.getComponent<MeshRendererComponent>();
-    if (!mrc) continue;
-    auto mesh = mrc->getMesh();
-    if (!mesh || !mesh->isValid()) continue;
-    if (!mesh->hasGPUData()) {
-      // initVulkanResources needs non-const refs; safe to cast since operations are read-only
-      auto& physDev = const_cast<vk::raii::PhysicalDevice&>(*physicalDevice);
-      auto& cmdPool = const_cast<vk::raii::CommandPool&>(pRenderer->getCommandPool());
-      auto& queue = const_cast<vk::raii::Queue&>(pRenderer->getQueue());
-      mesh->initVulkanResources(logicalDevice, physDev, cmdPool, queue);
+    auto mrcs = entity.getComponents<MeshRendererComponent>();
+    for (auto* mrc : mrcs) {
+      auto mesh = mrc->getMesh();
+      if (!mesh || !mesh->isValid()) continue;
+      if (!mesh->hasGPUData()) {
+        auto& physDev = const_cast<vk::raii::PhysicalDevice&>(*physicalDevice);
+        auto& cmdPool = const_cast<vk::raii::CommandPool&>(pRenderer->getCommandPool());
+        auto& queue = const_cast<vk::raii::Queue&>(pRenderer->getQueue());
+        mesh->initVulkanResources(logicalDevice, physDev, cmdPool, queue);
+      }
     }
   }
 }
@@ -362,10 +382,9 @@ void EditorApp::pickEntityAtScreen(float windowX, float windowY) {
   for (int i = 0; i < static_cast<int>(entities.size()); ++i) {
     auto& entity = entities[i];
     if (!entity.getActive()) continue;
-    auto* mrc = entity.getComponent<MeshRendererComponent>();
-    if (!mrc) continue;
-    auto mesh = mrc->getMesh();
-    if (!mesh || !mesh->isValid()) continue;
+
+    auto mrcs = entity.getComponents<MeshRendererComponent>();
+    if (mrcs.empty()) continue;
 
     glm::mat4 modelMatrix = glm::mat4(1.0f);
     auto* tc = entity.getComponent<TransformComponent>();
@@ -373,14 +392,19 @@ void EditorApp::pickEntityAtScreen(float windowX, float windowY) {
       modelMatrix = tc->getLocalMatrix();
     }
 
-    AABB localAABB = AABB::fromVertices(mesh->getVertices());
-    AABB worldAABB = localAABB.transformed(modelMatrix);
+    for (auto* mrc : mrcs) {
+      auto mesh = mrc->getMesh();
+      if (!mesh || !mesh->isValid()) continue;
 
-    float t = 0.0f;
-    if (rayIntersectsAABB(ray.origin, ray.direction, worldAABB, t)) {
-      if (t < bestDist) {
-        bestDist = t;
-        bestIdx = i;
+      AABB localAABB = AABB::fromVertices(mesh->getVertices());
+      AABB worldAABB = localAABB.transformed(modelMatrix);
+
+      float t = 0.0f;
+      if (rayIntersectsAABB(ray.origin, ray.direction, worldAABB, t)) {
+        if (t < bestDist) {
+          bestDist = t;
+          bestIdx = i;
+        }
       }
     }
   }
@@ -481,17 +505,17 @@ void EditorApp::recordEditorCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t
     pGridPipeline->getLayout(), 0, *pRenderer->getCurrentDescriptorSet(), nullptr);
   cmd.draw(6, 1, 0, 0);  // Fullscreen quad (6 vertices, no vertex buffer)
 
-  // Draw scene meshes with unlit pipeline
-  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, **pUnlitPipeline);
+  // Draw scene meshes with active pipeline (unlit or lit based on viewport mode)
+  auto* activePipeline = (viewportMode == ViewportMode::Lit) ? pLitPipeline.get() : pUnlitPipeline.get();
+  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, **activePipeline);
   cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-    pUnlitPipeline->getLayout(), 0, *pRenderer->getCurrentDescriptorSet(), nullptr);
+    activePipeline->getLayout(), 0, *pRenderer->getCurrentDescriptorSet(), nullptr);
 
   for (auto& entity : pScene->getEntitiesMut()) {
     if (!entity.getActive()) continue;
-    auto* mrc = entity.getComponent<MeshRendererComponent>();
-    if (!mrc) continue;
-    auto mesh = mrc->getMesh();
-    if (!mesh || !mesh->hasGPUData()) continue;
+
+    auto mrcs = entity.getComponents<MeshRendererComponent>();
+    if (mrcs.empty()) continue;
 
     // Get transform for this entity
     glm::mat4 modelMatrix = glm::mat4(1.0f);
@@ -500,14 +524,32 @@ void EditorApp::recordEditorCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t
       modelMatrix = tc->getLocalMatrix();
     }
 
-    // Push model matrix
-    cmd.pushConstants<glm::mat4>(pUnlitPipeline->getLayout(),
-      vk::ShaderStageFlagBits::eVertex, 0, modelMatrix);
+    for (auto* mrc : mrcs) {
+      auto mesh = mrc->getMesh();
+      if (!mesh || !mesh->hasGPUData()) continue;
 
-    // Bind and draw mesh
-    auto& cmdRef = const_cast<vk::raii::CommandBuffer&>(cmd);
-    mesh->bind(cmdRef);
-    mesh->draw(cmdRef);
+      // Build push constants with material data
+      MeshPushConstants pushData {};
+      pushData.model = modelMatrix;
+      pushData.baseColor = glm::vec4(0.7f, 0.7f, 0.7f, 1.0f); // default grey
+      pushData.metallic = 0.0f;
+      pushData.roughness = 0.5f;
+
+      auto material = mrc->getMaterial();
+      if (material) {
+        auto& props = material->getProperties();
+        pushData.baseColor = props.baseColorFactor;
+        pushData.metallic = props.metallicFactor;
+        pushData.roughness = props.roughnessFactor;
+      }
+
+      cmd.pushConstants<MeshPushConstants>(activePipeline->getLayout(),
+        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, pushData);
+
+      auto& cmdRef = const_cast<vk::raii::CommandBuffer&>(cmd);
+      mesh->bind(cmdRef);
+      mesh->draw(cmdRef);
+    }
   }
 
   // Draw gizmo for selected entity
@@ -715,6 +757,7 @@ void EditorApp::buildEditorUI() {
   if (ImGui::BeginMenuBar()) {
     if (ImGui::BeginMenu("File")) {
       if (ImGui::MenuItem("New Scene", "Ctrl+N")) {
+        logicalDevice->waitIdle();
         pScene->getEntitiesMut().clear();
         selectionManager.deselect();
         setStatusMessage("New scene created");
@@ -1033,6 +1076,8 @@ void EditorApp::keyCallback(GLFWwindow* window, int key, int /*scancode*/, int a
     auto& entities = app->pScene->getEntitiesMut();
     if (idx >= 0 && idx < static_cast<int>(entities.size())) {
       std::string name = entities[idx].get_name();
+      // Wait for GPU to finish using entity's mesh buffers before destroying
+      app->logicalDevice->waitIdle();
       entities.erase(entities.begin() + idx);
       app->selectionManager.deselect();
       app->setStatusMessage("Deleted: " + name);
@@ -1048,6 +1093,7 @@ void EditorApp::keyCallback(GLFWwindow* window, int key, int /*scancode*/, int a
   // Ctrl+N for new scene
   if (key == GLFW_KEY_N && action == GLFW_PRESS &&
       glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
+    app->logicalDevice->waitIdle();
     app->pScene->getEntitiesMut().clear();
     app->selectionManager.deselect();
     app->setStatusMessage("New scene created");

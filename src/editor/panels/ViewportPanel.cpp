@@ -49,6 +49,39 @@ void ViewportPanel::render() {
       );
     }
   }
+
+  ImVec2 windowPos = ImGui::GetWindowPos();
+  ImVec2 contentMin = ImGui::GetWindowContentRegionMin();
+
+  // Viewport mode toggle button (top-right corner)
+  // Drawn before InvisibleButton so it gets click priority in its rect
+  {
+    ViewportMode currentMode = app.getViewportMode();
+    const char* vpModeStr = (currentMode == ViewportMode::Lit) ? "Lit" : "Unlit";
+    float btnWidth = 60.0f;
+    float btnHeight = 22.0f;
+    float btnX = windowPos.x + contentMin.x + size.x - btnWidth - 10;
+    float btnY = windowPos.y + contentMin.y + 5;
+
+    ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.18f, 0.85f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.32f, 0.90f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.35f, 0.35f, 0.45f, 0.95f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+    if (ImGui::Button(vpModeStr, ImVec2(btnWidth, btnHeight))) {
+      if (currentMode == ViewportMode::Unlit) {
+        app.setViewportMode(ViewportMode::Lit);
+      } else {
+        app.setViewportMode(ViewportMode::Unlit);
+      }
+    }
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor(3);
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Toggle viewport shading mode (Unlit / Lit)");
+    }
+  }
+
   // Make the viewport area a drop target for GLTF files
   ImGui::SetCursorScreenPos(cursorPos);
   ImGui::InvisibleButton("##ViewportDropTarget", size);
@@ -64,9 +97,6 @@ void ViewportPanel::render() {
   }
 
   // Draw overlay info on top
-  ImVec2 windowPos = ImGui::GetWindowPos();
-  ImVec2 contentMin = ImGui::GetWindowContentRegionMin();
-
   ImVec2 overlayPos = ImVec2(windowPos.x + contentMin.x + 10,
                               windowPos.y + contentMin.y + 5);
 

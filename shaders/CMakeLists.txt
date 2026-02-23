@@ -50,6 +50,8 @@ if(GLSLC)
   add_glsl_shader_target(editorGridFrag editor_grid.frag editor_grid.frag.spv)
   add_glsl_shader_target(editorUnlitVert editor_unlit.vert editor_unlit.vert.spv)
   add_glsl_shader_target(editorUnlitFrag editor_unlit.frag editor_unlit.frag.spv)
+  add_glsl_shader_target(editorLitVert editor_lit.vert editor_lit.vert.spv)
+  add_glsl_shader_target(editorLitFrag editor_lit.frag editor_lit.frag.spv)
 endif()
 
 add_custom_target(shaders DEPENDS
@@ -59,5 +61,7 @@ add_custom_target(shaders DEPENDS
   $<$<BOOL:${GLSLC}>:editorGridFrag>
   $<$<BOOL:${GLSLC}>:editorUnlitVert>
   $<$<BOOL:${GLSLC}>:editorUnlitFrag>
+  $<$<BOOL:${GLSLC}>:editorLitVert>
+  $<$<BOOL:${GLSLC}>:editorLitFrag>
 )
 

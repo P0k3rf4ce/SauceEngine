@@ -298,7 +298,7 @@ private:
     };
 
     vk::PushConstantRange pushRange {
-      .stageFlags = vk::ShaderStageFlagBits::eVertex,
+      .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
       .offset = 0,
       .size = config.pushConstantSize,
     };

@@ -30,6 +30,17 @@
 
 namespace sauce::editor {
 
+struct MeshPushConstants {
+  glm::mat4 model;       // 64 bytes
+  glm::vec4 baseColor;   // 16 bytes
+  float metallic;        // 4 bytes
+  float roughness;       // 4 bytes
+  float pad[2];          // 8 bytes alignment
+};
+// Total: 96 bytes (within 128-byte minimum guarantee)
+
+enum class ViewportMode { Unlit, Lit };
+
 class EditorPanel;
 class SceneHierarchyPanel;
 class InspectorPanel;
@@ -56,6 +67,9 @@ public:
   sauce::Renderer& getRenderer() { return *pRenderer; }
 
   OffscreenFramebuffer* getOffscreenFramebuffer() { return pOffscreenFB.get(); }
+
+  ViewportMode getViewportMode() const { return viewportMode; }
+  void setViewportMode(ViewportMode mode) { viewportMode = mode; }
 
   void setStatusMessage(const std::string& msg) { statusMessage = msg; statusTimer = 5.0f; }
 
@@ -108,6 +122,7 @@ private:
   std::unique_ptr<OffscreenFramebuffer> pOffscreenFB;
   std::unique_ptr<sauce::GraphicsPipeline> pGridPipeline;
   std::unique_ptr<sauce::GraphicsPipeline> pUnlitPipeline;
+  std::unique_ptr<sauce::GraphicsPipeline> pLitPipeline;
   std::unique_ptr<GizmoRenderer> pGizmoRenderer;
 
   SelectionManager selectionManager;
@@ -127,6 +142,7 @@ private:
   bool viewportHovered = false;
   bool viewportFocused = false;
 
+  ViewportMode viewportMode = ViewportMode::Unlit;
   GizmoType activeGizmoMode = GizmoType::Translate;
   bool gizmoInteracting = false;
 

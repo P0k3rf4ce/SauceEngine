@@ -101,6 +101,8 @@ void SceneHierarchyPanel::render() {
         } else if (selection.getSelectedIndex() > i) {
           selection.select(selection.getSelectedIndex() - 1);
         }
+        // Wait for GPU to finish using entity's mesh buffers before destroying
+        app.getLogicalDevice()->waitIdle();
         entities.erase(entities.begin() + i);
         app.setStatusMessage("Deleted: " + deletedName);
         ImGui::EndPopup();
