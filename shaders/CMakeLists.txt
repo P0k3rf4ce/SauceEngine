@@ -22,9 +22,11 @@ endif()
 
 add_slang_shader_target(shaderTarget SOURCES shader.slang OUTPUT shader.spv)
 add_slang_shader_target(shaderLightsTarget SOURCES shader_lights.slang OUTPUT shader_lights.spv)
+add_slang_shader_target(postProcessShaderTarget SOURCES post_process.slang OUTPUT post_process.spv)
 
 add_custom_target(shaders DEPENDS
   shaderTarget
   shaderLightsTarget
+  postProcessShaderTarget
 )
 
