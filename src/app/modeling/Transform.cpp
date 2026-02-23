@@ -43,9 +43,7 @@ glm::mat4 Transform::getLocalMatrix() const {
 }
 
 glm::mat4 Transform::getWorldMatrix(const ModelNode* node) const {
-    // This will be implemented once ModelNode is defined
-    // For now, just return local matrix
-    // The actual implementation will traverse up the parent chain
+    // TODO: Traverse parent chain to compute world matrix
     return getLocalMatrix();
 }
 

@@ -29,6 +29,16 @@ void Model::rebuildFlatLists() {
     }
 }
 
+std::vector<MeshMaterialPair> Model::getAllMeshMaterialPairs() const {
+    std::vector<MeshMaterialPair> allPairs;
+
+    if (rootNode) {
+        collectPairsFromNode(rootNode, allPairs);
+    }
+
+    return allPairs;
+}
+
 void Model::traverseNode(std::shared_ptr<ModelNode> node) {
     if (!node) {
         return;
@@ -55,11 +65,26 @@ void Model::traverseNode(std::shared_ptr<ModelNode> node) {
         traverseNode(child);
     }
 
-    // Clear sets after complete traversal (this is a static, so we need to clean up)
-    // This works because traverseNode is called from rebuildFlatLists which is the entry point
+    // Clear static sets after complete traversal
     if (node == rootNode) {
         meshSet.clear();
         materialSet.clear();
+    }
+}
+
+void Model::collectPairsFromNode(std::shared_ptr<ModelNode> node, std::vector<MeshMaterialPair>& pairs) const {
+    if (!node) {
+        return;
+    }
+
+    // Add all pairs from this node
+    for (const auto& pair : node->getMeshMaterialPairs()) {
+        pairs.push_back(pair);
+    }
+
+    // Traverse children
+    for (const auto& child : node->getChildren()) {
+        collectPairsFromNode(child, pairs);
     }
 }
 
