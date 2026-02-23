@@ -1,5 +1,8 @@
 #include "app/physics/constraints/StretchConstraint.hpp"
 
+namespace{
+    constexpr float EPS = 1e-8f;
+}
 
 /**
  * Preconditions:
@@ -14,7 +17,7 @@ void StretchConstraint::solve(std::vector<Vertex>& vertices, std::vector<glm::ve
     float w2 = v2.invMass;
 
     // No point in calculating anything then
-    if (w1 == 0.0f && w2 == 0.0f) return;
+    if (w1 < EPS && w2 < EPS) return;
 
     glm::vec3 p1 = v1.position;
     glm::vec3 p2 = v2.position;
@@ -23,7 +26,7 @@ void StretchConstraint::solve(std::vector<Vertex>& vertices, std::vector<glm::ve
     float distance = glm::length(diff);
 
     // distance is negligible in this case
-    if (distance < 1e-8f) return; 
+    if (distance < EPS) return; 
 
     // calculate the constraint
     float c = distance - restLength;
@@ -37,7 +40,7 @@ void StretchConstraint::solve(std::vector<Vertex>& vertices, std::vector<glm::ve
 
     float denominator = w1 + w2 + a;
     // negligible in this case
-    if (denominator < 1e-8f) return; 
+    if (denominator < EPS) return; 
 
     float dlambda = (-c - a * lambda)/denominator;
 

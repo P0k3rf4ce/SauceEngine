@@ -1,5 +1,8 @@
 #include "app/physics/constraints/BendConstraint.hpp"
 
+namespace{
+    constexpr float EPS = 1e-8f;
+}
 
 /**
  * Preconditions:
@@ -18,7 +21,7 @@ void BendConstraint::solve(std::vector<Vertex>& vertices, std::vector<glm::vec3>
     float w4 = v4.invMass;
 
     // No point in calculating anything then
-    if (w1 + w2 + w3 + w4 == 0.0f) return;
+    if (w1 + w2 + w3 + w4 < EPS) return;
 
     glm::vec3 p1 = v1.position;
     glm::vec3 p2 = v2.position;
@@ -28,7 +31,7 @@ void BendConstraint::solve(std::vector<Vertex>& vertices, std::vector<glm::vec3>
     // helper vectors representing triangle edges
     glm::vec3 e = p2 - p1;    // common edge the two triangles share
     float eLen = glm::length(e);
-    if (eLen < 1e-8f) return;
+    if (eLen < EPS) return;
     glm::vec3 e31 = p3 - p1;
     glm::vec3 e41 = p4 - p1;
 
@@ -41,7 +44,7 @@ void BendConstraint::solve(std::vector<Vertex>& vertices, std::vector<glm::vec3>
     // normalize
     float n1Len = glm::length(n1);
     float n2Len = glm::length(n2);
-    if (n1Len < 1e-8f || n2Len < 1e-8f) return; // values would be negligible
+    if (n1Len < EPS || n2Len < EPS) return; // values would be negligible
     n1 = n1/n1Len;
     n2 = n2/n2Len;
 
@@ -67,7 +70,7 @@ void BendConstraint::solve(std::vector<Vertex>& vertices, std::vector<glm::vec3>
 
     float denominator = w1*glm::dot(g1, g1) + w2*glm::dot(g2, g2) +w3*glm::dot(g3, g3) + w4*glm::dot(g4, g4) + a;
     // negligible in this case
-    if (denominator < 1e-8f) return; 
+    if (denominator < EPS) return; 
 
     float dlambda = (-c - a * lambda)/denominator;
 
