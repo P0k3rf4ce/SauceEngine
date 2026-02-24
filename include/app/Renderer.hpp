@@ -5,6 +5,7 @@
 #include <vulkan/vulkan_core.h>
 #include <vulkan/vulkan_raii.hpp>
 
+#include <array>
 #include <chrono>
 
 #include <glm/glm.hpp>
@@ -13,6 +14,7 @@
 #include <app/BufferUtils.hpp>
 #include <app/Camera.hpp>
 #include <app/GraphicsPipeline.hpp>
+#include <app/ImGuiRenderer.hpp>
 #include <app/ImageUtils.hpp>
 #include <app/LogicalDevice.hpp>
 #include <app/Scene.hpp>
@@ -60,6 +62,16 @@ const std::vector<uint16_t> indices {
   13, 12, 14, 15, 14, 12,
   16, 17, 18, 18, 19, 16,
   21, 20, 22, 23, 22, 20,
+};
+
+struct MaterialData {
+  glm::vec4 baseColorFactor{1.0f, 1.0f, 1.0f, 1.0f}; // offset  0
+  float     metallicFactor{1.0f};                      // offset 16
+  float     roughnessFactor{1.0f};                     // offset 20
+  float     normalScale{1.0f};                         // offset 24
+  float     occlusionStrength{1.0f};                   // offset 28
+  alignas(16) glm::vec3 emissiveFactor{0.0f};          // offset 32
+  float     _pad0{0.0f};                               // offset 44
 };
 
 struct RendererCreateInfo {
@@ -115,7 +127,9 @@ public:
     commandPool = vk::raii::CommandPool { *createInfo.logicalDevice, commandPoolCreateInfo };
 
     createDepthResources(createInfo.physicalDevice, createInfo.logicalDevice);
-    createOffscreenResources(createInfo.physicalDevice, createInfo.logicalDevice);
+    createDefaultTextures(createInfo.physicalDevice, createInfo.logicalDevice);
+    createMaterialBuffer(createInfo.physicalDevice, createInfo.logicalDevice);
+    createLightSSBO(createInfo.physicalDevice, createInfo.logicalDevice);
   
     vk::CommandBufferAllocateInfo allocInfo {
       .commandPool = commandPool,
@@ -143,16 +157,28 @@ public:
     }
   }
 
+  const vk::raii::Queue& getQueue() const { return *pQueue; }
+  const sauce::SwapChain& getSwapChain() const { return *pSwapChain; }
+  const vk::raii::CommandPool& getCommandPool() const { return commandPool; }
+
   void createDescriptorSetLayout(const sauce::LogicalDevice& logicalDevice) {
-    vk::DescriptorSetLayoutBinding uboLayoutBinding {
-      .binding = 0,
-      .descriptorType = vk::DescriptorType::eUniformBuffer,
-      .descriptorCount = 1,
-      .stageFlags = vk::ShaderStageFlagBits::eVertex,
-    };
+    std::array<vk::DescriptorSetLayoutBinding, 13> bindings;
+
+    // UBO
+    bindings[0] = { .binding = 0, .descriptorType = vk::DescriptorType::eUniformBuffer,  .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment };
+    // MaterialData
+    bindings[1] = { .binding = 1, .descriptorType = vk::DescriptorType::eUniformBuffer,  .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
+    // Light SSBO
+    bindings[2] = { .binding = 2, .descriptorType = vk::DescriptorType::eStorageBuffer,  .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
+    // Texture and Sampler pairs
+    for (uint32_t i = 0; i < 5; ++i) {
+      bindings[3 + i * 2] = { .binding = 3 + i * 2, .descriptorType = vk::DescriptorType::eSampledImage, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
+      bindings[4 + i * 2] = { .binding = 4 + i * 2, .descriptorType = vk::DescriptorType::eSampler,      .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
+    }
+
     vk::DescriptorSetLayoutCreateInfo dsLayoutInfo {
-      .bindingCount = 1,
-      .pBindings = &uboLayoutBinding,
+      .bindingCount = static_cast<uint32_t>(bindings.size()),
+      .pBindings = bindings.data(),
     };
 
     descriptorSetLayout = vk::raii::DescriptorSetLayout{ *logicalDevice, dsLayoutInfo };
@@ -171,14 +197,16 @@ public:
   }
 
   void createDescriptorSets(const sauce::LogicalDevice& logicalDevice) {
-    std::vector<vk::DescriptorPoolSize> poolSizes {
-      { .type = vk::DescriptorType::eUniformBuffer, .descriptorCount = sauce::Renderer::MAX_FRAMES_IN_FLIGHT },
-      { .type = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = sauce::Renderer::MAX_FRAMES_IN_FLIGHT }
-    };
+    std::array<vk::DescriptorPoolSize, 4> poolSizes {{
+      { vk::DescriptorType::eUniformBuffer, 2u * MAX_FRAMES_IN_FLIGHT },
+      { vk::DescriptorType::eStorageBuffer, 1u * MAX_FRAMES_IN_FLIGHT },
+      { vk::DescriptorType::eSampledImage,  5u * MAX_FRAMES_IN_FLIGHT },
+      { vk::DescriptorType::eSampler,       5u * MAX_FRAMES_IN_FLIGHT },
+    }};
 
     vk::DescriptorPoolCreateInfo poolCreateInfo {
       .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-      .maxSets = sauce::Renderer::MAX_FRAMES_IN_FLIGHT * 2,
+      .maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
       .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
       .pPoolSizes = poolSizes.data(),
     };
@@ -194,23 +222,24 @@ public:
 
     descriptorSets = logicalDevice->allocateDescriptorSets(dsAllocInfo);
 
+    vk::DescriptorBufferInfo materialInfo { .buffer = *materialBuffer, .offset = 0, .range = sizeof(MaterialData) };
+    vk::DescriptorBufferInfo lightSSBOInfo { .buffer = *lightSSBO,     .offset = 0, .range = lightSSBOSize };
+    vk::DescriptorImageInfo  imageInfo     { .imageView = *defaultImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    vk::DescriptorImageInfo  samplerInfo   { .sampler = *defaultSampler };
+
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
-      vk::DescriptorBufferInfo bufferInfo {
-        .buffer = uniformBuffers[i],
-        .offset = 0,
-        .range = sizeof(UniformBufferObject),
-      };
+      vk::DescriptorBufferInfo uboInfo { .buffer = uniformBuffers[i], .offset = 0, .range = sizeof(UniformBufferObject) };
 
-      vk::WriteDescriptorSet descriptorWrite {
-        .dstSet = descriptorSets[i],
-        .dstBinding = 0,
-        .dstArrayElement = 0,
-        .descriptorCount = 1,
-        .descriptorType = vk::DescriptorType::eUniformBuffer,
-        .pBufferInfo = &bufferInfo,
-      };
+      std::array<vk::WriteDescriptorSet, 13> writes;
+      writes[0] = { .dstSet = descriptorSets[i], .dstBinding = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eUniformBuffer,  .pBufferInfo = &uboInfo };
+      writes[1] = { .dstSet = descriptorSets[i], .dstBinding = 1, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eUniformBuffer,  .pBufferInfo = &materialInfo };
+      writes[2] = { .dstSet = descriptorSets[i], .dstBinding = 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eStorageBuffer,  .pBufferInfo = &lightSSBOInfo };
+      for (uint32_t t = 0; t < 5; ++t) {
+        writes[3 + t * 2] = { .dstSet = descriptorSets[i], .dstBinding = 3 + t * 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampledImage, .pImageInfo = &imageInfo };
+        writes[4 + t * 2] = { .dstSet = descriptorSets[i], .dstBinding = 4 + t * 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampler,      .pImageInfo = &samplerInfo };
+      }
 
-      logicalDevice->updateDescriptorSets(descriptorWrite, {});
+      logicalDevice->updateDescriptorSets(writes, {});
     }
   }
 
@@ -430,7 +459,7 @@ public:
     commandBuffers[frameIndex].pipelineBarrier2(dependencyInfo);
   }
 
-  void recordCommandBuffer(uint32_t imageIndex){
+  void recordCommandBuffer(uint32_t imageIndex, sauce::ImGuiRenderer* imguiRenderer){
     commandBuffers[frameIndex].begin({});
 
     // Transition offscreen image for rendering
@@ -499,65 +528,19 @@ public:
         static_cast<float>(pSwapChain->getExtent().height), 0.0f, 1.0f));
     commandBuffers[frameIndex].setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), pSwapChain->getExtent()));
 
-    commandBuffers[frameIndex].drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
-
-    commandBuffers[frameIndex].endRendering();
-
-    // Transition offscreen image for sampling
-    transitionImageLayout(
-      *offscreenImage,
-      vk::ImageLayout::eColorAttachmentOptimal,
-      vk::ImageLayout::eShaderReadOnlyOptimal,
-      vk::AccessFlagBits2::eColorAttachmentWrite,
-      vk::AccessFlagBits2::eShaderRead,
-      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-      vk::PipelineStageFlagBits2::eFragmentShader,
-      vk::ImageAspectFlagBits::eColor
+    const uint32_t lightCount = 0;
+    commandBuffers[frameIndex].pushConstants<uint32_t>(
+        *pPipeline->getLayout(),
+        vk::ShaderStageFlagBits::eFragment,
+        0u, { lightCount }
     );
 
-    // Transition swapchain image for rendering
-    transitionImageLayout(
-      pSwapChain->getImages()[imageIndex],
-      vk::ImageLayout::eUndefined,
-      vk::ImageLayout::eColorAttachmentOptimal,
-      {},
-      vk::AccessFlagBits2::eColorAttachmentWrite,
-      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-      vk::ImageAspectFlagBits::eColor
-    );
+    commandBuffers[frameIndex].drawIndexed(indices.size(), 1, 0, 0, 0);
 
-    // Pass 2: Render Post-processing to Swapchain Image
-    vk::RenderingAttachmentInfo ppColorAttachmentInfo = {
-      .imageView = pSwapChain->getImageViews()[imageIndex],
-      .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-      .loadOp = vk::AttachmentLoadOp::eClear,
-      .storeOp = vk::AttachmentStoreOp::eStore,
-      .clearValue = clearColor,
-    };
-
-    vk::RenderingInfo ppRenderingInfo {
-      .renderArea = { 
-        .offset = { 0, 0 }, 
-        .extent = pSwapChain->getExtent(),
-      },
-      .layerCount = 1,
-      .colorAttachmentCount = 1,
-      .pColorAttachments = &ppColorAttachmentInfo,
-    };
-
-    commandBuffers[frameIndex].beginRendering(ppRenderingInfo);
-
-    commandBuffers[frameIndex].bindPipeline(vk::PipelineBindPoint::eGraphics, **pPostProcessPipeline);
-    commandBuffers[frameIndex].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pPostProcessPipeline->getLayout(), 0, *postProcessDescriptorSets[frameIndex], nullptr);
-
-    commandBuffers[frameIndex].setViewport(
-        0, vk::Viewport(0.0f, 0.0f, static_cast<float>(pSwapChain->getExtent().width), 
-        static_cast<float>(pSwapChain->getExtent().height), 0.0f, 1.0f));
-    commandBuffers[frameIndex].setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), pSwapChain->getExtent()));
-
-    // Draw fullscreen quad (3 vertices)
-    commandBuffers[frameIndex].draw(3, 1, 0, 0);
+    // Render ImGui overlay
+    if (imguiRenderer) {
+      imguiRenderer->render(commandBuffers[frameIndex], imageIndex);
+    }
 
     commandBuffers[frameIndex].endRendering();
 
@@ -586,15 +569,14 @@ public:
    * * @param logicalDevice The device handle used to manage synchronization primitives.
    * @throws std::runtime_error If synchronization fails or the swapchain becomes invalid.
    */
-  void drawFrame(const sauce::LogicalDevice& logicalDevice, const sauce::Scene& scene){
-    // Wait for the in-flight fence to be signaled, ensuring the previous frame finished rendering
-    // This ensures the CPU doesn't submit additional frames while our previous frames are still rendering
+  void drawFrame(const sauce::LogicalDevice& logicalDevice, const sauce::Scene& scene, sauce::ImGuiRenderer* imguiRenderer = nullptr){
+    // Wait for the previous frame to finish rendering before submitting the next frame
     auto fenceResult = logicalDevice->waitForFences(*inFlightFences[frameIndex], vk::True, UINT64_MAX);
     if (fenceResult != vk::Result::eSuccess) {
       throw std::runtime_error("Failed to wait for fence!");
     }
 
-    // Request the next available image from the swap chain (our display engine)
+    // Request the next available image from the swap chain
     auto [result, imageIndex] = (*pSwapChain)->acquireNextImage(UINT64_MAX, *presentCompleteSemaphores[frameIndex], nullptr);
 
     // Verify the swap chain image was acquired successfully (suboptimal is acceptable)
@@ -607,7 +589,7 @@ public:
 
     // Reset and record the command buffer with rendering commands
     commandBuffers[frameIndex].reset();
-    recordCommandBuffer(imageIndex);
+    recordCommandBuffer(imageIndex, imguiRenderer);
 
     // Update the uniform buffer with current transformation matrices
     updateUniformBuffer(frameIndex, scene);
@@ -682,6 +664,86 @@ public:
   }
 
 
+  // Creates a 1x1 white pixel image + sampler used as fallbacks for all 5 PBR texture slots.
+  void createDefaultTextures(const sauce::PhysicalDevice& physicalDevice, const sauce::LogicalDevice& logicalDevice) {
+    uint8_t whitePixel[4] = {255, 255, 255, 255};
+    vk::DeviceSize pixelSize = sizeof(whitePixel);
+
+    vk::raii::Buffer stagingBuffer = nullptr;
+    vk::raii::DeviceMemory stagingMemory = nullptr;
+    sauce::BufferUtils::createBuffer(
+        physicalDevice, logicalDevice, pixelSize,
+        vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+        stagingBuffer, stagingMemory
+    );
+    void* mapped = stagingMemory.mapMemory(0, pixelSize);
+    memcpy(mapped, whitePixel, pixelSize);
+    stagingMemory.unmapMemory();
+
+    ImageUtils::createImage(
+        physicalDevice, logicalDevice, 1, 1,
+        vk::Format::eR8G8B8A8Unorm, vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        defaultImage, defaultImageMemory
+    );
+
+    ImageUtils::transitionImageLayout(
+        logicalDevice, commandPool, *pQueue, defaultImage,
+        vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal,
+        {}, vk::AccessFlagBits2::eTransferWrite,
+        vk::PipelineStageFlagBits2::eNone, vk::PipelineStageFlagBits2::eTransfer
+    );
+    ImageUtils::copyBufferToImage(logicalDevice, commandPool, *pQueue, stagingBuffer, defaultImage, 1, 1);
+    ImageUtils::transitionImageLayout(
+        logicalDevice, commandPool, *pQueue, defaultImage,
+        vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
+        vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eShaderRead,
+        vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eFragmentShader
+    );
+
+    defaultImageView = ImageUtils::createImageView(logicalDevice, defaultImage, vk::Format::eR8G8B8A8Unorm, vk::ImageAspectFlagBits::eColor);
+
+    vk::SamplerCreateInfo samplerInfo {
+      .magFilter = vk::Filter::eLinear,
+      .minFilter = vk::Filter::eLinear,
+      .mipmapMode = vk::SamplerMipmapMode::eLinear,
+      .addressModeU = vk::SamplerAddressMode::eRepeat,
+      .addressModeV = vk::SamplerAddressMode::eRepeat,
+      .addressModeW = vk::SamplerAddressMode::eRepeat,
+      .minLod = 0.0f,
+      .maxLod = 0.0f,
+    };
+    defaultSampler = vk::raii::Sampler{ *logicalDevice, samplerInfo };
+  }
+
+  // Creates a host-visible uniform buffer holding default PBR material properties.
+  void createMaterialBuffer(const sauce::PhysicalDevice& physicalDevice, const sauce::LogicalDevice& logicalDevice) {
+    MaterialData defaults{};
+    sauce::BufferUtils::createBuffer(
+        physicalDevice, logicalDevice, sizeof(MaterialData),
+        vk::BufferUsageFlagBits::eUniformBuffer,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+        materialBuffer, materialBufferMemory
+    );
+    void* data = materialBufferMemory.mapMemory(0, sizeof(MaterialData));
+    memcpy(data, &defaults, sizeof(MaterialData));
+    materialBufferMemory.unmapMemory();
+  }
+
+  // Allocates a storage buffer for lights. lightCount = 0 for now; one slot pre-allocated
+  // because Vulkan does not permit zero-size buffers.
+  void createLightSSBO(const sauce::PhysicalDevice& physicalDevice, const sauce::LogicalDevice& logicalDevice) {
+    lightSSBOSize = 64; // sizeof one Light struct (matches shader layout)
+    sauce::BufferUtils::createBuffer(
+        physicalDevice, logicalDevice, lightSSBOSize,
+        vk::BufferUsageFlagBits::eStorageBuffer,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+        lightSSBO, lightSSBOMemory
+    );
+  }
+
 private:
   std::unique_ptr<vk::raii::Queue> pQueue;
   std::unique_ptr<sauce::SwapChain> pSwapChain;
@@ -721,10 +783,18 @@ private:
   vk::raii::DeviceMemory depthImageMemory = nullptr;
   vk::raii::ImageView depthImageView = nullptr;
 
-  vk::raii::Image offscreenImage = nullptr;
-  vk::raii::DeviceMemory offscreenImageMemory = nullptr;
-  vk::raii::ImageView offscreenImageView = nullptr;
-  vk::raii::Sampler offscreenSampler = nullptr;
+  // PBR resources
+  vk::raii::Buffer materialBuffer = nullptr;
+  vk::raii::DeviceMemory materialBufferMemory = nullptr;
+
+  vk::DeviceSize lightSSBOSize{0};
+  vk::raii::Buffer lightSSBO = nullptr;
+  vk::raii::DeviceMemory lightSSBOMemory = nullptr;
+
+  vk::raii::Image defaultImage = nullptr;
+  vk::raii::DeviceMemory defaultImageMemory = nullptr;
+  vk::raii::ImageView defaultImageView = nullptr;
+  vk::raii::Sampler defaultSampler = nullptr;
 };
 
 }
