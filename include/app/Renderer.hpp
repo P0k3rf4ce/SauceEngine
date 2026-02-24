@@ -143,6 +143,8 @@ public:
 
   const vk::raii::Image& getDepthImage() const { return depthImage; }
   const vk::raii::ImageView& getDepthImageView() const { return depthImageView; }
+  const GraphicsPipeline& getPipeline() const { return *pPipeline; }
+  const vk::raii::Buffer& getCurrentUniformBuffer() const { return uniformBuffers[frameIndex]; }
 
   void setCommandBufferRecorder(CommandBufferRecorder recorder) {
     customRecorder = std::move(recorder);
@@ -267,7 +269,7 @@ public:
           physicalDevice,
           logicalDevice,
           size,
-          vk::BufferUsageFlagBits::eUniformBuffer,
+          vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst,
           vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible,
           buf,
           mem

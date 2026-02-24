@@ -79,6 +79,8 @@ public:
   void saveScene();
   void saveSceneAs(const std::string& path);
 
+  void setInitialSceneFile(const std::string& path) { initialSceneFile = path; }
+
 private:
   void initWindow();
   void initVulkan();
@@ -157,6 +159,8 @@ private:
   bool showOpenDialog = false;
   bool showSaveAsDialog = false;
   char dialogPathBuf[512] = {};
+
+  std::string initialSceneFile;
 };
 
 } // namespace sauce::editor

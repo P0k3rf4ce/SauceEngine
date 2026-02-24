@@ -329,7 +329,12 @@ void EditorApp::initEditor() {
   lightEntity.addComponent<TransformComponent>();
   pScene->addEntity(std::move(lightEntity));
 
-  setStatusMessage("SauceEditor ready");
+  // Load initial scene file if specified via command line
+  if (!initialSceneFile.empty()) {
+    openScene(initialSceneFile);
+  } else {
+    setStatusMessage("SauceEditor ready");
+  }
 }
 
 void EditorApp::importGLTFToScene(const std::string& path) {

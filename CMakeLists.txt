@@ -63,7 +63,7 @@ target_sources(${EXEC_NAME} PRIVATE
 )
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/shaders)
-add_dependencies(${EXEC_NAME} shaders)
+# add_dependencies(${EXEC_NAME} shaders)  # Requires slangc; pre-compiled .spv files used instead
 
 # Model test executable
 add_executable(modeltest src/modeltest.cpp)

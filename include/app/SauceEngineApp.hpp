@@ -89,9 +89,17 @@ private:
 
   void buildExampleUI();
 
+  void uploadMeshGPUResources();
+  void setupSceneRenderer();
+  void recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t imageIndex);
+
 public:
   sauce::ui::ImGuiComponentManager& getImGuiManager() { return *pImGuiComponentManager; }
   void setCustomUIBuilder(std::function<void(sauce::ui::ImGuiComponentManager&)> builder);
+  void setSceneFile(const std::string& path) { sceneFile = path; }
+
+private:
+  std::string sceneFile;
 };
 
 }
