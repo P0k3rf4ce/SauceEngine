@@ -1,5 +1,8 @@
 #include "app/modeling/Mesh.hpp"
 #include <glm/glm.hpp>
+#include "app/BufferUtils.hpp"
+#include "app/LogicalDevice.hpp"
+#include <cstring>
 
 namespace sauce {
 namespace modeling {
@@ -27,7 +30,7 @@ bool Mesh::isValid() const {
 
     // Check that indices count is a multiple of 3 (triangles)
     if (indices.size() % 3 != 0) {
-        // Warning: index count is not a multiple of 3
+        // TODO: Log warning or handle invalid index count
     }
 
     return true;

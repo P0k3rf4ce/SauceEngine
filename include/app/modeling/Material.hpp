@@ -3,11 +3,18 @@
 #include "app/modeling/Texture.hpp"
 #include "app/modeling/PropertyValue.hpp"
 #include <glm/glm.hpp>
+#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
+#include <vulkan/vulkan_raii.hpp>
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include <memory>
 #include <vulkan/vulkan_raii.hpp>
 
+
+namespace sauce {
+    struct LogicalDevice;
+}
 
 namespace sauce {
 namespace modeling {
@@ -30,6 +37,21 @@ struct MaterialProperties {
     AlphaMode alphaMode = AlphaMode::Opaque;
     float alphaCutoff = 0.5f;
     bool doubleSided = false;
+};
+
+// GPU-side UBO layout (std140-friendly)
+struct MaterialUBO {
+    glm::vec4 baseColorFactor;
+    float metallicFactor;
+    float roughnessFactor;
+    float normalScale;
+    float occlusionStrength;
+    glm::vec4 emissiveFactor_alphaCutoff; // xyz = emissive, w = alphaCutoff
+};
+
+struct MaterialDescriptorInfo {
+    vk::DescriptorBufferInfo bufferInfo;
+    std::vector<vk::DescriptorImageInfo> imageInfos;
 };
 
 class Material {
@@ -58,6 +80,15 @@ public:
     void setMetadata(const std::string& key, const PropertyValue& value);
     bool hasMetadata(const std::string& key) const;
 
+    // Vulkan resource management
+    void initVulkanResources(
+        const sauce::LogicalDevice& logicalDevice,
+        vk::raii::PhysicalDevice& physicalDevice,
+        vk::raii::CommandPool& commandPool,
+        vk::raii::Queue& queue
+    );
+    MaterialDescriptorInfo getDescriptorInfo() const;
+
 private:
     std::string name;
     MaterialProperties properties;
@@ -65,13 +96,12 @@ private:
     std::unordered_map<TextureType, std::shared_ptr<Texture>> textures;
     std::unordered_map<std::string, PropertyValue> metadata;
 
-    std::optional<vk::raii::Buffer> uniformBuffer;
-    std::optional<vk::raii::DeviceMemory> uniformMemory;
+    // Vulkan resources
+    std::unique_ptr<vk::raii::Buffer> uniformBuffer;
+    std::unique_ptr<vk::raii::DeviceMemory> uniformBufferMemory;
 
-    uint32_t findMemoryType(
-        vk::PhysicalDeviceMemoryProperties memProperties,
-        uint32_t typeFilter,
-        vk::MemoryPropertyFlags properties);
+    // Helpers
+    void updateUniformBuffer(const sauce::LogicalDevice& logicalDevice) const;
 };
 
 } // namespace modeling
