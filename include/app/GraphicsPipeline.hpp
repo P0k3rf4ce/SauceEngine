@@ -19,21 +19,19 @@ struct GraphicsPipelineConfig {
     const vk::raii::DescriptorSetLayout& descriptorSetLayout;
     vk::Format colorFormat;
     std::string shaderPath;
-    std::string vertEntryPoint = "vertMain";
-    std::string fragEntryPoint = "fragMain";
+    const std::string vertEntryPoint = "vertMain";
+    const std::string fragEntryPoint = "fragMain";
     bool useVertexInput = true;
     bool useDepthTest = true;
 };
 
 struct GraphicsPipeline {
+  GraphicsPipelineConfig config;
 
   GraphicsPipeline(
-      const sauce::PhysicalDevice& physicalDevice,
-      const sauce::LogicalDevice& logicalDevice,
-      const vk::raii::DescriptorSetLayout& descriptorSetLayout,
-      const sauce::SwapChain& swapChain
-      ) {
-    vk::raii::ShaderModule shaderModule = createShaderModule(logicalDevice, readBinaryFile("shaders/shader_pbr.spv"));
+      const sauce::GraphicsPipelineConfig& config
+      ) : config(config) {
+    vk::raii::ShaderModule shaderModule = createShaderModule(config.logicalDevice, readBinaryFile(config.shaderPath));
     vk::PipelineShaderStageCreateInfo vertShaderCreateInfo {
       .stage = vk::ShaderStageFlagBits::eVertex,
       .module = shaderModule,
@@ -49,30 +47,30 @@ struct GraphicsPipeline {
       fragShaderCreateInfo,
     };
 
-    initPipeline(physicalDevice, logicalDevice, descriptorSetLayout, swapChain, shaderStages);
+    initPipeline(shaderStages);
   }
 
   // Constructor for separate GLSL vertex and fragment shaders
-  GraphicsPipeline(const sauce::PhysicalDevice& physicalDevice, const sauce::LogicalDevice& logicalDevice, const vk::raii::DescriptorSetLayout& descriptorSetLayout, const sauce::SwapChain& swapChain, const std::string& vertShaderPath, const std::string& fragShaderPath) {
-    vertShaderModule = createShaderModule(logicalDevice, readBinaryFile(vertShaderPath));
-    fragShaderModule = createShaderModule(logicalDevice, readBinaryFile(fragShaderPath));
+  GraphicsPipeline(const sauce::GraphicsPipelineConfig& config, const std::string& vertShaderPath, const std::string& fragShaderPath) : config(config) {
+    vertShaderModule = createShaderModule(config.logicalDevice, readBinaryFile(vertShaderPath));
+    fragShaderModule = createShaderModule(config.logicalDevice, readBinaryFile(fragShaderPath));
 
     vk::PipelineShaderStageCreateInfo vertShaderCreateInfo {
       .stage = vk::ShaderStageFlagBits::eVertex,
       .module = vertShaderModule,
-      .pName = "main",
+      .pName = config.vertEntryPoint.c_str(),
     };
     vk::PipelineShaderStageCreateInfo fragShaderCreateInfo {
       .stage = vk::ShaderStageFlagBits::eFragment,
       .module = fragShaderModule,
-      .pName = "main",
+      .pName = config.fragEntryPoint.c_str(),
     };
     vk::PipelineShaderStageCreateInfo shaderStages[] = {
       vertShaderCreateInfo,
       fragShaderCreateInfo,
     };
 
-    initPipeline(physicalDevice, logicalDevice, descriptorSetLayout, swapChain, shaderStages);
+    initPipeline(shaderStages);
   }
 
 private:
@@ -81,7 +79,7 @@ private:
   vk::raii::ShaderModule vertShaderModule = nullptr;
   vk::raii::ShaderModule fragShaderModule = nullptr;
 
-  void initPipeline(const sauce::PhysicalDevice& physicalDevice, const sauce::LogicalDevice& logicalDevice, const vk::raii::DescriptorSetLayout& descriptorSetLayout, const sauce::SwapChain& swapChain, vk::PipelineShaderStageCreateInfo* shaderStages) {
+  void initPipeline(vk::PipelineShaderStageCreateInfo* shaderStages) {
     
     auto bindingDescription = Vertex::getBindingDescription();
     auto attributeDescriptions = Vertex::getAttributeDescription();
@@ -156,7 +154,7 @@ private:
 
     vk::PipelineLayoutCreateInfo pipelineLayoutInfo {
       .setLayoutCount = 1,
-      .pSetLayouts = &*descriptorSetLayout,
+      .pSetLayouts = &*config.descriptorSetLayout,
       .pushConstantRangeCount = 1,
       .pPushConstantRanges = &pushConstantRange,
     };

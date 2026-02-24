@@ -113,7 +113,7 @@ public:
       .logicalDevice = createInfo.logicalDevice,
       .descriptorSetLayout = postProcessDescriptorSetLayout,
       .colorFormat = pSwapChain->getSurfaceFormat().format,
-      .shaderPath = "shaders/post_process.spv",
+      .shaderPath = "shaders/postprocess.spv",
       .useVertexInput = false,
       .useDepthTest = false,
     };
@@ -244,7 +244,7 @@ public:
   }
 
   void createPostProcessDescriptorSets(const sauce::LogicalDevice& logicalDevice) {
-    std::vector<vk::DescriptorSetLayout> layouts{ MAX_FRAMES_IN_FLIGHT, *postProcessDescriptorSetLayout };
+    std::vector<vk::DescriptorSetLayout> layouts{ 1, *postProcessDescriptorSetLayout };
     vk::DescriptorSetAllocateInfo dsAllocInfo {
       .descriptorPool = descriptorPool,
       .descriptorSetCount = static_cast<uint32_t>(layouts.size()),
@@ -253,24 +253,22 @@ public:
 
     postProcessDescriptorSets = logicalDevice->allocateDescriptorSets(dsAllocInfo);
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
-      vk::DescriptorImageInfo imageInfo {
-        .sampler = *offscreenSampler,
-        .imageView = *offscreenImageView,
-        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-      };
+    vk::DescriptorImageInfo imageInfo {
+      .sampler = *offscreenSampler,
+      .imageView = *offscreenImageView,
+      .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+    };
 
-      vk::WriteDescriptorSet descriptorWrite {
-        .dstSet = postProcessDescriptorSets[i],
-        .dstBinding = 0,
-        .dstArrayElement = 0,
-        .descriptorCount = 1,
-        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-        .pImageInfo = &imageInfo,
-      };
+    vk::WriteDescriptorSet descriptorWrite {
+      .dstSet = postProcessDescriptorSets[0],
+      .dstBinding = 0,
+      .dstArrayElement = 0,
+      .descriptorCount = 1,
+      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+      .pImageInfo = &imageInfo,
+    };
 
-      logicalDevice->updateDescriptorSets(descriptorWrite, {});
-    }
+    logicalDevice->updateDescriptorSets(descriptorWrite, {});
   }
 
 
@@ -795,6 +793,11 @@ private:
   vk::raii::DeviceMemory defaultImageMemory = nullptr;
   vk::raii::ImageView defaultImageView = nullptr;
   vk::raii::Sampler defaultSampler = nullptr;
+
+  vk::raii::Image offscreenImage = nullptr;
+  vk::raii::DeviceMemory offscreenImageMemory = nullptr;
+  vk::raii::ImageView offscreenImageView = nullptr;
+  vk::raii::Sampler offscreenSampler = nullptr;
 };
 
 }

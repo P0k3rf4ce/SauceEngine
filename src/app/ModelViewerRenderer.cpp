@@ -17,7 +17,13 @@ ModelViewerRenderer::ModelViewerRenderer(const RendererCreateInfo& createInfo) {
   );
 
   createDescriptorSetLayout(createInfo.logicalDevice);
-  pPipeline = std::make_unique<sauce::GraphicsPipeline>(createInfo.physicalDevice, createInfo.logicalDevice, descriptorSetLayout, *pSwapChain, "shaders/shader_3d.vert.spv", "shaders/shader_3d.frag.spv");
+  sauce::GraphicsPipelineConfig mainPipelineConfig {
+    .physicalDevice = createInfo.physicalDevice,
+    .logicalDevice = createInfo.logicalDevice,
+    .descriptorSetLayout = descriptorSetLayout,
+    .colorFormat = pSwapChain->getSurfaceFormat().format,
+  };
+  pPipeline = std::make_unique<sauce::GraphicsPipeline>(mainPipelineConfig, "shaders/shader_3d.vert.spv", "shaders/shader_3d.frag.spv");
 
   vk::CommandPoolCreateInfo commandPoolCreateInfo {
     .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
