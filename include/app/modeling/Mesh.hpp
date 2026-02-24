@@ -22,9 +22,9 @@ public:
     size_t getVertexCount() const { return vertices.size(); }
     size_t getIndexCount() const { return indices.size(); }
 
-    bool hasGPUData() const { return vertexBuffer.has_value(); }
+    bool hasGPUData() const { return vertexBuffer != nullptr; }
 
-    bool isValid() const { return !vertices.empty(); }
+    bool isValid() const;
 
     void initVulkanResources(
         vk::raii::Device& device,
@@ -55,11 +55,11 @@ private:
     std::vector<uint32_t> indices;
     std::unordered_map<std::string, PropertyValue> metadata;
 
-    // GPU resources
-    std::optional<vk::raii::Buffer> vertexBuffer;
-    std::optional<vk::raii::Buffer> indexBuffer;
-    std::optional<vk::raii::DeviceMemory> vertexMemory;
-    std::optional<vk::raii::DeviceMemory> indexMemory;
+    // GPU resources (optional, for Phase 6)
+    std::unique_ptr<vk::raii::Buffer> vertexBuffer;
+    std::unique_ptr<vk::raii::Buffer> indexBuffer;
+    std::unique_ptr<vk::raii::DeviceMemory> vertexBufferMemory;
+    std::unique_ptr<vk::raii::DeviceMemory> indexBufferMemory;
 
     vk::raii::PipelineLayout* pipelineLayout = nullptr;
 

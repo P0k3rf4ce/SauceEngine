@@ -4,31 +4,6 @@
 namespace sauce {
 namespace modeling {
 
-Model::Model() {
-}
-
-void Model::setRootNode(std::shared_ptr<ModelNode> root) {
-    rootNode = root;
-    rebuildFlatLists();
-}
-
-void Model::setMetadata(const std::string& key, const PropertyValue& value) {
-    metadata[key] = value;
-}
-
-bool Model::hasMetadata(const std::string& key) const {
-    return metadata.find(key) != metadata.end();
-}
-
-void Model::rebuildFlatLists() {
-    allMeshes.clear();
-    allMaterials.clear();
-
-    if (rootNode) {
-        traverseNode(rootNode);
-    }
-}
-
 void Model::traverseNode(std::shared_ptr<ModelNode> node) {
     if (!node) {
         return;

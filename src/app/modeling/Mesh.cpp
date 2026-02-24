@@ -4,9 +4,6 @@
 namespace sauce {
 namespace modeling {
 
-Mesh::Mesh() {
-}
-
 Mesh::Mesh(const std::vector<sauce::Vertex>& vertices, const std::vector<uint32_t>& indices)
     : vertices(vertices)
     , indices(indices) {
