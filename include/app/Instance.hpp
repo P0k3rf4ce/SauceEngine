@@ -57,6 +57,9 @@ private:
 
 #ifdef NDEBUG
   constexpr static bool enableValidationLayers = false;
+#elif defined(__APPLE__)
+  // Khronos validation layer injects vkCmdWriteTimestamp with null query pool on MoltenVK, causing validation errors and segfault
+  constexpr static bool enableValidationLayers = false;
 #else
   constexpr static bool enableValidationLayers = true;
 #endif
