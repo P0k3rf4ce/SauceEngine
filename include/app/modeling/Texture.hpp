@@ -20,6 +20,7 @@ enum class TextureType {
     MetallicRoughness,
     Occlusion,
     Emissive,
+    EnvironmentMapHDR,
     Unknown
 };
 
@@ -36,6 +37,7 @@ public:
     const std::string& getPath() const { return path; }
     TextureType getType() const { return type; }
     bool isSRGB() const { return sRGB; }
+    bool isHDR() const { return hdr; }
     int getWidth() const { return width; }
     int getHeight() const { return height; }
     int getChannels() const { return channels; }
@@ -44,6 +46,7 @@ public:
 
     // Get CPU-side texture data (loads from file if necessary)
     const std::vector<unsigned char>& getData();
+    const std::vector<float>& getHdrData();
 
     // Initialize Vulkan GPU resources
     void initVulkanResources(
@@ -60,6 +63,7 @@ private:
     std::string path;
     TextureType type;
     bool sRGB;
+    bool hdr;
     bool embedded;
 
     // CPU-side data
@@ -67,6 +71,7 @@ private:
     int height;
     int channels;
     std::vector<unsigned char> data;
+    std::vector<float> hdrData;
     bool dataLoaded;
 
     // GPU resources (optional, for Phase 6)
@@ -75,8 +80,9 @@ private:
     std::unique_ptr<vk::raii::DeviceMemory> imageMemory;
     std::unique_ptr<vk::raii::Sampler> sampler;
 
-    // Helper to load image from file
     void loadFromFile();
+    void loadFromFileHDR();
+    void createDefaultPixels();
 };
 
 } // namespace modeling
