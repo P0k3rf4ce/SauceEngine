@@ -851,12 +851,11 @@ void EditorApp::buildEditorUI() {
       ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Entity")) {
-      if (ImGui::MenuItem("Add Empty Entity")) {
-        sauce::Entity e("New Entity");
-        e.addComponent<TransformComponent>();
-        pScene->addEntity(std::move(e));
-        selectionManager.select(static_cast<int>(pScene->getEntities().size()) - 1);
-        setStatusMessage("Created new entity");
+      if (ImGui::BeginMenu("Create")) { 
+        if (ImGui::MenuItem("Empty Entity")) {createEmptyEntity();}
+        if (ImGui::MenuItem("Box")) {createBoxEntity();}
+        if (ImGui::MenuItem("Ball")) {createBallEntity();}
+        ImGui::EndMenu(); 
       }
       ImGui::EndMenu();
     }
@@ -1261,5 +1260,42 @@ void EditorApp::dropCallback(GLFWwindow* window, int count, const char** paths) 
     app->assetBrowserPanel->handleFileDrop(paths[i]);
   }
 }
+
+void EditorApp::createEmptyEntity() {
+    sauce::Entity e("Empty Entity");
+    e.addComponent<TransformComponent>();
+    pScene->addEntity(std::move(e));
+
+    selectionManager.select(int(pScene->getEntities().size()) - 1);
+    setStatusMessage("Created Empty Entity");
+}
+
+void EditorApp::createBoxEntity() {
+    size_t before = pScene->getEntities().size();
+    pScene->loadGLTFModel("assets/models/Cube.gltf", true);
+    size_t after = pScene->getEntities().size();
+
+    if (after > before) {
+        selectionManager.select(int(after - 1));
+        setStatusMessage("Created Box");
+    }
+}
+
+void EditorApp::createBallEntity() {
+    size_t before = pScene->getEntities().size();
+    pScene->loadGLTFModel("assets/models/sphere.gltf", true);
+
+    size_t after = pScene->getEntities().size();
+
+    if (after > before) {
+        selectionManager.select(int(after - 1));
+        setStatusMessage("Created Ball");
+    }
+}
+
+
+
+
+
 
 } // namespace sauce::editor

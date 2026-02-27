@@ -17,6 +17,20 @@ SceneHierarchyPanel::SceneHierarchyPanel(EditorApp& app)
 void SceneHierarchyPanel::render() {
   ImGui::Begin(title.c_str(), &isOpen);
 
+  if (ImGui::Button("Create")) {
+      ImGui::OpenPopup("CreateEntityPopup");
+  }
+
+  if (ImGui::BeginPopup("CreateEntityPopup")) {
+      if (ImGui::MenuItem("Empty Entity")) {app.createEmptyEntity();}
+      if (ImGui::MenuItem("Box")){app.createBoxEntity();}
+      if (ImGui::MenuItem("Ball")){app.createBallEntity();}
+      ImGui::EndPopup();
+  }
+
+  ImGui::Separator();
+
+
   auto& scene = app.getScene();
   auto& entities = scene.getEntitiesMut();
   auto& selection = app.getSelectionManager();
