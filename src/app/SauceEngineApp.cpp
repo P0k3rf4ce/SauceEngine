@@ -56,9 +56,7 @@ void SauceEngineApp::initVulkan() {
 
     pRenderer = std::make_unique<sauce::Renderer>(rendererCreateInfo);
 
-#if !defined(__APPLE__)
-    // Initialize ImGui (Vulkan). On macOS, ImGui_ImplVulkan_CreateDeviceObjects triggers
-    // a MoltenVK vkCmdWriteTimestamp bug during font sampler creation, causing a segfault.
+    // Initialize ImGui
     sauce::ImGuiRendererCreateInfo imguiCreateInfo{
       .instance = **pInstance,
       .physicalDevice = physicalDevice,
@@ -75,9 +73,9 @@ void SauceEngineApp::initVulkan() {
 
     pImGuiRenderer = std::make_unique<sauce::ImGuiRenderer>(imguiCreateInfo);
 
+    // Add default UI components
     pImGuiComponentManager->addComponent(std::make_unique<sauce::ui::HelloWorldWindow>());
     pImGuiComponentManager->addComponent(std::make_unique<sauce::ui::DebugStatsWindow>());
-#endif
   }
 
 void SauceEngineApp::initWindow() {
@@ -150,10 +148,8 @@ void SauceEngineApp::mainLoop() {
       glfwPollEvents();
       processInput(deltaTime);
 
-      if (pImGuiRenderer) {
-        pImGuiRenderer->newFrame();
-        buildExampleUI();
-      }
+      pImGuiRenderer->newFrame();
+      buildExampleUI();
 
       pRenderer->drawFrame(logicalDevice, *pScene, pImGuiRenderer.get());
     }
