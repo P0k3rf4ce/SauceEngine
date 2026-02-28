@@ -44,7 +44,7 @@ const std::vector<unsigned char>& Texture::getData() {
     return data;
 }
 
-const std::vector<float>& Texture::getHdrData() {
+const std::vector<float>& Texture::getHDRData() {
     if (!dataLoaded) {
         loadFromFile();
     }

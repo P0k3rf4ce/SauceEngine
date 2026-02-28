@@ -46,7 +46,7 @@ public:
 
     // Get CPU-side texture data (loads from file if necessary)
     const std::vector<unsigned char>& getData();
-    const std::vector<float>& getHdrData();
+    const std::vector<float>& getHDRData();
 
     // Initialize Vulkan GPU resources
     void initVulkanResources(
