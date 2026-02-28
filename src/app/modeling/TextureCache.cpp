@@ -22,6 +22,17 @@ std::shared_ptr<Texture> TextureCache::getTexture(const std::string& path, Textu
     return texture;
 }
 
+std::shared_ptr<Texture> TextureCache::getHDRTexture(const std::string& path) {
+    auto it = cache.find(path);
+    if (it != cache.end()) {
+        return it->second;
+    }
+
+    auto texture = std::make_shared<Texture>(path, TextureType::EnvironmentMapHDR, false);
+    cache[path] = texture;
+    return texture;
+}
+
 std::shared_ptr<Texture> TextureCache::getEmbeddedTexture(const std::vector<unsigned char>& data,
                                                            int width, int height, int channels,
                                                            TextureType type, bool sRGB) {
