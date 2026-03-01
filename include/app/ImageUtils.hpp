@@ -20,14 +20,18 @@ struct ImageUtils {
       vk::ImageUsageFlags usage, 
       vk::MemoryPropertyFlags properties, 
       vk::raii::Image& image, 
-      vk::raii::DeviceMemory& imageMemory
+      vk::raii::DeviceMemory& imageMemory,
+      uint32_t mipLevels = 1,
+      uint32_t arrayLayers = 1,
+      vk::ImageCreateFlags flags = {}
       ) {
     vk::ImageCreateInfo imageInfo{ 
+      .flags = flags,
       .imageType = vk::ImageType::e2D,
       .format = format,
       .extent = {width, height, 1},
-      .mipLevels = 1,
-      .arrayLayers = 1,
+      .mipLevels = mipLevels,
+      .arrayLayers = arrayLayers,
       .samples = vk::SampleCountFlagBits::e1,
       .tiling = tiling,
       .usage = usage,
@@ -48,10 +52,15 @@ struct ImageUtils {
   static vk::raii::ImageView createImageView(
       const sauce::LogicalDevice& logicalDevice,
       vk::raii::Image& image, vk::Format format, 
-      vk::ImageAspectFlags aspectFlags
+      vk::ImageAspectFlags aspectFlags,
+      vk::ImageViewType viewType = vk::ImageViewType::e2D,
+      uint32_t mipLevels = 1,
+      uint32_t arrayLayers = 1,
+      uint32_t baseMipLevel = 0,
+      uint32_t baseArrayLayer = 0
       ) {
-    vk::ImageViewCreateInfo viewInfo{ .image = image, .viewType = vk::ImageViewType::e2D,
-        .format = format, .subresourceRange = { aspectFlags, 0, 1, 0, 1 } };
+    vk::ImageViewCreateInfo viewInfo{ .image = image, .viewType = viewType,
+        .format = format, .subresourceRange = { aspectFlags, baseMipLevel, mipLevels, baseArrayLayer, arrayLayers } };
     return vk::raii::ImageView { *logicalDevice, viewInfo };
   }
 
@@ -118,7 +127,11 @@ struct ImageUtils {
       vk::AccessFlags2 srcAccessMask,
       vk::AccessFlags2 dstAccessMask,
       vk::PipelineStageFlags2 srcStageMask,
-      vk::PipelineStageFlags2 dstStageMask
+      vk::PipelineStageFlags2 dstStageMask,
+      uint32_t mipLevels = 1,
+      uint32_t arrayLayers = 1,
+      uint32_t baseMipLevel = 0,
+      uint32_t baseArrayLayer = 0
   ) {
     vk::CommandBufferAllocateInfo transitionCommandBufferAllocInfo {
       .commandPool = commandPool,
@@ -141,10 +154,10 @@ struct ImageUtils {
       .image = image,
       .subresourceRange = {
         .aspectMask = vk::ImageAspectFlagBits::eColor,
-        .baseMipLevel = 0,
-        .levelCount = 1,
-        .baseArrayLayer = 0,
-        .layerCount = 1,
+        .baseMipLevel = baseMipLevel,
+        .levelCount = mipLevels,
+        .baseArrayLayer = baseArrayLayer,
+        .layerCount = arrayLayers,
       },
     };
 
