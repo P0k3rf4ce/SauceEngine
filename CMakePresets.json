@@ -1,12 +1,13 @@
 {
-  "version": 2,
+  "version": 3,
   "configurePresets": [
     {
       "name": "vcpkg",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
-        "BUILD_TESTS": "ON"      
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/build/vcpkg_installed",
+        "BUILD_TESTS": "OFF"
       }
     }
   ]

@@ -3,7 +3,6 @@
 /**
  * Options:
  * --help               Help
- * --skip-launcher      Start the engine immediately
  * -w --width           Screen width
  * -h --height          Screen height
  * -t --tickrate        Tickrate
@@ -28,7 +27,6 @@ AppOptions::AppOptions(int argc, char const **argv): desc("Allowed options") {
     po::notify(vm);
 
     this->help = vm.count("help") > 0;
-    this->skip_launcher = vm.count("skip-launcher") > 0;
 }
 
 boost::program_options::options_description AppOptions::getHelpMessage() const {
