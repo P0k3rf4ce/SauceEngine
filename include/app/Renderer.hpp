@@ -81,6 +81,7 @@ struct RendererCreateInfo {
   const sauce::LogicalDevice& logicalDevice;
   const sauce::RenderSurface& renderSurface;
   GLFWwindow* window;
+  bool vsync = true;
 };
 
 // Callback type for custom command buffer recording
@@ -103,7 +104,8 @@ public:
         createInfo.physicalDevice,
         createInfo.logicalDevice,
         createInfo.renderSurface,
-        createInfo.window
+        createInfo.window,
+        createInfo.vsync
     );
 
 

@@ -64,6 +64,8 @@ private:
   float lastX = 0.0f;
   float lastY = 0.0f;
   bool firstMouse = true;
+  bool cursorCaptured = true;
+  bool gravePressedLastFrame = false;
 
   std::unique_ptr<sauce::Instance> pInstance;
 
