@@ -28,6 +28,10 @@
 #include <chrono>
 #include <filesystem>
 
+namespace sauce {
+class MeshRendererComponent;
+} // namespace sauce
+
 namespace sauce::editor {
 
 struct MeshPushConstants {
@@ -78,6 +82,8 @@ public:
   void setStatusMessage(const std::string& msg) { statusMessage = msg; statusTimer = 5.0f; }
 
   void importGLTFToScene(const std::string& path);
+  void replaceModelOnComponent(MeshRendererComponent& mrc, const std::string& path);
+  void clearModelOnComponent(MeshRendererComponent& mrc);
 
   void openScene(const std::string& path);
   void saveScene();

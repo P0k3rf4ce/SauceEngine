@@ -21,15 +21,6 @@
 
 namespace sauce::editor {
 
-static void loadAndAssignModel(const std::string& path, MeshRendererComponent& mrc) {
-  sauce::modeling::GLTFLoader loader;
-  auto model = loader.loadModel(path);
-  if (!model) return;
-  auto pairs = model->getAllMeshMaterialPairs();
-  if (pairs.empty()) return;
-  mrc.setMesh(pairs[0].mesh);
-  mrc.setMaterial(pairs[0].material);
-}
 
 InspectorPanel::InspectorPanel(EditorApp& app)
   : EditorPanel("Inspector", app) {}
@@ -198,30 +189,51 @@ void InspectorPanel::drawMeshRendererSection(sauce::Entity& entity) {
       auto mesh = mrc->getMesh();
       auto material = mrc->getMaterial();
 
+      const std::string& modelPath = mrc->getModelPath();
+      std::string displayName = modelPath.empty()
+        ? "None"
+        : std::filesystem::path(modelPath).filename().string();
+
+      float clearBtnWidth = 24.0f;
+      float labelWidth = 50.0f;
+      float slotWidth = ImGui::GetContentRegionAvail().x - clearBtnWidth - ImGui::GetStyle().ItemSpacing.x - labelWidth;
+
+      ImGui::AlignTextToFramePadding();
+      ImGui::Text("Model");
+      ImGui::SameLine();
+      ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_FrameBgHovered));
+      ImGui::Button(displayName.c_str(), ImVec2(slotWidth, 0));
+      ImGui::PopStyleColor(2);
+
+      if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Drag a .gltf/.glb from the Asset Browser to assign or replace");
+
+      if (ImGui::BeginDragDropTarget()) {
+        if (auto* payload = ImGui::AcceptDragDropPayload("ASSET_FILE")) {
+          std::string path(static_cast<const char*>(payload->Data));
+          std::string ext = std::filesystem::path(path).extension().string();
+          if (ext == ".gltf" || ext == ".glb") {
+            app.replaceModelOnComponent(*mrc, path);
+          }
+        }
+        ImGui::EndDragDropTarget();
+      }
+
+      ImGui::SameLine();
+      if (ImGui::Button("x##clearMesh", ImVec2(clearBtnWidth, 0))) {
+        app.clearModelOnComponent(*mrc);
+      }
+      if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Clear mesh");
+
       if (mesh) {
         ImGui::Text("Vertices: %zu", mesh->getVertexCount());
         ImGui::SameLine(0, 20);
         ImGui::Text("Indices: %zu", mesh->getIndexCount());
-
         const auto& meshMeta = mesh->getMetadata();
-        if (!meshMeta.empty()) {
+        if (!meshMeta.empty())
           drawMetadataSection("Mesh Metadata", meshMeta);
-        }
-      } else {
-        ImGui::TextDisabled("No mesh assigned");
-        ImGui::TextDisabled("Drag a .gltf/.glb file here");
-        if (ImGui::BeginDragDropTarget()) {
-          if (auto* payload = ImGui::AcceptDragDropPayload("ASSET_FILE")) {
-            std::string path(static_cast<const char*>(payload->Data));
-            std::string ext = std::filesystem::path(path).extension().string();
-            if (ext == ".gltf" || ext == ".glb") {
-              loadAndAssignModel(path, *mrc);
-              app.setStatusMessage("Assigned model from " +
-                                   std::filesystem::path(path).filename().string());
-            }
-          }
-          ImGui::EndDragDropTarget();
-        }
       }
 
       ImGui::Spacing();

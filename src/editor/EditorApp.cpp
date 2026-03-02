@@ -9,6 +9,8 @@
 #include <app/components/TransformComponent.hpp>
 #include <app/components/MeshRendererComponent.hpp>
 #include <app/modeling/Material.hpp>
+#include <app/modeling/GLTFLoader.hpp>
+#include <app/modeling/Model.hpp>
 
 #include <glm/gtc/quaternion.hpp>
 #include <imgui.h>
@@ -347,6 +349,38 @@ void EditorApp::importGLTFToScene(const std::string& path) {
   } catch (const std::exception& e) {
     setStatusMessage("Import failed: " + std::string(e.what()));
   }
+}
+
+void EditorApp::replaceModelOnComponent(MeshRendererComponent& mrc, const std::string& path) {
+  try {
+    sauce::modeling::GLTFLoader loader;
+    auto model = loader.loadModel(path);
+    if (!model) {
+      setStatusMessage("Failed to load: " + std::filesystem::path(path).filename().string());
+      return;
+    }
+    auto pairs = model->getAllMeshMaterialPairs();
+    if (pairs.empty()) {
+      setStatusMessage("No meshes in: " + std::filesystem::path(path).filename().string());
+      return;
+    }
+
+    logicalDevice->waitIdle();
+    mrc.setMesh(pairs[0].mesh);
+    mrc.setMaterial(pairs[0].material);
+    mrc.setModelPath(path);
+    setStatusMessage("Changed model to: " + std::filesystem::path(path).filename().string());
+  } catch (const std::exception& e) {
+    setStatusMessage("Model change failed: " + std::string(e.what()));
+  }
+}
+
+void EditorApp::clearModelOnComponent(MeshRendererComponent& mrc) {
+  logicalDevice->waitIdle();
+  mrc.setMesh(nullptr);
+  mrc.setMaterial(nullptr);
+  mrc.setModelPath("");
+  setStatusMessage("Cleared mesh");
 }
 
 void EditorApp::openScene(const std::string& path) {
