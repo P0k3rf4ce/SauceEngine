@@ -62,6 +62,10 @@ public:
   GLFWwindow* getWindow() { return window; }
   float getDeltaTime() const { return deltaTime; }
 
+  void createEmptyEntity();
+  void createBoxEntity();
+  void createBallEntity();
+  
   const sauce::PhysicalDevice& getPhysicalDevice() const { return physicalDevice; }
   const sauce::LogicalDevice& getLogicalDevice() const { return logicalDevice; }
   sauce::Renderer& getRenderer() { return *pRenderer; }
