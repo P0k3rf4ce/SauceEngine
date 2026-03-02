@@ -4,6 +4,8 @@
 
 namespace physics {
 
+const float eps = 1e-8f;
+
 bool SphereCollider::checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const {
   const auto* other = dynamic_cast<const SphereCollider*>(&collider);
   if (!other) {
@@ -15,7 +17,7 @@ bool SphereCollider::checkCollision(const Collider& collider, std::vector<Contac
   float distSq = glm::dot(delta, delta);
   float radiusSum = radius + other->radius;
 
-  if (distSq >= radiusSum * radiusSum) {
+  if (distSq > (radiusSum * radiusSum) + eps) {
     return false;
   }
 
@@ -25,7 +27,7 @@ bool SphereCollider::checkCollision(const Collider& collider, std::vector<Contac
   glm::vec3 contactPoint;
   float penetrationDepth = radiusSum - dist;
 
-  if (dist < 1e-6f) {
+  if (dist < eps) {
     // Spheres are nearly coincident — pick an arbitrary normal
     normal = glm::vec3(0.0f, 1.0f, 0.0f);
     contactPoint = center;
