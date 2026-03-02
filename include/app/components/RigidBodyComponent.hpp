@@ -28,6 +28,7 @@ public:
   }
 
   const glm::vec3& getPosition()                    const { return position; }
+  const glm::vec3& getCenterOfMass()                const { return centerOfMass; }
   const glm::vec3& getVelocity()                    const { return velocity; }
   const glm::quat& getOrientation()                 const { return orientation; }
   const glm::vec3& getAngularVelocity()             const { return angularVelocity; }
@@ -36,6 +37,7 @@ public:
   const glm::mat3& getInvInertiaTensor()            const { return invInertiaTensor; }
 
   void setPosition(const glm::vec3& p)              { position = p; }
+  void setCenterOfMass(const glm::vec3& p)          { centerOfMass = p; }
   void setVelocity(const glm::vec3& v)              { velocity = v; }
   void setOrientation(const glm::quat& q)           { orientation = q; }
   void setAngularVelocity(const glm::vec3& w)       { angularVelocity = w; }
@@ -53,6 +55,7 @@ public:
 
 private:
   glm::vec3 position;
+  glm::vec3 centerOfMass;
   glm::vec3 velocity;
   glm::quat orientation;
   glm::vec3 angularVelocity;
