@@ -16,10 +16,12 @@ public:
     // Getters
     std::shared_ptr<modeling::Mesh> getMesh() const { return mesh; }
     std::shared_ptr<modeling::Material> getMaterial() const { return material; }
+    const std::string& getModelPath() const { return modelPath; }
 
     // Setters
     void setMesh(std::shared_ptr<modeling::Mesh> mesh) { this->mesh = mesh; }
     void setMaterial(std::shared_ptr<modeling::Material> material) { this->material = material; }
+    void setModelPath(const std::string& path) { modelPath = path; }
 
     // Component interface
     virtual void render() override;
@@ -28,6 +30,7 @@ public:
 private:
     std::shared_ptr<modeling::Mesh> mesh;
     std::shared_ptr<modeling::Material> material;
+    std::string modelPath;
 };
 
 } // namespace sauce

@@ -26,3 +26,4 @@ sauceengine_settings.json
 # Experimental/temporary files
 ModelLoader.cpp
 
+imgui.ini

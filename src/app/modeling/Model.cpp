@@ -4,6 +4,17 @@
 namespace sauce {
 namespace modeling {
 
+std::vector<MeshMaterialPair> Model::getAllMeshMaterialPairs() const {
+    std::vector<MeshMaterialPair> allPairs;
+
+    if (rootNode) {
+        collectPairsFromNode(rootNode, allPairs);
+    }
+
+    return allPairs;
+}
+
+
 void Model::traverseNode(std::shared_ptr<ModelNode> node) {
     if (!node) {
         return;
