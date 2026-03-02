@@ -23,9 +23,12 @@
 #include <app/RenderSurface.hpp>
 #include <app/SwapChain.hpp>
 #include <app/ImGuiRenderer.hpp>
+#include <app/Settings.hpp>
+#include <app/Log.hpp>
 #include <app/ui/ImGuiComponentManager.hpp>
 #include <app/ui/components/HelloWorldWindow.hpp>
 #include <app/ui/components/DebugStatsWindow.hpp>
+#include <app/ui/components/SettingsWindow.hpp>
 #include <app/ui/components/BulletText.hpp>
 #include <app/ui/components/Button.hpp>
 #include <app/ui/components/Checkbox.hpp>
@@ -64,6 +67,8 @@ private:
   float lastX = 0.0f;
   float lastY = 0.0f;
   bool firstMouse = true;
+  bool cursorCaptured = true;
+  bool gravePressedLastFrame = false;
 
   std::unique_ptr<sauce::Instance> pInstance;
 
@@ -81,6 +86,8 @@ private:
   std::unique_ptr<sauce::ui::ImGuiComponentManager> pImGuiComponentManager;
   std::function<void(sauce::ui::ImGuiComponentManager&)> pCustomUIBuilder;
 
+  sauce::SettingsManager settingsManager;
+
   void initVulkan();
   void initWindow();
   void mainLoop();
@@ -88,6 +95,7 @@ private:
   static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn);
 
   void buildExampleUI();
+  void applySettings(const sauce::EditorSettings& s);
 
 public:
   sauce::ui::ImGuiComponentManager& getImGuiManager() { return *pImGuiComponentManager; }

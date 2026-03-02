@@ -100,7 +100,13 @@ public:
   /**
    * Set camera FOV
    */
-  void setFOV(float fov) { this->fov=fov; }
+  void setFOV(float newFov) { this->fov = newFov; }
+
+  void setMovementSpeed(float speed) { this->movementSpeed = speed; }
+  float getMovementSpeed() const { return movementSpeed; }
+
+  void setMouseSensitivity(float sensitivity) { this->mouseSensitivity = sensitivity; }
+  float getMouseSensitivity() const { return mouseSensitivity; }
 
   /**
    * Get view matrix from the current view vectors
@@ -156,8 +162,8 @@ public:
 	 * @param constrainPitch - whether or not to clamp pitch when out of bounds
 	 */
 	void processMouseMovement(float xoffset, float yoffset, bool constrainPitch = true) {
-    yaw += xoffset;
-		pitch += yoffset;
+    yaw += xoffset * mouseSensitivity;
+		pitch += yoffset * mouseSensitivity;
 
 		if (constrainPitch) {
 			pitch = std::max(std::min(pitch, CameraCreateInfo::PITCH_MAX), CameraCreateInfo::PITCH_MIN);

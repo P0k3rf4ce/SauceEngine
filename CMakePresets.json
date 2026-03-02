@@ -9,6 +9,22 @@
         "VCPKG_INSTALLED_DIR": "${sourceDir}/build/vcpkg_installed",
         "BUILD_TESTS": "OFF"
       }
+    },
+    {
+      "name": "debug",
+      "inherits": "vcpkg",
+      "binaryDir": "${sourceDir}/build-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "vcpkg",
+      "binaryDir": "${sourceDir}/build-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
     }
   ]
 }

@@ -79,6 +79,7 @@ struct RendererCreateInfo {
   const sauce::LogicalDevice& logicalDevice;
   const sauce::RenderSurface& renderSurface;
   GLFWwindow* window;
+  bool vsync = true;
 };
 
 class Renderer {
@@ -93,7 +94,8 @@ public:
         createInfo.physicalDevice, 
         createInfo.logicalDevice, 
         createInfo.renderSurface, 
-        createInfo.window
+        createInfo.window,
+        createInfo.vsync
     );
 
 

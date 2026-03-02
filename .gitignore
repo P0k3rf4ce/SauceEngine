@@ -2,6 +2,8 @@ CMakeFiles/
 CMakeCache.txt
 CMakeUserPresets.json
 build/
+build-debug/
+build-release/
 .vscode
 vcpkg_installed
 run.sh
@@ -17,6 +19,7 @@ coverage*
 *.profraw
 .cache
 shaders/*.spv
+sauceengine_settings.json
 
 
 
