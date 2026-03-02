@@ -193,6 +193,7 @@ void InspectorPanel::drawMeshRendererSection(sauce::Entity& entity) {
       ? "Mesh Renderer"
       : "Mesh " + std::to_string(i);
 
+    bool removeRequested = false;
     if (ImGui::CollapsingHeader(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
       auto mesh = mrc->getMesh();
       auto material = mrc->getMaterial();
@@ -252,6 +253,23 @@ void InspectorPanel::drawMeshRendererSection(sauce::Entity& entity) {
       } else {
         ImGui::TextDisabled("No material assigned");
       }
+
+      ImGui::Spacing();
+      float removeWidth = ImGui::GetContentRegionAvail().x;
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.15f, 0.15f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.8f, 0.25f, 0.25f, 1.0f));
+      if (ImGui::Button("Remove Component", ImVec2(removeWidth, 0))) {
+        removeRequested = true;
+      }
+      ImGui::PopStyleColor(3);
+    }
+
+    if (removeRequested) {
+      entity.removeComponentByPointer(mrc);
+      app.setStatusMessage("Removed MeshRendererComponent");
+      ImGui::PopID();
+      break;
     }
 
     ImGui::PopID();

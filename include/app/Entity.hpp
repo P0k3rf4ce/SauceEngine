@@ -62,6 +62,18 @@ public:
 	}
 
 	/**
+	 * Removes a specific component by pointer
+	 */
+	void removeComponentByPointer(Component* target) {
+		for (auto it = components.begin(); it != components.end(); ++it) {
+			if (it->get() == target) {
+				components.erase(it);
+				return;
+			}
+		}
+	}
+
+	/**
 	 * Returns a raw pointer to the most recently added component of a specified type
 	 */
 	template <typename T>
