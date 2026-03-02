@@ -6,6 +6,8 @@
 #include <string>
 #include <unordered_map>
 
+#include <physics/XPBD.hpp>
+
 namespace sauce {
 
 namespace modeling {

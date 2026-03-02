@@ -58,6 +58,7 @@ target_sources(${EXEC_NAME} PRIVATE
   src/app/Scene.cpp
   src/app/ImGuiRenderer.cpp
   src/app/SauceEngineApp.cpp
+  src/app/IBLGenerator.cpp
   src/app/ui/ImGuiComponentManager.cpp
   ${UI_COMPONENT_SOURCES}
 )

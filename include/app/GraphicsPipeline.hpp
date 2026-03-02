@@ -32,7 +32,7 @@ struct GraphicsPipeline {
       const vk::raii::DescriptorSetLayout& descriptorSetLayout,
       const sauce::SwapChain& swapChain
       ) {
-    vk::raii::ShaderModule shaderModule = createShaderModule(logicalDevice, readBinaryFile("shaders/shader_lights.spv"));
+    vk::raii::ShaderModule shaderModule = createShaderModule(logicalDevice, readBinaryFile("shaders/shader_pbr.spv"));
     vk::PipelineShaderStageCreateInfo vertShaderCreateInfo {
       .stage = vk::ShaderStageFlagBits::eVertex,
       .module = shaderModule,
@@ -104,6 +104,7 @@ struct GraphicsPipeline {
 
     initPipelineConfigurable(physicalDevice, logicalDevice, descriptorSetLayout, colorFormat, shaderStages, config);
   }
+
 
 private:
   vk::raii::PipelineLayout layout = nullptr;
@@ -178,10 +179,17 @@ private:
       .pDynamicStates = dynamicStates.data(),
     };
 
+    vk::PushConstantRange pushConstantRange {
+      .stageFlags = vk::ShaderStageFlagBits::eFragment,
+      .offset = 0,
+      .size = sizeof(uint32_t),
+    };
+
     vk::PipelineLayoutCreateInfo pipelineLayoutInfo {
       .setLayoutCount = 1,
       .pSetLayouts = &*descriptorSetLayout,
-      .pushConstantRangeCount = 0,
+      .pushConstantRangeCount = 1,
+      .pPushConstantRanges = &pushConstantRange,
     };
 
     layout = vk::raii::PipelineLayout { *logicalDevice, pipelineLayoutInfo };
@@ -338,6 +346,7 @@ private:
 
     pipeline = vk::raii::Pipeline { *logicalDevice, nullptr, pipelineInfo };
   }
+
 
 public:
   const vk::raii::Pipeline& operator*() const & noexcept {

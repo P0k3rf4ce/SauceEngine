@@ -7,50 +7,6 @@
 namespace sauce {
 namespace modeling {
 
-Mesh::Mesh() {
-}
-void Mesh::initVulkanResources(const sauce::LogicalDevice& logicalDevice, vk::raii::PhysicalDevice& physicalDevice, vk::raii::CommandPool& commandPool, vk::raii::Queue& queue) {
-    vk::DeviceSize vertexBufferSize = sizeof(vertices[0]) * vertices.size();
-
-    vk::raii::Buffer stagingVertexBuffer(nullptr);
-    vk::raii::DeviceMemory stagingVertexBufferMemory(nullptr);
-    sauce::BufferUtils::createBuffer(physicalDevice, logicalDevice, vertexBufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingVertexBuffer, stagingVertexBufferMemory);
-
-    void* data = stagingVertexBufferMemory.mapMemory(0, vertexBufferSize);
-    memcpy(data, vertices.data(), (size_t)vertexBufferSize);
-    stagingVertexBufferMemory.unmapMemory();
-
-    vertexBuffer = std::make_unique<vk::raii::Buffer>(nullptr);
-    vertexBufferMemory = std::make_unique<vk::raii::DeviceMemory>(nullptr);
-    sauce::BufferUtils::createBuffer(physicalDevice, logicalDevice, vertexBufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, *vertexBuffer, *vertexBufferMemory);
-
-    sauce::BufferUtils::copyBuffer(logicalDevice, commandPool, queue, stagingVertexBuffer, *vertexBuffer, vertexBufferSize);
-
-    vk::DeviceSize indexBufferSize = sizeof(indices[0]) * indices.size();
-
-    vk::raii::Buffer stagingIndexBuffer(nullptr);
-    vk::raii::DeviceMemory stagingIndexBufferMemory(nullptr);
-    sauce::BufferUtils::createBuffer(physicalDevice, logicalDevice, indexBufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingIndexBuffer, stagingIndexBufferMemory);
-
-    data = stagingIndexBufferMemory.mapMemory(0, indexBufferSize);
-    memcpy(data, indices.data(), (size_t)indexBufferSize);
-    stagingIndexBufferMemory.unmapMemory();
-
-    indexBuffer = std::make_unique<vk::raii::Buffer>(nullptr);
-    indexBufferMemory = std::make_unique<vk::raii::DeviceMemory>(nullptr);
-    sauce::BufferUtils::createBuffer(physicalDevice, logicalDevice, indexBufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, *indexBuffer, *indexBufferMemory);
-
-    sauce::BufferUtils::copyBuffer(logicalDevice, commandPool, queue, stagingIndexBuffer, *indexBuffer, indexBufferSize);
-}
-void Mesh::bind(vk::raii::CommandBuffer& commandBuffer) {
-    vk::Buffer vertexBuffers[] = { **vertexBuffer };
-    vk::DeviceSize offsets[] = { 0 };
-    commandBuffer.bindVertexBuffers(0, *vertexBuffers, {0});
-    commandBuffer.bindIndexBuffer(**indexBuffer, 0, vk::IndexType::eUint32);
-}
-void Mesh::draw(vk::raii::CommandBuffer& commandBuffer) {
-    commandBuffer.drawIndexed(indices.size(), 1, 0, 0, 0);
-}
 Mesh::Mesh(const std::vector<sauce::Vertex>& vertices, const std::vector<uint32_t>& indices)
     : vertices(vertices)
     , indices(indices) {

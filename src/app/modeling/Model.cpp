@@ -39,6 +39,7 @@ std::vector<MeshMaterialPair> Model::getAllMeshMaterialPairs() const {
     return allPairs;
 }
 
+
 void Model::traverseNode(std::shared_ptr<ModelNode> node) {
     if (!node) {
         return;

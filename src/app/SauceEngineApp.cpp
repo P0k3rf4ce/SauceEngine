@@ -30,6 +30,7 @@ void SauceEngineApp::run() {
     }
   }
 
+
   // Call custom UI builder after ImGui is initialized
   if (pCustomUIBuilder) {
     pCustomUIBuilder(*pImGuiComponentManager);
@@ -391,5 +392,6 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
 
   cmd.end();
 }
+
 
 } // namespace sauce
