@@ -5,7 +5,6 @@
 #include <app/components/MeshRendererComponent.hpp>
 #include <functional>
 #include <cstring>
-#include <iostream>
 
 namespace sauce {
 
@@ -20,7 +19,7 @@ SauceEngineApp::~SauceEngineApp() {
 
 void SauceEngineApp::run() {
   initWindow();
-  initVulkan(); // ImGui initialized here
+  initVulkan();
 
   // Load scene file if specified
   if (!sceneFile.empty() && pScene) {
@@ -105,7 +104,17 @@ void SauceEngineApp::initWindow() {
   }
 
 void SauceEngineApp::processInput(float deltaTime) {
-    if (!pScene) {
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+      glfwSetWindowShouldClose(window, true);
+
+    if (glfwGetKey(window, GLFW_KEY_GRAVE_ACCENT) == GLFW_PRESS && !gravePressedLastFrame) {
+      cursorCaptured = !cursorCaptured;
+      glfwSetInputMode(window, GLFW_CURSOR, cursorCaptured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+      firstMouse = true;
+    }
+    gravePressedLastFrame = glfwGetKey(window, GLFW_KEY_GRAVE_ACCENT) == GLFW_PRESS;
+
+    if (!cursorCaptured || !pScene) {
       return;
     }
 
@@ -119,14 +128,11 @@ void SauceEngineApp::processInput(float deltaTime) {
       camera.processDirection(Camera::Movement::LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
       camera.processDirection(Camera::Movement::RIGHT, deltaTime);
-
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-      glfwSetWindowShouldClose(window, true);
   }
 
 void SauceEngineApp::mouseCallback(GLFWwindow* window, double xposIn, double yposIn) {
     auto* app = static_cast<SauceEngineApp*>(glfwGetWindowUserPointer(window));
-    if (!app) {
+    if (!app || !app->cursorCaptured) {
       return;
     }
 
@@ -392,6 +398,5 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
 
   cmd.end();
 }
-
 
 } // namespace sauce

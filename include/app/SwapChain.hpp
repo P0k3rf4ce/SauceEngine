@@ -26,7 +26,8 @@ struct SwapChain {
       const sauce::PhysicalDevice& physicalDevice,
       const sauce::LogicalDevice& logicalDevice,
       const sauce::RenderSurface& renderSurface, 
-      GLFWwindow* window
+      GLFWwindow* window,
+      bool vsync = true
   ) {
     vk::SurfaceCapabilitiesKHR surfaceCapabilities = physicalDevice->getSurfaceCapabilitiesKHR(**renderSurface);
     extent = chooseSwapExtent(surfaceCapabilities, window);
@@ -43,7 +44,7 @@ struct SwapChain {
       .imageSharingMode = vk::SharingMode::eExclusive,
       .preTransform = surfaceCapabilities.currentTransform,
       .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
-      .presentMode = chooseSwapPresentMode(physicalDevice->getSurfacePresentModesKHR(**renderSurface)),
+      .presentMode = chooseSwapPresentMode(physicalDevice->getSurfacePresentModesKHR(**renderSurface), vsync),
       .clipped = vk::True
     };
 
@@ -128,20 +129,27 @@ private:
   }
 
   /**
-   * Selects the best available presentation mode.
-   * Prefers Mailbox (triple buffering) for low latency without tearing.
-   * Falls back to FIFO (vsync) which is guaranteed to be available.
+   * Selects the presentation mode based on the vsync setting.
+   * When vsync is true, returns FIFO (vertical sync, guaranteed available).
+   * When vsync is false, prefers Mailbox (triple buffering), then Immediate
+   * (uncapped framerate), falling back to FIFO if neither is available.
    */
-  static vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes) {
+  static vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes, bool vsync = true) {
+    if (vsync) {
+      return vk::PresentModeKHR::eFifo;
+    }
+
     for (const auto& mode: availablePresentModes) {
-      // mailbox = triple buffering, replaces queued frames with newer ones
       if (mode == vk::PresentModeKHR::eMailbox) {
         return mode;
       }
     }
 
-    // fifo (vsync) is the only mode guaranteed by the vulkan spec, so it always exists as a fallback
-    assert(std::ranges::any_of(availablePresentModes, [](const vk::PresentModeKHR& mode) { return mode == vk::PresentModeKHR::eFifo; }));
+    for (const auto& mode: availablePresentModes) {
+      if (mode == vk::PresentModeKHR::eImmediate) {
+        return mode;
+      }
+    }
 
     return vk::PresentModeKHR::eFifo;
   }
