@@ -129,9 +129,10 @@ private:
   }
 
   /**
-   * Selects the best available presentation mode.
-   * Prefers Mailbox (triple buffering) for low latency without tearing.
-   * Falls back to FIFO (vsync) which is guaranteed to be available.
+   * Selects the presentation mode based on the vsync setting.
+   * When vsync is true, returns FIFO (vertical sync, guaranteed available).
+   * When vsync is false, prefers Mailbox (triple buffering), then Immediate
+   * (uncapped framerate), falling back to FIFO if neither is available.
    */
   static vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes, bool vsync = true) {
     if (vsync) {

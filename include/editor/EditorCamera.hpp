@@ -51,6 +51,10 @@ public:
 
   void setScreenSize(float width, float height) { scrWidth = width; scrHeight = height; }
 
+  void setFlySpeed(float s) { flySpeed = s; }
+  void setMouseSensitivity(float s) { mouseSensitivity = s; }
+  void setFOV(float f) { fov = f; }
+
 private:
   void updateOrbitPosition();
 

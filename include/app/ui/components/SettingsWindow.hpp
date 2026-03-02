@@ -14,8 +14,9 @@ public:
     : ImGuiComponent("SettingsWindow"), settings(settingsManager)
   {
     auto& s = settings.get();
-    std::copy(s.workingDirectory.begin(), s.workingDirectory.end(), workingDirBuf);
-    workingDirBuf[std::min(s.workingDirectory.size(), sizeof(workingDirBuf) - 1)] = '\0';
+    const std::size_t copyLen = std::min(s.workingDirectory.size(), sizeof(workingDirBuf) - 1);
+    std::copy_n(s.workingDirectory.data(), copyLen, workingDirBuf);
+    workingDirBuf[copyLen] = '\0';
   }
 
   void render() override {
@@ -65,8 +66,23 @@ public:
       }
     }
 
-    if (changed) {
+    if (changed && !ImGui::IsAnyItemActive()) {
       settings.markDirtyAndSave();
+    }
+
+    ImGui::Separator();
+    ImGui::Spacing();
+    if (ImGui::SmallButton("store.palantir.com")) {
+      #ifdef _WIN32
+        system("start https://store.palantir.com");
+      #elif __APPLE__
+        system("open https://store.palantir.com");
+      #else
+        system("xdg-open https://store.palantir.com");
+      #endif
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
     }
 
     ImGui::End();

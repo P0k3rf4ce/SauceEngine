@@ -1,33 +1,18 @@
 #include <app/SauceEngineApp.hpp>
 #include <app/ui/components/HelloWorldWindow.hpp>
 #include <app/ui/components/DebugStatsWindow.hpp>
-#include <app/ui/components/SettingsWindow.hpp>
 #include <app/components/TransformComponent.hpp>
 #include <app/components/MeshRendererComponent.hpp>
 #include <functional>
-#include <filesystem>
 #include <cstring>
-#include <iostream>
 
 namespace sauce {
 
 SauceEngineApp::SauceEngineApp() {
   pImGuiComponentManager = std::make_unique<sauce::ui::ImGuiComponentManager>();
-
-  Log::init();
-  settingsManager.load();
-  Log::setPalantirMode(settingsManager.get().palantirMode);
-  SAUCE_LOG("App", "SauceEngine starting up");
-  SAUCE_LOG_VERBOSE("Settings", "Palantir Mode enabled -- verbose logging active");
-
-  settingsManager.setOnChangeCallback([this](const EditorSettings& s) {
-    applySettings(s);
-  });
 }
 
 SauceEngineApp::~SauceEngineApp() {
-    SAUCE_LOG("App", "SauceEngine shutting down");
-    Log::shutdown();
     glfwDestroyWindow(window);
     glfwTerminate();
 }
@@ -50,7 +35,6 @@ void SauceEngineApp::run() {
     pCustomUIBuilder(*pImGuiComponentManager);
   }
 
-  applySettings(settingsManager.get());
   mainLoop();
 }
 
@@ -62,20 +46,15 @@ void SauceEngineApp::initVulkan() {
     uint32_t glfwExtensionsCount = 0;
     const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionsCount);
     pInstance = std::make_unique<sauce::Instance>(glfwExtensions, glfwExtensionsCount);
-    SAUCE_LOG_VERBOSE("Vulkan", "Instance created");
 
     pRenderSurface = std::make_unique<sauce::RenderSurface>(*pInstance, window);
 
     physicalDevice = { *pInstance };
     logicalDevice = { physicalDevice, *pRenderSurface };
 
-    const auto& s = settingsManager.get();
     sauce::CameraCreateInfo cameraCreateInfo {
       .scrWidth = WIDTH,
       .scrHeight = HEIGHT,
-      .fov = s.fieldOfView,
-      .movementSpeed = s.cameraSpeed,
-      .mouseSensitivity = s.mouseSensitivity,
     };
 
     pScene = std::make_unique<sauce::Scene>( cameraCreateInfo );
@@ -85,11 +64,9 @@ void SauceEngineApp::initVulkan() {
       .logicalDevice = logicalDevice,
       .renderSurface = *pRenderSurface,
       .window = window,
-      .vsync = settingsManager.get().vsync,
     };
 
     pRenderer = std::make_unique<sauce::Renderer>(rendererCreateInfo);
-    SAUCE_LOG_VERBOSE("Vulkan", "Renderer created (vsync: {})", settingsManager.get().vsync ? "on" : "off");
 
     // Initialize ImGui
     sauce::ImGuiRendererCreateInfo imguiCreateInfo{
@@ -107,14 +84,10 @@ void SauceEngineApp::initVulkan() {
     };
 
     pImGuiRenderer = std::make_unique<sauce::ImGuiRenderer>(imguiCreateInfo);
-    SAUCE_LOG("ImGui", "ImGui initialized");
-
-    ImGui::GetIO().FontGlobalScale = settingsManager.get().imguiScale;
 
     // Add default UI components
     pImGuiComponentManager->addComponent(std::make_unique<sauce::ui::HelloWorldWindow>());
     pImGuiComponentManager->addComponent(std::make_unique<sauce::ui::DebugStatsWindow>());
-    pImGuiComponentManager->addComponent(std::make_unique<sauce::ui::SettingsWindow>(settingsManager));
   }
 
 void SauceEngineApp::initWindow() {
@@ -138,7 +111,6 @@ void SauceEngineApp::processInput(float deltaTime) {
       cursorCaptured = !cursorCaptured;
       glfwSetInputMode(window, GLFW_CURSOR, cursorCaptured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
       firstMouse = true;
-      SAUCE_LOG_VERBOSE("Input", "Cursor {}", cursorCaptured ? "captured" : "released");
     }
     gravePressedLastFrame = glfwGetKey(window, GLFW_KEY_GRAVE_ACCENT) == GLFW_PRESS;
 
@@ -206,34 +178,6 @@ void SauceEngineApp::mainLoop() {
 
 void SauceEngineApp::buildExampleUI() {
     pImGuiComponentManager->renderAll();
-  }
-
-void SauceEngineApp::applySettings(const sauce::EditorSettings& s) {
-    ImGui::GetIO().FontGlobalScale = s.imguiScale;
-
-    Log::setPalantirMode(s.palantirMode);
-
-    pImGuiComponentManager->setComponentEnabled("DebugStatsWindow", s.showDebugStats);
-
-    if (pScene) {
-      auto& camera = pScene->getCameraRW();
-      camera.setMouseSensitivity(s.mouseSensitivity);
-      camera.setMovementSpeed(s.cameraSpeed);
-      camera.setFOV(s.fieldOfView);
-    }
-
-    if (!s.workingDirectory.empty()) {
-      std::error_code ec;
-      std::filesystem::current_path(s.workingDirectory, ec);
-      if (ec) {
-        SAUCE_LOG("Settings", "Failed to set working directory to '{}': {}", s.workingDirectory, ec.message());
-      } else {
-        SAUCE_LOG_VERBOSE("Settings", "Working directory set to '{}'", std::filesystem::current_path().string());
-      }
-    }
-
-    SAUCE_LOG_VERBOSE("Settings", "Settings applied (scale={:.2f}, sensitivity={:.2f}, speed={:.1f}, fov={:.0f})",
-        s.imguiScale, s.mouseSensitivity, s.cameraSpeed, s.fieldOfView);
   }
 
 void SauceEngineApp::uploadMeshGPUResources() {

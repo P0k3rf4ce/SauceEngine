@@ -62,8 +62,6 @@ target_sources(${EXEC_NAME} PRIVATE
   src/app/ImGuiRenderer.cpp
   src/app/SauceEngineApp.cpp
   src/app/IBLGenerator.cpp
-  src/app/Log.cpp
-  src/app/Settings.cpp
   src/app/ui/ImGuiComponentManager.cpp
   ${UI_COMPONENT_SOURCES}
 )
@@ -156,11 +154,14 @@ target_sources(sauceeditor PRIVATE
     src/app/components/MeshRendererComponent.cpp
     src/app/Scene.cpp
     src/app/ImGuiRenderer.cpp
+    src/app/Log.cpp
+    src/app/Settings.cpp
 )
 
 target_link_libraries(sauceeditor PUBLIC Vulkan::Vulkan)
 target_link_libraries(sauceeditor PRIVATE glfw)
 target_link_libraries(sauceeditor PRIVATE imgui::imgui)
+target_link_libraries(sauceeditor PRIVATE nlohmann_json::nlohmann_json)
 
 # Editor only needs GLSL shaders, not the Slang ones
 if(TARGET editorGridVert)
