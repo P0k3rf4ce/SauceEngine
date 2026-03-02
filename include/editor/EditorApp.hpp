@@ -24,6 +24,9 @@
 #include <editor/OffscreenFramebuffer.hpp>
 #include <editor/gizmos/Gizmo.hpp>
 
+#include <app/Settings.hpp>
+#include <app/Log.hpp>
+
 #include <memory>
 #include <chrono>
 #include <filesystem>
@@ -31,6 +34,10 @@
 namespace sauce {
 class MeshRendererComponent;
 } // namespace sauce
+
+namespace sauce::ui {
+class SettingsWindow;
+} // namespace sauce::ui
 
 namespace sauce::editor {
 
@@ -153,6 +160,7 @@ private:
   bool showInspector = true;
   bool showViewport = true;
   bool showAssetBrowser = true;
+  bool showSettings = false;
 
   bool firstFrame = true;
   bool viewportHovered = false;
@@ -171,6 +179,12 @@ private:
   char dialogPathBuf[512] = {};
 
   std::string initialSceneFile;
+
+  sauce::SettingsManager settingsManager;
+  std::string lastWorkingDirectory;
+  std::unique_ptr<sauce::ui::SettingsWindow> settingsWindow;
+
+  void applySettings(const sauce::EditorSettings& s);
 };
 
 } // namespace sauce::editor

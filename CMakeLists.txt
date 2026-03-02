@@ -32,6 +32,9 @@ target_link_libraries(${EXEC_NAME} PRIVATE glfw)
 find_package(imgui CONFIG REQUIRED)
 target_link_libraries(${EXEC_NAME} PRIVATE imgui::imgui)
 
+find_package(nlohmann_json CONFIG REQUIRED)
+target_link_libraries(${EXEC_NAME} PRIVATE nlohmann_json::nlohmann_json)
+
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
 target_include_directories(${EXEC_NAME} PRIVATE ${TINYGLTF_INCLUDE_DIRS})
 
@@ -151,11 +154,14 @@ target_sources(sauceeditor PRIVATE
     src/app/components/MeshRendererComponent.cpp
     src/app/Scene.cpp
     src/app/ImGuiRenderer.cpp
+    src/app/Log.cpp
+    src/app/Settings.cpp
 )
 
 target_link_libraries(sauceeditor PUBLIC Vulkan::Vulkan)
 target_link_libraries(sauceeditor PRIVATE glfw)
 target_link_libraries(sauceeditor PRIVATE imgui::imgui)
+target_link_libraries(sauceeditor PRIVATE nlohmann_json::nlohmann_json)
 
 # Editor only needs GLSL shaders, not the Slang ones
 if(TARGET editorGridVert)

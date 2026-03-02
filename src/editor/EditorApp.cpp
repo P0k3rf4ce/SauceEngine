@@ -6,6 +6,7 @@
 #include <editor/AABB.hpp>
 #include <editor/gizmos/GizmoRenderer.hpp>
 #include <app/GraphicsPipeline.hpp>
+#include <app/ui/components/SettingsWindow.hpp>
 #include <app/components/TransformComponent.hpp>
 #include <app/components/MeshRendererComponent.hpp>
 #include <app/modeling/Material.hpp>
@@ -25,13 +26,25 @@ namespace sauce::editor {
 static constexpr uint32_t EDITOR_WIDTH = 1920;
 static constexpr uint32_t EDITOR_HEIGHT = 1080;
 
-EditorApp::EditorApp() = default;
+EditorApp::EditorApp() {
+  sauce::Log::init();
+  settingsManager.load();
+  sauce::Log::setPalantirMode(settingsManager.get().palantirMode);
+  SAUCE_LOG("Editor", "SauceEditor starting up");
+
+  settingsManager.setOnChangeCallback([this](const sauce::EditorSettings& s) {
+    applySettings(s);
+  });
+}
 
 EditorApp::~EditorApp() {
+  SAUCE_LOG("Editor", "SauceEditor shutting down");
+
   if (pRenderer) {
     logicalDevice->waitIdle();
   }
 
+  settingsWindow.reset();
   hierarchyPanel.reset();
   inspectorPanel.reset();
   viewportPanel.reset();
@@ -51,12 +64,18 @@ EditorApp::~EditorApp() {
     glfwDestroyWindow(window);
     glfwTerminate();
   }
+
+  sauce::Log::shutdown();
 }
 
 void EditorApp::run() {
   initWindow();
   initVulkan();
   initEditor();
+
+  settingsWindow = std::make_unique<sauce::ui::SettingsWindow>(settingsManager);
+  applySettings(settingsManager.get());
+
   mainLoop();
 }
 
@@ -878,6 +897,7 @@ void EditorApp::buildEditorUI() {
       ImGui::MenuItem("Inspector", nullptr, &showInspector);
       ImGui::MenuItem("Viewport", nullptr, &showViewport);
       ImGui::MenuItem("Asset Browser", nullptr, &showAssetBrowser);
+      ImGui::MenuItem("Settings", nullptr, &showSettings);
       ImGui::Separator();
       if (ImGui::MenuItem("Reset Layout")) {
         firstFrame = true; // re-trigger layout on next frame
@@ -912,6 +932,14 @@ void EditorApp::buildEditorUI() {
   }
   if (showAssetBrowser && assetBrowserPanel) {
     assetBrowserPanel->render();
+  }
+  if (showSettings && settingsWindow) {
+    settingsWindow->setEnabled(true);
+    settingsWindow->render();
+    // Sync back: if user closed the window via its X button
+    if (!settingsWindow->isEnabled()) {
+      showSettings = false;
+    }
   }
 
   // Status bar at bottom
@@ -1327,8 +1355,29 @@ void EditorApp::createBallEntity() {
     }
 }
 
+void EditorApp::applySettings(const sauce::EditorSettings& s) {
+  ImGui::GetIO().FontGlobalScale = s.imguiScale;
 
+  sauce::Log::setPalantirMode(s.palantirMode);
 
+  editorCamera.setMouseSensitivity(s.mouseSensitivity);
+  editorCamera.setFlySpeed(s.cameraSpeed);
+  editorCamera.setFOV(s.fieldOfView);
+
+  if (!s.workingDirectory.empty() && s.workingDirectory != lastWorkingDirectory) {
+    std::error_code ec;
+    std::filesystem::current_path(s.workingDirectory, ec);
+    if (ec) {
+      SAUCE_LOG("Settings", "Failed to set working directory to '{}': {}", s.workingDirectory, ec.message());
+    } else {
+      lastWorkingDirectory = s.workingDirectory;
+      SAUCE_LOG_VERBOSE("Settings", "Working directory set to '{}'", std::filesystem::current_path().string());
+    }
+  }
+
+  SAUCE_LOG_VERBOSE("Settings", "Settings applied (scale={:.2f}, sensitivity={:.2f}, speed={:.1f}, fov={:.0f})",
+      s.imguiScale, s.mouseSensitivity, s.cameraSpeed, s.fieldOfView);
+}
 
 
 
