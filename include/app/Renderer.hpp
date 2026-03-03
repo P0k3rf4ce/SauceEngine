@@ -7,6 +7,8 @@
 
 #include <array>
 #include <chrono>
+#include <functional>
+#include <iostream>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -24,31 +26,31 @@ namespace sauce {
 
 
 const std::vector<Vertex> vertices {
-  {{ -0.5f, -0.5f, -0.5f, }, { 0.0f,  0.0f, -1.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, }, 
-  {{  0.5f, -0.5f, -0.5f, }, { 0.0f,  0.0f, -1.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, }, 
+  {{ -0.5f, -0.5f, -0.5f, }, { 0.0f,  0.0f, -1.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
+  {{  0.5f, -0.5f, -0.5f, }, { 0.0f,  0.0f, -1.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
   {{  0.5f,  0.5f, -0.5f, }, { 0.0f,  0.0f, -1.0f, }, { 0.0f, 0.0f, }, { 0.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
   {{ -0.5f,  0.5f, -0.5f, }, { 0.0f,  0.0f, -1.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
-                                                                       
+
   {{ -0.5f, -0.5f,  0.5f, }, { 0.0f,  0.0f,  1.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
   {{  0.5f, -0.5f,  0.5f, }, { 0.0f,  0.0f,  1.0f, }, { 0.0f, 0.0f, }, { 0.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
   {{  0.5f,  0.5f,  0.5f, }, { 0.0f,  0.0f,  1.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
   {{ -0.5f,  0.5f,  0.5f, }, { 0.0f,  0.0f,  1.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
-                                                                       
+
   {{ -0.5f,  0.5f,  0.5f, }, {-1.0f,  0.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
   {{ -0.5f,  0.5f, -0.5f, }, {-1.0f,  0.0f,  0.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
   {{ -0.5f, -0.5f, -0.5f, }, {-1.0f,  0.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
   {{ -0.5f, -0.5f,  0.5f, }, {-1.0f,  0.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
-                                                                       
+
   {{  0.5f,  0.5f,  0.5f, }, { 1.0f,  0.0f,  0.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
   {{  0.5f,  0.5f, -0.5f, }, { 1.0f,  0.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
   {{  0.5f, -0.5f, -0.5f, }, { 1.0f,  0.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
   {{  0.5f, -0.5f,  0.5f, }, { 1.0f,  0.0f,  0.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
-                                                                       
+
   {{ -0.5f, -0.5f, -0.5f, }, { 0.0f, -1.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
   {{  0.5f, -0.5f, -0.5f, }, { 0.0f, -1.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
   {{  0.5f, -0.5f,  0.5f, }, { 0.0f, -1.0f,  0.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
   {{ -0.5f, -0.5f,  0.5f, }, { 0.0f, -1.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
-                                                                       
+
   {{ -0.5f,  0.5f, -0.5f, }, { 0.0f,  1.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 0.0f, 1.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
   {{  0.5f,  0.5f, -0.5f, }, { 0.0f,  1.0f,  0.0f, }, { 0.0f, 0.0f, }, { 1.0f, 0.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
   {{  0.5f,  0.5f,  0.5f, }, { 0.0f,  1.0f,  0.0f, }, { 0.0f, 0.0f, }, { 0.0f, 1.0f, 0.0f, }, { 0.0f, 0.0f, 0.0f, 0.0f, }, },
@@ -79,21 +81,31 @@ struct RendererCreateInfo {
   const sauce::LogicalDevice& logicalDevice;
   const sauce::RenderSurface& renderSurface;
   GLFWwindow* window;
+  bool vsync = true;
 };
+
+// Callback type for custom command buffer recording
+using CommandBufferRecorder = std::function<void(vk::raii::CommandBuffer&, uint32_t)>;
 
 class Renderer {
 public:
   static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
-  Renderer(const RendererCreateInfo& createInfo) {
+  Renderer(const RendererCreateInfo& createInfo)
+    : pPhysicalDevice(&createInfo.physicalDevice),
+      pLogicalDevice(&createInfo.logicalDevice),
+      pRenderSurface(&createInfo.renderSurface),
+      pWindow(createInfo.window)
+  {
     queueIndex = createInfo.logicalDevice.getQueueIndex();
     pQueue = std::make_unique<vk::raii::Queue>(*createInfo.logicalDevice, queueIndex, 0);
 
     pSwapChain = std::make_unique<sauce::SwapChain>(
-        createInfo.physicalDevice, 
-        createInfo.logicalDevice, 
-        createInfo.renderSurface, 
-        createInfo.window
+        createInfo.physicalDevice,
+        createInfo.logicalDevice,
+        createInfo.renderSurface,
+        createInfo.window,
+        createInfo.vsync
     );
 
 
@@ -114,8 +126,8 @@ public:
       .descriptorSetLayout = postProcessDescriptorSetLayout,
       .colorFormat = pSwapChain->getSurfaceFormat().format,
       .shaderPath = "shaders/postprocess.spv",
-      .useVertexInput = false,
-      .useDepthTest = false,
+      .hasVertexInput = false,
+      .depthTestEnable = false,
     };
     pPostProcessPipeline = std::make_unique<sauce::GraphicsPipeline>(postProcessPipelineConfig);
 
@@ -131,7 +143,8 @@ public:
     createDefaultTextures(createInfo.physicalDevice, createInfo.logicalDevice);
     createMaterialBuffer(createInfo.physicalDevice, createInfo.logicalDevice);
     createLightSSBO(createInfo.physicalDevice, createInfo.logicalDevice);
-  
+
+
     vk::CommandBufferAllocateInfo allocInfo {
       .commandPool = commandPool,
       .level = vk::CommandBufferLevel::ePrimary,
@@ -139,8 +152,6 @@ public:
     };
 
     commandBuffers = vk::raii::CommandBuffers(*createInfo.logicalDevice, allocInfo);
-
-    // pCamera = std::make_unique<sauce::Camera>( pSwapChain->getExtent().width, pSwapChain->getExtent().height );
 
     createUniformBuffers(createInfo.physicalDevice, createInfo.logicalDevice);
     createVertexBuffer(createInfo.physicalDevice, createInfo.logicalDevice);
@@ -161,6 +172,51 @@ public:
   const vk::raii::Queue& getQueue() const { return *pQueue; }
   const sauce::SwapChain& getSwapChain() const { return *pSwapChain; }
   const vk::raii::CommandPool& getCommandPool() const { return commandPool; }
+  const vk::raii::DescriptorSetLayout& getDescriptorSetLayout() const { return descriptorSetLayout; }
+  uint32_t getFrameIndex() const { return frameIndex; }
+  const vk::raii::DescriptorSet& getCurrentDescriptorSet() const { return descriptorSets[frameIndex]; }
+  void* getCurrentUniformBufferMapped() const { return uniformBuffersMapped[frameIndex]; }
+
+  void setFramebufferResized() { framebufferResized = true; }
+
+  const vk::raii::Image& getDepthImage() const { return depthImage; }
+  const vk::raii::ImageView& getDepthImageView() const { return depthImageView; }
+  const GraphicsPipeline& getPipeline() const { return *pPipeline; }
+  const vk::raii::Buffer& getCurrentUniformBuffer() const { return uniformBuffers[frameIndex]; }
+
+  void setCommandBufferRecorder(CommandBufferRecorder recorder) {
+    customRecorder = std::move(recorder);
+  }
+
+  void recreateSwapChain() {
+    // Handle minimized windows
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(pWindow, &width, &height);
+    while (width == 0 || height == 0) {
+      glfwGetFramebufferSize(pWindow, &width, &height);
+      glfwWaitEvents();
+    }
+
+    (*pLogicalDevice)->waitIdle();
+
+    // Destroy old resources in correct order
+    depthImageView = nullptr;
+    depthImageMemory = nullptr;
+    depthImage = nullptr;
+    renderFinishedSemaphores.clear();
+    pSwapChain.reset();
+
+    // Recreate swapchain and dependent resources
+    pSwapChain = std::make_unique<sauce::SwapChain>(
+        *pPhysicalDevice, *pLogicalDevice, *pRenderSurface, pWindow
+    );
+
+    createDepthResources(*pPhysicalDevice, *pLogicalDevice);
+
+    for (size_t i = 0; i < pSwapChain->getImages().size(); ++i) {
+      renderFinishedSemaphores.emplace_back(**pLogicalDevice, vk::SemaphoreCreateInfo{});
+    }
+  }
 
   void createDescriptorSetLayout(const sauce::LogicalDevice& logicalDevice) {
     std::array<vk::DescriptorSetLayoutBinding, 13> bindings;
@@ -176,6 +232,7 @@ public:
       bindings[3 + i * 2] = { .binding = 3 + i * 2, .descriptorType = vk::DescriptorType::eSampledImage, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
       bindings[4 + i * 2] = { .binding = 4 + i * 2, .descriptorType = vk::DescriptorType::eSampler,      .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
     }
+
 
     vk::DescriptorSetLayoutCreateInfo dsLayoutInfo {
       .bindingCount = static_cast<uint32_t>(bindings.size()),
@@ -279,10 +336,10 @@ public:
     ImageUtils::createImage(
         physicalDevice,
         logicalDevice,
-        pSwapChain->getExtent().width, 
-        pSwapChain->getExtent().height, 
-        depthFormat, 
-        vk::ImageTiling::eOptimal, 
+        pSwapChain->getExtent().width,
+        pSwapChain->getExtent().height,
+        depthFormat,
+        vk::ImageTiling::eOptimal,
         vk::ImageUsageFlagBits::eDepthStencilAttachment,
         vk::MemoryPropertyFlagBits::eDeviceLocal,
         depthImage,
@@ -339,7 +396,7 @@ public:
           physicalDevice,
           logicalDevice,
           size,
-          vk::BufferUsageFlagBits::eUniformBuffer,
+          vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst,
           vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible,
           buf,
           mem
@@ -364,7 +421,7 @@ public:
         logicalDevice,
         bufferSize,
         vk::BufferUsageFlagBits::eTransferSrc,
-        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, 
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
         stagingBuffer,
         stagingBufferMemory
     );
@@ -376,10 +433,10 @@ public:
     sauce::BufferUtils::createBuffer(
         physicalDevice,
         logicalDevice,
-        bufferSize, 
+        bufferSize,
         vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
         vk::MemoryPropertyFlagBits::eDeviceLocal,
-        vertexBuffer, 
+        vertexBuffer,
         vertexBufferMemory
     );
 
@@ -387,7 +444,7 @@ public:
   }
 
   void createIndexBuffer(
-      const sauce::PhysicalDevice& physicalDevice, 
+      const sauce::PhysicalDevice& physicalDevice,
       const sauce::LogicalDevice& logicalDevice
       ) {
     vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
@@ -399,7 +456,7 @@ public:
         logicalDevice,
         bufferSize,
         vk::BufferUsageFlagBits::eTransferSrc,
-        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, 
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
         stagingBuffer,
         stagingBufferMemory
     );
@@ -411,10 +468,10 @@ public:
     sauce::BufferUtils::createBuffer(
         physicalDevice,
         logicalDevice,
-        bufferSize, 
+        bufferSize,
         vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
         vk::MemoryPropertyFlagBits::eDeviceLocal,
-        indexBuffer, 
+        indexBuffer,
         indexBufferMemory
     );
 
@@ -422,6 +479,7 @@ public:
   }
 
   void transitionImageLayout(
+    const vk::raii::CommandBuffer& cmdBuf,
     vk::Image image,
     vk::ImageLayout oldLayout,
     vk::ImageLayout newLayout,
@@ -456,7 +514,7 @@ public:
       .pImageMemoryBarriers = &barrier,
     };
 
-    commandBuffers[frameIndex].pipelineBarrier2(dependencyInfo);
+    cmdBuf.pipelineBarrier2(dependencyInfo);
   }
 
   void recordCommandBuffer(uint32_t imageIndex, sauce::ImGuiRenderer* imguiRenderer){
@@ -464,6 +522,7 @@ public:
 
     // Transition offscreen image for rendering
     transitionImageLayout(
+      commandBuffers[frameIndex],
       *offscreenImage,
       vk::ImageLayout::eUndefined,
       vk::ImageLayout::eColorAttachmentOptimal,
@@ -475,6 +534,7 @@ public:
     );
 
     transitionImageLayout(
+        commandBuffers[frameIndex],
         *depthImage,
         vk::ImageLayout::eUndefined,
         vk::ImageLayout::eDepthAttachmentOptimal,
@@ -506,8 +566,8 @@ public:
     };
 
     vk::RenderingInfo renderingInfo {
-      .renderArea = { 
-        .offset = { 0, 0 }, 
+      .renderArea = {
+        .offset = { 0, 0 },
         .extent = pSwapChain->getExtent(),
       },
       .layerCount = 1,
@@ -524,7 +584,7 @@ public:
     commandBuffers[frameIndex].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pPipeline->getLayout(), 0, *descriptorSets[frameIndex], nullptr);
 
     commandBuffers[frameIndex].setViewport(
-        0, vk::Viewport(0.0f, 0.0f, static_cast<float>(pSwapChain->getExtent().width), 
+        0, vk::Viewport(0.0f, 0.0f, static_cast<float>(pSwapChain->getExtent().width),
         static_cast<float>(pSwapChain->getExtent().height), 0.0f, 1.0f));
     commandBuffers[frameIndex].setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), pSwapChain->getExtent()));
 
@@ -540,6 +600,7 @@ public:
     commandBuffers[frameIndex].endRendering();
 
     transitionImageLayout(
+      commandBuffers[frameIndex],
       *offscreenImage,
       vk::ImageLayout::eColorAttachmentOptimal,
       vk::ImageLayout::eShaderReadOnlyOptimal,
@@ -551,6 +612,7 @@ public:
     );
 
     transitionImageLayout(
+      commandBuffers[frameIndex],
       pSwapChain->getImages()[imageIndex],
       vk::ImageLayout::eUndefined,
       vk::ImageLayout::eColorAttachmentOptimal,
@@ -599,6 +661,7 @@ public:
     commandBuffers[frameIndex].endRendering();
 
     transitionImageLayout(
+      commandBuffers[frameIndex],
       pSwapChain->getImages()[imageIndex],
       vk::ImageLayout::eColorAttachmentOptimal,
       vk::ImageLayout::ePresentSrcKHR,
@@ -612,17 +675,6 @@ public:
     commandBuffers[frameIndex].end();
   }
 
-  /**
-   * @brief Orchestrates the rendering of a single frame.
-   * * This function handles the synchronization between the CPU and GPU by:
-   * 1. Waiting for the previous frame's fence to ensure resources are free.
-   *    - Fence is a synchronization primitive used to sync the GPU with the CPU.
-   * 2. Acquiring an image from the swapchain.
-   * 3. Recording and submitting command buffers to the graphics queue.
-   * 4. Presenting the finished image back to the screen.
-   * * @param logicalDevice The device handle used to manage synchronization primitives.
-   * @throws std::runtime_error If synchronization fails or the swapchain becomes invalid.
-   */
   void drawFrame(const sauce::LogicalDevice& logicalDevice, const sauce::Scene& scene, sauce::ImGuiRenderer* imguiRenderer = nullptr){
     // Wait for the previous frame to finish rendering before submitting the next frame
     auto fenceResult = logicalDevice->waitForFences(*inFlightFences[frameIndex], vk::True, UINT64_MAX);
@@ -631,11 +683,17 @@ public:
     }
 
     // Request the next available image from the swap chain
-    auto [result, imageIndex] = (*pSwapChain)->acquireNextImage(UINT64_MAX, *presentCompleteSemaphores[frameIndex], nullptr);
-
-    // Verify the swap chain image was acquired successfully (suboptimal is acceptable)
-    if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
-      throw std::runtime_error("Failed to acquire swap chain image");
+    uint32_t imageIndex;
+    try {
+      auto [result, idx] = (*pSwapChain)->acquireNextImage(UINT64_MAX, *presentCompleteSemaphores[frameIndex], nullptr);
+      if (result == vk::Result::eErrorOutOfDateKHR) {
+        recreateSwapChain();
+        return;
+      }
+      imageIndex = idx;
+    } catch (const vk::OutOfDateKHRError&) {
+      recreateSwapChain();
+      return;
     }
 
     // Reset the fence for the next frame
@@ -643,10 +701,13 @@ public:
 
     // Reset and record the command buffer with rendering commands
     commandBuffers[frameIndex].reset();
-    recordCommandBuffer(imageIndex, imguiRenderer);
 
-    // Update the uniform buffer with current transformation matrices
-    updateUniformBuffer(frameIndex, scene);
+    if (customRecorder) {
+      customRecorder(commandBuffers[frameIndex], imageIndex);
+    } else {
+      recordCommandBuffer(imageIndex, imguiRenderer);
+      updateUniformBuffer(frameIndex, scene);
+    }
 
     // Prepare submission: wait for image to be available before starting color attachment output
     vk::PipelineStageFlags waitDestinationStageMask { vk::PipelineStageFlagBits::eColorAttachmentOutput };
@@ -672,25 +733,22 @@ public:
       .pImageIndices = &imageIndex,
     };
 
-    // Present the rendered image to the screen
-    result = pQueue->presentKHR(presentInfoKHR);
-    if (result != vk::Result::eSuccess) {
-      throw std::runtime_error("Failed to present swap chain image!");
+    // Present the rendered image to the screen, handling resize
+    try {
+      auto result = pQueue->presentKHR(presentInfoKHR);
+      if (result == vk::Result::eSuboptimalKHR || framebufferResized) {
+        framebufferResized = false;
+        recreateSwapChain();
+      }
+    } catch (const vk::OutOfDateKHRError&) {
+      framebufferResized = false;
+      recreateSwapChain();
     }
 
     // Advance to the next frame in the circular buffer
     frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
   }
 
-  /**
-   * @brief Updates the Uniform Buffer Object (UBO) with current frame transformations.
-   * * Calculates the elapsed time to handle object rotation and constructs the 
-   *   Model-View-Projection (MVP) matrices. The resulting data is copied directly 
-   *   into the GPU-mapped memory for the specific frame being rendered.
-   * * @note Vulkan's clip space Y-axis is inverted compared to OpenGL. This function 
-   *   manually compensates by flipping the Y-coordinate in the projection matrix.
-   * * @param curImage The index of the current swapchain image/frame being processed.
-   */
   void updateUniformBuffer(uint32_t curImage, const sauce::Scene& scene) {
     // Record the start time on first call (static initialization)
     static auto startTime = std::chrono::high_resolution_clock::now();
@@ -703,13 +761,11 @@ public:
     sauce::UniformBufferObject ubo {
       // Model matrix: rotates the object 90 degrees per second around the Z axis
       .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-      // .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.1f)),
-      // .proj = glm::perspective(glm::radians(45.0f), static_cast<float>(WIDTH) / static_cast<float>(HEIGHT), 0.1f, 10.0f),
       .view = scene.getCameraRO().getViewMatrix(),
       .proj = scene.getCameraRO().getProjectionMatrix(),
       .cameraPos = scene.getCameraRO().getPos(),
     };
-    
+
     // Flip Y coordinate of projection matrix (Vulkan uses inverted Y compared to OpenGL)
     ubo.proj[1][1] *= -1;
 
@@ -799,11 +855,17 @@ public:
   }
 
 private:
+  // Stored references for swapchain recreation
+  const sauce::PhysicalDevice* pPhysicalDevice;
+  const sauce::LogicalDevice* pLogicalDevice;
+  const sauce::RenderSurface* pRenderSurface;
+  GLFWwindow* pWindow;
+
   std::unique_ptr<vk::raii::Queue> pQueue;
   std::unique_ptr<sauce::SwapChain> pSwapChain;
 
   vk::raii::CommandPool commandPool = nullptr;
-  
+
   std::vector<vk::raii::CommandBuffer> commandBuffers;
 
   std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
@@ -812,6 +874,7 @@ private:
 
   uint32_t frameIndex = 0;
   uint32_t queueIndex = ~0;
+  bool framebufferResized = false;
 
   std::unique_ptr<sauce::GraphicsPipeline> pPipeline;
   std::unique_ptr<sauce::GraphicsPipeline> pPostProcessPipeline;
@@ -837,6 +900,8 @@ private:
   vk::raii::DeviceMemory depthImageMemory = nullptr;
   vk::raii::ImageView depthImageView = nullptr;
 
+  CommandBufferRecorder customRecorder;
+
   // PBR resources
   vk::raii::Buffer materialBuffer = nullptr;
   vk::raii::DeviceMemory materialBufferMemory = nullptr;
@@ -857,4 +922,3 @@ private:
 };
 
 }
-

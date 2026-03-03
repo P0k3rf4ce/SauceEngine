@@ -1,8 +1,10 @@
 #include "app/Scene.hpp"
 #include "app/modeling/GLTFLoader.hpp"
+#include "app/modeling/GLTFExporter.hpp"
 #include "app/components/TransformComponent.hpp"
 #include "app/components/MeshRendererComponent.hpp"
 #include <unordered_map>
+#include <iostream>
 
 namespace sauce {
 
@@ -17,6 +19,47 @@ sauce::Entity* Scene::getEntity(const std::string& name) {
         }
     }
     return nullptr;
+}
+
+bool Scene::saveToFile(const std::string& filePath) const {
+    using namespace sauce::modeling;
+
+    ExportOptions opts;
+    // Determine binary mode from extension
+    if (filePath.size() >= 4 && filePath.substr(filePath.size() - 4) == ".glb") {
+        opts.writeBinary = true;
+        opts.embedImages = true;
+        opts.embedBuffers = true;
+    }
+
+    GLTFExporter exporter(opts);
+    bool success = exporter.exportScene(*this, filePath);
+    if (success) {
+        const_cast<Scene*>(this)->currentFilePath = filePath;
+    }
+    return success;
+}
+
+bool Scene::loadFromFile(const std::string& filePath) {
+    using namespace sauce::modeling;
+
+    GLTFLoader loader;
+    auto model = loader.loadModel(filePath);
+
+    if (!model || !model->getRootNode()) {
+        std::cerr << "Scene::loadFromFile: Failed to load " << filePath << std::endl;
+        return false;
+    }
+
+    // Clear existing entities
+    entities.clear();
+
+    // Load entities from model
+    std::unordered_map<ModelNode*, Entity*> nodeToEntityMap;
+    loadGLTFNodeHierarchy(model->getRootNode(), nullptr, nodeToEntityMap, filePath);
+
+    currentFilePath = filePath;
+    return true;
 }
 
 void Scene::loadGLTFModel(const std::string& filePath, bool preserveHierarchy) {
@@ -37,16 +80,17 @@ void Scene::loadGLTFModel(const std::string& filePath, bool preserveHierarchy) {
     if (preserveHierarchy) {
         // Create entity tree preserving hierarchy
         std::unordered_map<ModelNode*, Entity*> nodeToEntityMap;
-        loadGLTFNodeHierarchy(model->getRootNode(), nullptr, nodeToEntityMap);
+        loadGLTFNodeHierarchy(model->getRootNode(), nullptr, nodeToEntityMap, filePath);
     } else {
         // Flatten all meshes into individual entities
-        loadGLTFFlattened(model);
+        loadGLTFFlattened(model, filePath);
     }
 }
 
 void Scene::loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
                                    Entity* parentEntity,
-                                   std::unordered_map<modeling::ModelNode*, Entity*>& nodeToEntityMap) {
+                                   std::unordered_map<modeling::ModelNode*, Entity*>& nodeToEntityMap,
+                                   const std::string& filePath) {
     if (!node) {
         return;
     }
@@ -54,7 +98,7 @@ void Scene::loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
     // Skip the artificial root node
     if (node->getName() == "__root__") {
         for (const auto& child : node->getChildren()) {
-            loadGLTFNodeHierarchy(child, nullptr, nodeToEntityMap);
+            loadGLTFNodeHierarchy(child, nullptr, nodeToEntityMap, filePath);
         }
         return;
     }
@@ -69,6 +113,7 @@ void Scene::loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
     // Add MeshRendererComponents for each mesh-material pair
     for (const auto& pair : node->getMeshMaterialPairs()) {
         entity.addComponent<MeshRendererComponent>(pair.mesh, pair.material);
+        entity.getComponents<MeshRendererComponent>().back()->setModelPath(filePath);
     }
 
     // Add entity to scene
@@ -80,11 +125,11 @@ void Scene::loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
 
     // Process children
     for (const auto& child : node->getChildren()) {
-        loadGLTFNodeHierarchy(child, entityPtr, nodeToEntityMap);
+        loadGLTFNodeHierarchy(child, entityPtr, nodeToEntityMap, filePath);
     }
 }
 
-void Scene::loadGLTFFlattened(std::shared_ptr<modeling::Model> model) {
+void Scene::loadGLTFFlattened(std::shared_ptr<modeling::Model> model, const std::string& filePath) {
     const auto& allMeshes = model->getAllMeshes();
     const auto& allMaterials = model->getAllMaterials();
 
@@ -108,6 +153,7 @@ void Scene::loadGLTFFlattened(std::shared_ptr<modeling::Model> model) {
         }
 
         entity.addComponent<MeshRendererComponent>(allMeshes[i], material);
+        entity.getComponents<MeshRendererComponent>().back()->setModelPath(filePath);
 
         entities.push_back(std::move(entity));
     }

@@ -3,6 +3,7 @@
 #include <app/Camera.hpp>
 #include <app/Entity.hpp>
 #include <memory>
+#include <string>
 #include <unordered_map>
 
 #include <physics/XPBD.hpp>
@@ -16,12 +17,16 @@ namespace modeling {
 
 class SauceEngineApp;
 
+namespace editor {
+  class EditorApp;
+}
+
 class Scene {
 public:
   /**
-   * Loads scene from the file if provided. Otherwise, creates an empty scene 
+   * Loads scene from the file if provided. Otherwise, creates an empty scene
    * @param cameraCreateInfo - arguments for camera creation
-   * @param filename - file to load from 
+   * @param filename - file to load from
    */
   Scene(const sauce::CameraCreateInfo& cameraCreateInfo, const std::string& filename = "") {
     pCamera = std::make_unique<sauce::Camera>( cameraCreateInfo );
@@ -49,10 +54,30 @@ public:
   void loadGLTFModel(const std::string& filePath, bool preserveHierarchy = true);
 
   /**
+   * Saves the entire scene to a GLTF/GLB file
+   * @return true on success
+   */
+  bool saveToFile(const std::string& filePath) const;
+
+  /**
+   * Loads a GLTF/GLB file as the entire scene (clears existing entities)
+   * @return true on success
+   */
+  bool loadFromFile(const std::string& filePath);
+
+  const std::string& getCurrentFilePath() const { return currentFilePath; }
+  void setCurrentFilePath(const std::string& path) { currentFilePath = path; }
+  bool hasFilePath() const { return !currentFilePath.empty(); }
+
+  /**
    * Returns a const ref to camera
    */
   const sauce::Camera& getCameraRO() const noexcept {
     return *pCamera;
+  }
+
+  std::vector<sauce::Entity>& getEntitiesMut() {
+    return entities;
   }
 
 private:
@@ -60,11 +85,14 @@ private:
 
   std::unique_ptr<sauce::Camera> pCamera;
 
+  std::string currentFilePath;
+
   // Helper functions for GLTF loading
   void loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
                              Entity* parentEntity,
-                             std::unordered_map<modeling::ModelNode*, Entity*>& nodeToEntityMap);
-  void loadGLTFFlattened(std::shared_ptr<modeling::Model> model);
+                             std::unordered_map<modeling::ModelNode*, Entity*>& nodeToEntityMap,
+                             const std::string& filePath);
+  void loadGLTFFlattened(std::shared_ptr<modeling::Model> model, const std::string& filePath);
 
   /**
    * Returns a non-const ref to camera
@@ -74,6 +102,7 @@ private:
   }
 
   friend class sauce::SauceEngineApp; // This gives the app class full access to entities and camera for user interaction
+  friend class sauce::editor::EditorApp;
 };
 
 }

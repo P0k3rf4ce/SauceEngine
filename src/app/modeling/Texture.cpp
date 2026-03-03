@@ -15,6 +15,7 @@ Texture::Texture(const std::string& path, TextureType type, bool sRGB)
     : path(path)
     , type(type)
     , sRGB(sRGB)
+    , hdr(false)
     , embedded(false)
     , width(0)
     , height(0)
@@ -27,6 +28,7 @@ Texture::Texture(const std::vector<unsigned char>& data, int width, int height, 
     : path(name)
     , type(type)
     , sRGB(sRGB)
+    , hdr(false)
     , embedded(true)
     , width(width)
     , height(height)
@@ -42,6 +44,13 @@ const std::vector<unsigned char>& Texture::getData() {
     return data;
 }
 
+const std::vector<float>& Texture::getHDRData() {
+    if (!dataLoaded) {
+        loadFromFile();
+    }
+    return hdrData;
+}
+
 void Texture::loadFromFile() {
     if (dataLoaded) {
         return;
@@ -51,50 +60,67 @@ void Texture::loadFromFile() {
         return;
     }
 
+    if (stbi_is_hdr(path.c_str())) {
+        loadFromFileHDR();
+        return;
+    }
+
     int w, h, c;
     unsigned char* pixels = stbi_load(path.c_str(), &w, &h, &c, STBI_rgb_alpha);
 
     if (!pixels) {
-        // Create a default 1x1 texture based on type
-        width = 1;
-        height = 1;
-        channels = 4;
-        data.resize(4);
-
-        if (type == TextureType::Normal) {
-            // Flat normal pointing up (128, 128, 255, 255) -> (0, 0, 1) in tangent space
-            data[0] = 128;
-            data[1] = 128;
-            data[2] = 255;
-            data[3] = 255;
-        } else if (type == TextureType::MetallicRoughness || type == TextureType::Occlusion) {
-            // Black (non-metallic, smooth, no occlusion)
-            data[0] = 0;
-            data[1] = 0;
-            data[2] = 0;
-            data[3] = 255;
-        } else {
-            // White default for BaseColor and Emissive
-            data[0] = 255;
-            data[1] = 255;
-            data[2] = 255;
-            data[3] = 255;
-        }
-
-        dataLoaded = true;
+        createDefaultPixels();
         return;
     }
 
     width = w;
     height = h;
-    channels = 4; // stbi_load with STBI_rgb_alpha always returns 4 channels
+    channels = 4;
 
-    // Copy pixel data
     size_t dataSize = width * height * channels;
     data.resize(dataSize);
     std::memcpy(data.data(), pixels, dataSize);
 
     stbi_image_free(pixels);
+    dataLoaded = true;
+}
+
+void Texture::loadFromFileHDR() {
+    int w, h, c;
+    float* pixels = stbi_loadf(path.c_str(), &w, &h, &c, STBI_rgb_alpha);
+
+    if (!pixels) {
+        createDefaultPixels();
+        return;
+    }
+
+    width = w;
+    height = h;
+    channels = 4;
+    hdr = true;
+
+    size_t pixelCount = static_cast<size_t>(width) * height * channels;
+    hdrData.resize(pixelCount);
+    std::memcpy(hdrData.data(), pixels, pixelCount * sizeof(float));
+
+    stbi_image_free(pixels);
+    dataLoaded = true;
+}
+
+void Texture::createDefaultPixels() {
+    width = 1;
+    height = 1;
+    channels = 4;
+    data.resize(4);
+
+    if (type == TextureType::Normal) {
+        data[0] = 128; data[1] = 128; data[2] = 255; data[3] = 255;
+    } else if (type == TextureType::MetallicRoughness || type == TextureType::Occlusion) {
+        data[0] = 0; data[1] = 0; data[2] = 0; data[3] = 255;
+    } else {
+        data[0] = 255; data[1] = 255; data[2] = 255; data[3] = 255;
+    }
+
     dataLoaded = true;
 }
 
@@ -112,11 +138,13 @@ void Texture::initVulkanResources(
         getData();
     }
 
-    if (data.empty() || width == 0 || height == 0) {
+    bool hasPixels = hdr ? !hdrData.empty() : !data.empty();
+    if (!hasPixels || width == 0 || height == 0) {
         throw std::runtime_error("No data for " + path);
     }
 
-    vk::DeviceSize imageSize = (vk::DeviceSize)width * height * 4;
+    vk::DeviceSize bytesPerPixel = hdr ? (4 * sizeof(float)) : 4;
+    vk::DeviceSize imageSize = static_cast<vk::DeviceSize>(width) * height * bytesPerPixel;
 
     vk::raii::Buffer stagingBuffer(nullptr);
     vk::raii::DeviceMemory stagingMemory(nullptr);
@@ -129,10 +157,19 @@ void Texture::initVulkanResources(
     );
 
     void* mappedData = stagingMemory.mapMemory(0, imageSize);
-    memcpy(mappedData, this->data.data(), (size_t)imageSize);
+    if (hdr) {
+        memcpy(mappedData, hdrData.data(), static_cast<size_t>(imageSize));
+    } else {
+        memcpy(mappedData, data.data(), static_cast<size_t>(imageSize));
+    }
     stagingMemory.unmapMemory();
 
-    vk::Format imageFormat = sRGB ? vk::Format::eR8G8B8A8Srgb : vk::Format::eR8G8B8A8Unorm;
+    vk::Format imageFormat;
+    if (hdr) {
+        imageFormat = vk::Format::eR32G32B32A32Sfloat;
+    } else {
+        imageFormat = sRGB ? vk::Format::eR8G8B8A8Srgb : vk::Format::eR8G8B8A8Unorm;
+    }
 
     image = std::make_unique<vk::raii::Image>(nullptr);
     imageMemory = std::make_unique<vk::raii::DeviceMemory>(nullptr);
@@ -178,21 +215,27 @@ void Texture::initVulkanResources(
         )
     );
 
-    vk::PhysicalDeviceProperties properties = physicalDevice.getProperties();
+    bool isEnvMap = (type == TextureType::EnvironmentMapHDR);
+    vk::SamplerAddressMode addressMode = isEnvMap
+        ? vk::SamplerAddressMode::eClampToEdge
+        : vk::SamplerAddressMode::eRepeat;
+
     vk::SamplerCreateInfo samplerInfo{};
     samplerInfo.magFilter = vk::Filter::eLinear;
     samplerInfo.minFilter = vk::Filter::eLinear;
     samplerInfo.mipmapMode = vk::SamplerMipmapMode::eLinear;
-    samplerInfo.addressModeU = vk::SamplerAddressMode::eRepeat;
-    samplerInfo.addressModeV = vk::SamplerAddressMode::eRepeat;
-    samplerInfo.addressModeW = vk::SamplerAddressMode::eRepeat;
+    samplerInfo.addressModeU = addressMode;
+    samplerInfo.addressModeV = addressMode;
+    samplerInfo.addressModeW = addressMode;
     samplerInfo.mipLodBias = 0.0f;
     samplerInfo.anisotropyEnable = VK_FALSE;
     samplerInfo.maxAnisotropy = 1.0f;
     samplerInfo.compareEnable = VK_FALSE;
     samplerInfo.minLod = 0.0f;
     samplerInfo.maxLod = 0.0f;
-    samplerInfo.borderColor = vk::BorderColor::eIntOpaqueBlack;
+    samplerInfo.borderColor = hdr
+        ? vk::BorderColor::eFloatOpaqueBlack
+        : vk::BorderColor::eIntOpaqueBlack;
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
 
     sampler = std::make_unique<vk::raii::Sampler>(*logicalDevice, samplerInfo);

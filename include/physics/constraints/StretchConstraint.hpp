@@ -13,9 +13,7 @@ struct StretchConstraint : public Constraint {
   StretchConstraint() = default;
 
   StretchConstraint(uint32_t a, uint32_t b, float rest, float comp = 0.0f)
-      : indexA(a), indexB(b), restLength(rest) {
-    compliance = comp;
-  }
+      : Constraint(comp), indexA(a), indexB(b), restLength(rest) {}
 
   void solve(std::vector<Vertex>& vertices, float deltatime) override {
     if (indexA >= vertices.size() || indexB >= vertices.size()) return;
