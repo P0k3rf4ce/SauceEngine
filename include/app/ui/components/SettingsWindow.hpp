@@ -32,7 +32,8 @@ public:
     bool changed = false;
 
     if (ImGui::CollapsingHeader("Display", ImGuiTreeNodeFlags_DefaultOpen)) {
-      changed |= ImGui::SliderFloat("UI Scale", &s.imguiScale, 0.25f, 4.0f, "%.2fx");
+      ImGui::SliderFloat("UI Scale", &s.imguiScale, 0.25f, 4.0f, "%.2fx");
+      changed |= ImGui::IsItemDeactivatedAfterEdit();
 
       if (ImGui::Checkbox("V-Sync", &s.vsync)) {
         changed = true;
@@ -42,9 +43,12 @@ public:
     }
 
     if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
-      changed |= ImGui::SliderFloat("Mouse Sensitivity", &s.mouseSensitivity, 0.01f, 1.0f, "%.2f");
-      changed |= ImGui::SliderFloat("Movement Speed", &s.cameraSpeed, 0.5f, 20.0f, "%.1f");
-      changed |= ImGui::SliderFloat("Field of View", &s.fieldOfView, 30.0f, 120.0f, "%.0f deg");
+      ImGui::SliderFloat("Mouse Sensitivity", &s.mouseSensitivity, 0.01f, 1.0f, "%.2f");
+      changed |= ImGui::IsItemDeactivatedAfterEdit();
+      ImGui::SliderFloat("Movement Speed", &s.cameraSpeed, 0.5f, 20.0f, "%.1f");
+      changed |= ImGui::IsItemDeactivatedAfterEdit();
+      ImGui::SliderFloat("Field of View", &s.fieldOfView, 30.0f, 120.0f, "%.0f deg");
+      changed |= ImGui::IsItemDeactivatedAfterEdit();
     }
 
     if (ImGui::CollapsingHeader("General", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -66,7 +70,7 @@ public:
       }
     }
 
-    if (changed && !ImGui::IsAnyItemActive()) {
+    if (changed) {
       settings.markDirtyAndSave();
     }
 
