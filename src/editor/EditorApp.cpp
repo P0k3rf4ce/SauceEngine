@@ -160,6 +160,10 @@ void EditorApp::initVulkan() {
 
   // Create grid pipeline (no vertex input, alpha blending, no culling, no depth write)
   sauce::GraphicsPipelineConfig gridConfig {
+    .physicalDevice = physicalDevice,
+    .logicalDevice = logicalDevice,
+    .descriptorSetLayout = pRenderer->getDescriptorSetLayout(),
+    .colorFormat = OffscreenFramebuffer::COLOR_FORMAT,
     .hasVertexInput = false,
     .enableBlending = true,
     .enableCulling = false,
@@ -178,6 +182,10 @@ void EditorApp::initVulkan() {
 
   // Create unlit pipeline (vertex input, no blending, culling, depth write, push constants)
   sauce::GraphicsPipelineConfig unlitConfig {
+    .physicalDevice = physicalDevice,
+    .logicalDevice = logicalDevice,
+    .descriptorSetLayout = pRenderer->getDescriptorSetLayout(),
+    .colorFormat = OffscreenFramebuffer::COLOR_FORMAT,
     .hasVertexInput = true,
     .enableBlending = false,
     .enableCulling = true,
@@ -196,6 +204,10 @@ void EditorApp::initVulkan() {
 
   // Create lit pipeline (same config, PBR shaders)
   sauce::GraphicsPipelineConfig litConfig {
+    .physicalDevice = physicalDevice,
+    .logicalDevice = logicalDevice,
+    .descriptorSetLayout = pRenderer->getDescriptorSetLayout(),
+    .colorFormat = OffscreenFramebuffer::COLOR_FORMAT,
     .hasVertexInput = true,
     .enableBlending = false,
     .enableCulling = true,

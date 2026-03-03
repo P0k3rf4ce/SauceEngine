@@ -69,6 +69,11 @@ target_sources(${EXEC_NAME} PRIVATE
 add_subdirectory(${PROJECT_SOURCE_DIR}/shaders)
 # add_dependencies(${EXEC_NAME} shaders)  # Requires slangc; pre-compiled .spv files used instead
 
+add_custom_command(TARGET ${EXEC_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${PROJECT_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:${EXEC_NAME}>/shaders
+)
+
 # Model test executable
 add_executable(modeltest src/modeltest.cpp)
 target_include_directories(modeltest PRIVATE ${PROJECT_SOURCE_DIR}/include)
@@ -122,6 +127,11 @@ target_link_libraries(modelviewer PRIVATE glfw)
 target_link_libraries(modelviewer PRIVATE imgui::imgui)
 
 add_dependencies(modelviewer shaders)
+
+add_custom_command(TARGET modelviewer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${PROJECT_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:modelviewer>/shaders
+)
 
 # SauceEditor executable
 add_executable(sauceeditor src/editor/main.cpp)
