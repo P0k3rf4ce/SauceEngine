@@ -127,6 +127,7 @@ public:
     commandPool = vk::raii::CommandPool { *createInfo.logicalDevice, commandPoolCreateInfo };
 
     createDepthResources(createInfo.physicalDevice, createInfo.logicalDevice);
+    createOffscreenResources(createInfo.physicalDevice, createInfo.logicalDevice);
     createDefaultTextures(createInfo.physicalDevice, createInfo.logicalDevice);
     createMaterialBuffer(createInfo.physicalDevice, createInfo.logicalDevice);
     createLightSSBO(createInfo.physicalDevice, createInfo.logicalDevice);
@@ -197,16 +198,17 @@ public:
   }
 
   void createDescriptorSets(const sauce::LogicalDevice& logicalDevice) {
-    std::array<vk::DescriptorPoolSize, 4> poolSizes {{
+    std::array<vk::DescriptorPoolSize, 5> poolSizes {{
       { vk::DescriptorType::eUniformBuffer, 2u * MAX_FRAMES_IN_FLIGHT },
       { vk::DescriptorType::eStorageBuffer, 1u * MAX_FRAMES_IN_FLIGHT },
       { vk::DescriptorType::eSampledImage,  5u * MAX_FRAMES_IN_FLIGHT },
       { vk::DescriptorType::eSampler,       5u * MAX_FRAMES_IN_FLIGHT },
+      { vk::DescriptorType::eCombinedImageSampler, 1u * MAX_FRAMES_IN_FLIGHT },
     }};
 
     vk::DescriptorPoolCreateInfo poolCreateInfo {
       .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-      .maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
+      .maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT + 1), // +1 for post process
       .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
       .pPoolSizes = poolSizes.data(),
     };
@@ -534,6 +536,60 @@ public:
     );
 
     commandBuffers[frameIndex].drawIndexed(indices.size(), 1, 0, 0, 0);
+
+    commandBuffers[frameIndex].endRendering();
+
+    transitionImageLayout(
+      *offscreenImage,
+      vk::ImageLayout::eColorAttachmentOptimal,
+      vk::ImageLayout::eShaderReadOnlyOptimal,
+      vk::AccessFlagBits2::eColorAttachmentWrite,
+      vk::AccessFlagBits2::eShaderRead,
+      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+      vk::PipelineStageFlagBits2::eFragmentShader,
+      vk::ImageAspectFlagBits::eColor
+    );
+
+    transitionImageLayout(
+      pSwapChain->getImages()[imageIndex],
+      vk::ImageLayout::eUndefined,
+      vk::ImageLayout::eColorAttachmentOptimal,
+      {},
+      vk::AccessFlagBits2::eColorAttachmentWrite,
+      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+      vk::ImageAspectFlagBits::eColor
+    );
+
+    vk::RenderingAttachmentInfo ppColorAttachmentInfo = {
+      .imageView = pSwapChain->getImageViews()[imageIndex],
+      .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+      .loadOp = vk::AttachmentLoadOp::eClear,
+      .storeOp = vk::AttachmentStoreOp::eStore,
+      .clearValue = clearColor,
+    };
+
+    vk::RenderingInfo ppRenderingInfo {
+      .renderArea = { 
+        .offset = { 0, 0 }, 
+        .extent = pSwapChain->getExtent(),
+      },
+      .layerCount = 1,
+      .colorAttachmentCount = 1,
+      .pColorAttachments = &ppColorAttachmentInfo,
+    };
+
+    commandBuffers[frameIndex].beginRendering(ppRenderingInfo);
+
+    commandBuffers[frameIndex].bindPipeline(vk::PipelineBindPoint::eGraphics, **pPostProcessPipeline);
+    commandBuffers[frameIndex].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pPostProcessPipeline->getLayout(), 0, *postProcessDescriptorSets[0], nullptr);
+
+    commandBuffers[frameIndex].setViewport(
+        0, vk::Viewport(0.0f, 0.0f, static_cast<float>(pSwapChain->getExtent().width), 
+        static_cast<float>(pSwapChain->getExtent().height), 0.0f, 1.0f));
+    commandBuffers[frameIndex].setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), pSwapChain->getExtent()));
+
+    commandBuffers[frameIndex].draw(3, 1, 0, 0);
 
     // Render ImGui overlay
     if (imguiRenderer) {
