@@ -86,17 +86,6 @@ public:
   void createEmptyEntity();
   void createBoxEntity();
   void createBallEntity();
-  void saveSceneToZip(const std::string& zipPath,
-                               const std::string& scenePath,
-                               const std::vector<std::string>& assetPaths);
-  std::string loadFileToString(const std::string& path);
-  bool zipFolder(const std::filesystem::path& src, const std::filesystem::path& dst);
-  bool unzipToFolder(const std::filesystem::path& zipPath, const std::filesystem::path& outDir);
-  void loadSceneFromZip(const std::string& zipPath);
-
-  bool showExportZipDialog = false;
-  bool showImportZipDialog = false;
-
 
   const sauce::PhysicalDevice& getPhysicalDevice() const { return physicalDevice; }
   const sauce::LogicalDevice& getLogicalDevice() const { return logicalDevice; }
@@ -128,6 +117,17 @@ private:
   void buildEditorUI();
   void setupDefaultDockLayout(ImGuiID dockspaceId);
   void processInput();
+
+  void saveSceneToZip(const std::string& zipPath,
+                               const std::string& scenePath,
+                               const std::vector<std::string>& assetPaths);
+  std::string loadFileToString(const std::string& path);
+  bool zipFolder(const std::filesystem::path& src, const std::filesystem::path& dst);
+  bool unzipToFolder(const std::filesystem::path& zipPath, const std::filesystem::path& outDir);
+  void loadSceneFromZip(const std::string& zipPath);
+
+  bool showExportZipDialog = false;
+  bool showImportZipDialog = false;
 
 
   void recordEditorCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t imageIndex);

@@ -22,7 +22,6 @@
 #include <cmath>
 #include <cstring>
 #include <editor/zip_file.hpp>
-namespace fs = std::filesystem;
 
 namespace sauce::editor {
 
