@@ -53,7 +53,7 @@ struct XPBDSolver {
   }
 
   void projectConstraints(
-      std::vector<Vertex>& vertices,
+      std::vector<physics::Vertex>& vertices,
       std::vector<std::unique_ptr<Constraint>>& constraints,
       float deltatime
   ) {
