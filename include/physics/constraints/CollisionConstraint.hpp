@@ -24,7 +24,7 @@ struct CollisionConstraint : public Constraint {
       : Constraint(comp), indexA(a), indexB(UINT32_MAX), contactPoint(contactPt),
         contactNormal(normal), isStaticCollision(true) {}
 
-  void solve(std::vector<Vertex>& vertices, float deltatime) override {
+  void solve(std::vector<physics::Vertex>& vertices, float deltatime) override {
     if (isStaticCollision) {
       solveStatic(vertices, deltatime);
     } else {
@@ -41,11 +41,11 @@ struct CollisionConstraint : public Constraint {
 
 private:
   // Dynamic collision, vertex to vertex
-  void solveDynamic(std::vector<Vertex>& vertices, float deltatime) {
+  void solveDynamic(std::vector<physics::Vertex>& vertices, float deltatime) {
     if (indexA >= vertices.size() || indexB >= vertices.size()) return;
 
-    Vertex& va = vertices[indexA];
-    Vertex& vb = vertices[indexB];
+    physics::Vertex& va = vertices[indexA];
+    physics::Vertex& vb = vertices[indexB];
 
     const float w1 = va.invMass;
     const float w2 = vb.invMass;
@@ -76,10 +76,10 @@ private:
   }
 
   // Static collision, a single vertex against a fixed surface point
-  void solveStatic(std::vector<Vertex>& vertices, float deltatime) {
+  void solveStatic(std::vector<physics::Vertex>& vertices, float deltatime) {
     if (indexA >= vertices.size()) return;
 
-    Vertex& va = vertices[indexA];
+    physics::Vertex& va = vertices[indexA];
     const float w = va.invMass;
     if (w <= 1e-8f) return;
 

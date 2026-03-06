@@ -57,6 +57,7 @@ target_sources(${EXEC_NAME} PRIVATE
   src/app/modeling/GLTFLoader.cpp
   src/app/modeling/GLTFExporter.cpp
   src/app/components/TransformComponent.cpp
+  src/app/components/RigidBodyComponent.cpp
   src/app/components/MeshRendererComponent.cpp
   src/app/Scene.cpp
   src/app/ImGuiRenderer.cpp
@@ -115,6 +116,7 @@ target_sources(modelviewer PRIVATE
     src/app/modeling/Model.cpp
     src/app/modeling/GLTFLoader.cpp
     src/app/ImGuiRenderer.cpp
+    src/app/components/RigidBodyComponent.cpp
 )
 
 target_link_libraries(modelviewer PUBLIC Vulkan::Vulkan)
@@ -151,6 +153,7 @@ target_sources(sauceeditor PRIVATE
     src/app/modeling/GLTFLoader.cpp
     src/app/modeling/GLTFExporter.cpp
     src/app/components/TransformComponent.cpp
+    src/app/components/RigidBodyComponent.cpp
     src/app/components/MeshRendererComponent.cpp
     src/app/Scene.cpp
     src/app/ImGuiRenderer.cpp
