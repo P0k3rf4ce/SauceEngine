@@ -117,6 +117,7 @@ void Scene::loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
         entity.getComponents<MeshRendererComponent>().back()->setModelPath(filePath);
 
 		glm::vec3 com=RigidBodyComponent::meshCenterOfMass(pair.mesh);
+		float invmass=RigidBodyComponent::meshInvMass(pair.mesh);
 		entity.addComponent<RigidBodyComponent>(
 		  glm::vec3(0.f,0.f,0.f),
 		  glm::vec3(0.f,0.f,0.f),
@@ -124,6 +125,7 @@ void Scene::loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
 		  glm::vec3(0.f,0.f,0.f)
 		  );
 		entity.getComponents<RigidBodyComponent>().back()->setCenterOfMass(com);
+		entity.getComponents<RigidBodyComponent>().back()->setInvMass(invmass);
     }
 
     // Add entity to scene

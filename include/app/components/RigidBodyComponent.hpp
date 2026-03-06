@@ -50,6 +50,8 @@ public:
 
   // approximate center of mass given a mesh
   static glm::vec3 meshCenterOfMass(std::shared_ptr<modeling::Mesh> m);
+  // approximate inverse mass given a mesh
+  static float meshInvMass(std::shared_ptr<modeling::Mesh> m);
 
   // No implementation for this for now
   virtual void render() override {};
