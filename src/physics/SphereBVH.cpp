@@ -111,7 +111,7 @@ bool SphereBVHNode::isLeaf() const {
     return left == nullptr && right == nullptr;
 }
 
-bool SphereBVHNode::checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const {
+bool SphereBVHNode::checkCollision(const Collider& collider, std::vector<ContactInfo>& info) {
     const auto* otherSphere = dynamic_cast<const SphereCollider*>(&collider);
     if (!otherSphere) return false;
 

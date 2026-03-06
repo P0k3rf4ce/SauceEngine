@@ -3,6 +3,7 @@
 #include "app/modeling/GLTFExporter.hpp"
 #include "app/components/TransformComponent.hpp"
 #include "app/components/MeshRendererComponent.hpp"
+#include "app/components/RigidBodyComponent.hpp"
 #include <unordered_map>
 #include <iostream>
 
@@ -110,10 +111,19 @@ void Scene::loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
     // Add TransformComponent
     entity.addComponent<TransformComponent>(node->getTransform());
 
-    // Add MeshRendererComponents for each mesh-material pair
+    // Add MeshRendererComponents and RigidBodyComponent for each mesh-material pair
     for (const auto& pair : node->getMeshMaterialPairs()) {
         entity.addComponent<MeshRendererComponent>(pair.mesh, pair.material);
         entity.getComponents<MeshRendererComponent>().back()->setModelPath(filePath);
+
+		glm::vec3 com=RigidBodyComponent::meshCenterOfMass(pair.mesh);
+		entity.addComponent<RigidBodyComponent>(
+		  glm::vec3(0.f,0.f,0.f),
+		  glm::vec3(0.f,0.f,0.f),
+		  glm::quat(1.f,0.f,0.f,0.f),
+		  glm::vec3(0.f,0.f,0.f)
+		  );
+		entity.getComponents<RigidBodyComponent>().back()->setCenterOfMass(com);
     }
 
     // Add entity to scene
