@@ -31,12 +31,21 @@ struct Vertex {
   }
 };
 
+struct DirLight {
+    alignas(16) glm::vec3 direction;
+    alignas(16) glm::vec3 color;
+    alignas(16) glm::vec3 ambient;
+    alignas(16) glm::vec3 diffuse;
+    alignas(16) glm::vec3 specular;
+};
+
 struct UniformBufferObject {
   alignas(16) glm::mat4 model;
   alignas(16) glm::mat4 view;
   alignas(16) glm::mat4 proj;
   alignas(16) glm::vec3 cameraPos;
+  alignas(16) DirLight dirLights[4];
+  alignas(16) uint32_t dirLightCount;
 };
 
 }
-

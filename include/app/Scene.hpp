@@ -2,6 +2,7 @@
 
 #include <app/Camera.hpp>
 #include <app/Entity.hpp>
+#include <app/components/DirectionalLightComponent.hpp>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -23,6 +24,10 @@ namespace editor {
 
 class Scene {
 public:
+  /**
+   * Collects all active directional lights in the scene
+   */
+  std::vector<DirLight> getDirectionalLights() const;
   /**
    * Loads scene from the file if provided. Otherwise, creates an empty scene
    * @param cameraCreateInfo - arguments for camera creation
