@@ -93,6 +93,7 @@ private:
 
   void uploadMeshGPUResources();
   void setupSceneRenderer();
+  void syncRigidBodiesToTransforms();
   void recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t imageIndex);
 
 public:
