@@ -3,10 +3,38 @@
 #include "app/modeling/GLTFExporter.hpp"
 #include "app/components/TransformComponent.hpp"
 #include "app/components/MeshRendererComponent.hpp"
+#include "app/components/DirectionalLightComponent.hpp"
 #include <unordered_map>
 #include <iostream>
 
 namespace sauce {
+
+std::vector<DirLight> Scene::getDirectionalLights() const {
+    std::vector<DirLight> lights;
+    for (const auto& entity : entities) {
+        if (!entity.getActive()) continue;
+
+        auto* lightComp = entity.getComponent<DirectionalLightComponent>();
+        if (lightComp) {
+            DirLight light;
+            light.color = lightComp->color;
+            light.ambient = lightComp->ambient;
+            light.diffuse = lightComp->diffuse;
+            light.specular = lightComp->specular;
+
+            glm::vec3 direction(0.0f, 0.0f, -1.0f);
+            
+            auto* transformComp = entity.getComponent<TransformComponent>();
+            if (transformComp) {
+                direction = transformComp->getRotation() * direction;
+            }
+            light.direction = direction;
+
+            lights.push_back(light);
+        }
+    }
+    return lights;
+}
 
 void Scene::addEntity(sauce::Entity&& entity) {
     entities.push_back(std::move(entity));
