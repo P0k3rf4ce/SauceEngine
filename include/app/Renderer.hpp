@@ -116,7 +116,7 @@ public:
       .logicalDevice = createInfo.logicalDevice,
       .descriptorSetLayout = descriptorSetLayout,
       .colorFormat = pSwapChain->getSurfaceFormat().format,
-      .shaderPath = "shaders/shader_lights.spv",
+      .shaderPath = "shaders/shader_pbr.spv",
     };
     pPipeline = std::make_unique<sauce::GraphicsPipeline>(mainPipelineConfig);
 
