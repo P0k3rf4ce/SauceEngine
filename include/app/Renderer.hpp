@@ -15,12 +15,15 @@
 
 #include <app/BufferUtils.hpp>
 #include <app/Camera.hpp>
+#include <app/components/LightComponent.hpp>
 #include <app/GraphicsPipeline.hpp>
 #include <app/ImGuiRenderer.hpp>
 #include <app/ImageUtils.hpp>
 #include <app/LogicalDevice.hpp>
 #include <app/Scene.hpp>
 #include <app/SwapChain.hpp>
+
+#include <cstring>
 
 namespace sauce {
 
@@ -90,6 +93,7 @@ using CommandBufferRecorder = std::function<void(vk::raii::CommandBuffer&, uint3
 class Renderer {
 public:
   static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+  static constexpr uint32_t MAX_LIGHTS = 64;
 
   Renderer(const RendererCreateInfo& createInfo)
     : pPhysicalDevice(&createInfo.physicalDevice),
@@ -687,16 +691,25 @@ public:
     materialBufferMemory.unmapMemory();
   }
 
-  // Allocates a storage buffer for lights. lightCount = 0 for now; one slot pre-allocated
-  // because Vulkan does not permit zero-size buffers.
+  // Pre-allocates a persistently-mapped storage buffer for up to MAX_LIGHTS.
   void createLightSSBO(const sauce::PhysicalDevice& physicalDevice, const sauce::LogicalDevice& logicalDevice) {
-    lightSSBOSize = 64; // sizeof one Light struct (matches shader layout)
+    lightSSBOSize = static_cast<vk::DeviceSize>(MAX_LIGHTS) * sizeof(GPULight);
     sauce::BufferUtils::createBuffer(
         physicalDevice, logicalDevice, lightSSBOSize,
         vk::BufferUsageFlagBits::eStorageBuffer,
         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
         lightSSBO, lightSSBOMemory
     );
+    lightSSBOMapped = lightSSBOMemory.mapMemory(0, lightSSBOSize);
+  }
+
+  // Writes lights into the persistently-mapped SSBO. Returns count written (clamped to MAX_LIGHTS).
+  uint32_t updateLightSSBO(const GPULight* data, uint32_t count) {
+    count = std::min(count, MAX_LIGHTS);
+    if (count > 0) {
+      std::memcpy(lightSSBOMapped, data, count * sizeof(GPULight));
+    }
+    return count;
   }
 
 private:
@@ -751,6 +764,7 @@ private:
   vk::DeviceSize lightSSBOSize{0};
   vk::raii::Buffer lightSSBO = nullptr;
   vk::raii::DeviceMemory lightSSBOMemory = nullptr;
+  void* lightSSBOMapped = nullptr;
 
   vk::raii::Image defaultImage = nullptr;
   vk::raii::DeviceMemory defaultImageMemory = nullptr;

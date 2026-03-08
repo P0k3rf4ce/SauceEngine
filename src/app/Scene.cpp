@@ -3,6 +3,7 @@
 #include "app/modeling/GLTFExporter.hpp"
 #include "app/components/TransformComponent.hpp"
 #include "app/components/MeshRendererComponent.hpp"
+#include "app/components/PointLightComponent.hpp"
 #include <unordered_map>
 #include <iostream>
 
@@ -116,6 +117,13 @@ void Scene::loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
         entity.getComponents<MeshRendererComponent>().back()->setModelPath(filePath);
     }
 
+    if (node->hasLight()) {
+        const auto& info = node->getLightInfo().value();
+        if (info.type == modeling::LightInfo::Type::Point) {
+            entity.addComponent<PointLightComponent>(info.color, info.intensity, info.range);
+        }
+    }
+
     // Add entity to scene
     entities.push_back(std::move(entity));
     Entity* entityPtr = &entities.back();
@@ -157,6 +165,23 @@ void Scene::loadGLTFFlattened(std::shared_ptr<modeling::Model> model, const std:
 
         entities.push_back(std::move(entity));
     }
+}
+
+const std::vector<GPULight>& Scene::collectGPULights() {
+    gpuLightBuffer.clear();
+    for (auto& entity : entities) {
+        if (!entity.getActive()) continue;
+
+        auto* lc = entity.getComponent<LightComponent>();
+        if (!lc || !lc->getActive()) continue;
+
+        glm::vec3 worldPos{0.0f};
+        auto* tc = entity.getComponent<TransformComponent>();
+        if (tc) worldPos = tc->getTranslation();
+
+        gpuLightBuffer.push_back(lc->toGPULight(worldPos));
+    }
+    return gpuLightBuffer;
 }
 
 } // namespace sauce
