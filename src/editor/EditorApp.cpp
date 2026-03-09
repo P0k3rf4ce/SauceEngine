@@ -1046,9 +1046,10 @@ if (ImGui::BeginPopupModal("Export Scene as ZIP", nullptr, ImGuiWindowFlags_Alwa
             }
         }
 
-        saveSceneToZip(zipPath, pScene->getCurrentFilePath(), assets);
-        setStatusMessage("Exported scene to ZIP");
-        ImGui::CloseCurrentPopup();
+        if (saveSceneToZip(zipPath, pScene->getCurrentFilePath(), assets)) {
+            setStatusMessage("Exported scene to ZIP");
+            ImGui::CloseCurrentPopup();
+        }
     }
 
     ImGui::SameLine();
@@ -1491,19 +1492,35 @@ std::string EditorApp::loadFileToString(const std::string& path)
     );
 }
 
-void EditorApp::saveSceneToZip(const std::string& zipPath,
+bool EditorApp::saveSceneToZip(const std::string& zipPath,
                                const std::string& scenePath,
                                const std::vector<std::string>& assetPaths)
 {
-    // Prevent exporting an unsaved scene
-    if (scenePath.empty() || !std::filesystem::exists(scenePath)) {
-        setStatusMessage("Cannot export: scene has not been saved yet.");
-        return;
+    if (zipPath.empty()) {
+        setStatusMessage("Cannot export: no output path specified.");
+        return false;
     }
 
-    miniz_cpp::zip_file zip;  
+    // If the scene has been saved to disk, use that file directly.
+    // Otherwise, save to a temp file so we can still export.
+    std::string sceneFile = scenePath;
+    bool usedTmp = false;
 
-    std::string sceneData = loadFileToString(scenePath);
+    if (sceneFile.empty() || !std::filesystem::exists(sceneFile)) {
+        auto tmpDir = std::filesystem::temp_directory_path() / "sauce_export";
+        std::filesystem::create_directories(tmpDir);
+        sceneFile = (tmpDir / "scene.gltf").string();
+
+        if (!pScene->saveToFile(sceneFile)) {
+            setStatusMessage("Cannot export: failed to save scene to temp file.");
+            return false;
+        }
+        usedTmp = true;
+    }
+
+    miniz_cpp::zip_file zip;
+
+    std::string sceneData = loadFileToString(sceneFile);
     zip.writestr("scene.gltf", sceneData);
 
     for (const auto& asset : assetPaths) {
@@ -1513,7 +1530,13 @@ void EditorApp::saveSceneToZip(const std::string& zipPath,
         }
     }
 
-    zip.save(zipPath); 
+    zip.save(zipPath);
+
+    if (usedTmp) {
+        std::filesystem::remove_all(std::filesystem::temp_directory_path() / "sauce_export");
+    }
+
+    return true;
 }
 
 

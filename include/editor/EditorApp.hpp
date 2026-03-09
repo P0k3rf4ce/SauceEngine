@@ -118,7 +118,7 @@ private:
   void setupDefaultDockLayout(ImGuiID dockspaceId);
   void processInput();
 
-  void saveSceneToZip(const std::string& zipPath,
+  bool saveSceneToZip(const std::string& zipPath,
                                const std::string& scenePath,
                                const std::vector<std::string>& assetPaths);
   std::string loadFileToString(const std::string& path);
