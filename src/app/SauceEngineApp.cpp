@@ -317,6 +317,10 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
       pRenderer->getPipeline().getLayout(), 0, *pRenderer->getCurrentDescriptorSet(), nullptr);
 
+    const uint32_t lightCount = 0;
+    cmd.pushConstants<uint32_t>(pRenderer->getPipeline().getLayout(),
+      vk::ShaderStageFlagBits::eFragment, 0, lightCount);
+
     for (auto* mrc : mrcs) {
       auto mesh = mrc->getMesh();
       if (!mesh || !mesh->hasGPUData()) continue;
