@@ -117,10 +117,11 @@ void Scene::loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
         entity.addComponent<MeshRendererComponent>(pair.mesh, pair.material);
         entity.getComponents<MeshRendererComponent>().back()->setModelPath(filePath);
 
+        const auto& nodeTransform = node->getTransform();
 		entity.addComponent<RigidBodyComponent>(
+		  nodeTransform.getTranslation(),
 		  glm::vec3(0.f,0.f,0.f),
-		  glm::vec3(0.f,0.f,0.f),
-		  glm::quat(1.f,0.f,0.f,0.f),
+		  nodeTransform.getRotation(),
 		  glm::vec3(0.f,0.f,0.f)
 		  );
 		// calculate center of mass

@@ -2,6 +2,7 @@
 #include <app/ui/components/HelloWorldWindow.hpp>
 #include <app/ui/components/DebugStatsWindow.hpp>
 #include <app/components/TransformComponent.hpp>
+#include <app/components/RigidBodyComponent.hpp>
 #include <app/components/MeshRendererComponent.hpp>
 #include <app/components/LightComponent.hpp>
 #include <functional>
@@ -167,6 +168,7 @@ void SauceEngineApp::mainLoop() {
 
       glfwPollEvents();
       processInput(deltaTime);
+      syncRigidBodiesToTransforms();
 
       pImGuiRenderer->newFrame();
       buildExampleUI();
@@ -179,6 +181,23 @@ void SauceEngineApp::mainLoop() {
 
 void SauceEngineApp::buildExampleUI() {
     pImGuiComponentManager->renderAll();
+  }
+
+void SauceEngineApp::syncRigidBodiesToTransforms() {
+    if (!pScene) {
+      return;
+    }
+
+    for (auto& entity : pScene->getEntitiesMut()) {
+      auto* rigidBody = entity.getComponent<RigidBodyComponent>();
+      auto* transform = entity.getComponent<TransformComponent>();
+      if (!rigidBody || !transform) {
+        continue;
+      }
+
+      transform->setTranslation(rigidBody->getPosition());
+      transform->setRotation(rigidBody->getOrientation());
+    }
   }
 
 void SauceEngineApp::uploadMeshGPUResources() {
