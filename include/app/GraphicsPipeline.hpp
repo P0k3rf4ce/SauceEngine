@@ -13,8 +13,14 @@
 
 namespace sauce {
 
-// the editor uses these for gridline configs and such
 struct GraphicsPipelineConfig {
+  const sauce::PhysicalDevice& physicalDevice;
+  const sauce::LogicalDevice& logicalDevice;
+  const vk::raii::DescriptorSetLayout& descriptorSetLayout;
+  vk::Format colorFormat;
+  std::string shaderPath;
+  const std::string vertEntryPoint = "vertMain";
+  const std::string fragEntryPoint = "fragMain";
   bool hasVertexInput = true;
   bool enableBlending = false;
   bool enableCulling = true;
@@ -25,53 +31,51 @@ struct GraphicsPipelineConfig {
 };
 
 struct GraphicsPipeline {
+  GraphicsPipelineConfig config;
 
   GraphicsPipeline(
-      const sauce::PhysicalDevice& physicalDevice,
-      const sauce::LogicalDevice& logicalDevice,
-      const vk::raii::DescriptorSetLayout& descriptorSetLayout,
-      const sauce::SwapChain& swapChain
-      ) {
-    vk::raii::ShaderModule shaderModule = createShaderModule(logicalDevice, readBinaryFile("shaders/shader_pbr.spv"));
+      const sauce::GraphicsPipelineConfig& config
+      ) : config(config) {
+    vk::raii::ShaderModule shaderModule = createShaderModule(config.logicalDevice, readBinaryFile(config.shaderPath));
     vk::PipelineShaderStageCreateInfo vertShaderCreateInfo {
       .stage = vk::ShaderStageFlagBits::eVertex,
       .module = shaderModule,
-      .pName = "vertMain",
+      .pName = config.vertEntryPoint.c_str(),
     };
     vk::PipelineShaderStageCreateInfo fragShaderCreateInfo {
       .stage = vk::ShaderStageFlagBits::eFragment,
       .module = shaderModule,
-      .pName = "fragMain",
+      .pName = config.fragEntryPoint.c_str(),
     };
     vk::PipelineShaderStageCreateInfo shaderStages[] = {
       vertShaderCreateInfo,
       fragShaderCreateInfo,
     };
 
-    initPipeline(physicalDevice, logicalDevice, descriptorSetLayout, swapChain, shaderStages);
+    initPipeline(shaderStages);
   }
 
   // Constructor for separate GLSL vertex and fragment shaders
-  GraphicsPipeline(const sauce::PhysicalDevice& physicalDevice, const sauce::LogicalDevice& logicalDevice, const vk::raii::DescriptorSetLayout& descriptorSetLayout, const sauce::SwapChain& swapChain, const std::string& vertShaderPath, const std::string& fragShaderPath) {
-    vertShaderModule = createShaderModule(logicalDevice, readBinaryFile(vertShaderPath));
-    fragShaderModule = createShaderModule(logicalDevice, readBinaryFile(fragShaderPath));
+  GraphicsPipeline(const sauce::GraphicsPipelineConfig& config, const std::string& vertShaderPath, const std::string& fragShaderPath) : config(config) {
+    vertShaderModule = createShaderModule(config.logicalDevice, readBinaryFile(vertShaderPath));
+    fragShaderModule = createShaderModule(config.logicalDevice, readBinaryFile(fragShaderPath));
 
     vk::PipelineShaderStageCreateInfo vertShaderCreateInfo {
       .stage = vk::ShaderStageFlagBits::eVertex,
       .module = vertShaderModule,
-      .pName = "main",
+      .pName = config.vertEntryPoint.c_str(),
     };
     vk::PipelineShaderStageCreateInfo fragShaderCreateInfo {
       .stage = vk::ShaderStageFlagBits::eFragment,
       .module = fragShaderModule,
-      .pName = "main",
+      .pName = config.fragEntryPoint.c_str(),
     };
     vk::PipelineShaderStageCreateInfo shaderStages[] = {
       vertShaderCreateInfo,
       fragShaderCreateInfo,
     };
 
-    initPipeline(physicalDevice, logicalDevice, descriptorSetLayout, swapChain, shaderStages);
+    initPipeline(shaderStages);
   }
 
   // Constructor for editor pipelines with config (offscreen rendering)
@@ -83,7 +87,7 @@ struct GraphicsPipeline {
       const std::string& vertShaderPath,
       const std::string& fragShaderPath,
       const GraphicsPipelineConfig& config
-  ) {
+  ) : config(config) {
     vertShaderModule = createShaderModule(logicalDevice, readBinaryFile(vertShaderPath));
     fragShaderModule = createShaderModule(logicalDevice, readBinaryFile(fragShaderPath));
 
@@ -112,15 +116,15 @@ private:
   vk::raii::ShaderModule vertShaderModule = nullptr;
   vk::raii::ShaderModule fragShaderModule = nullptr;
 
-  void initPipeline(const sauce::PhysicalDevice& physicalDevice, const sauce::LogicalDevice& logicalDevice, const vk::raii::DescriptorSetLayout& descriptorSetLayout, const sauce::SwapChain& swapChain, vk::PipelineShaderStageCreateInfo* shaderStages) {
+  void initPipeline(vk::PipelineShaderStageCreateInfo* shaderStages) {
     
     auto bindingDescription = Vertex::getBindingDescription();
     auto attributeDescriptions = Vertex::getAttributeDescription();
     vk::PipelineVertexInputStateCreateInfo vertexInputInfo {
-      .vertexBindingDescriptionCount = 1,
-      .pVertexBindingDescriptions = &bindingDescription,
-      .vertexAttributeDescriptionCount = attributeDescriptions.size(),
-      .pVertexAttributeDescriptions = attributeDescriptions.data(),
+      .vertexBindingDescriptionCount = config.hasVertexInput ? 1u : 0u,
+      .pVertexBindingDescriptions = config.hasVertexInput ? &bindingDescription : nullptr,
+      .vertexAttributeDescriptionCount = config.hasVertexInput ? static_cast<uint32_t>(attributeDescriptions.size()) : 0u,
+      .pVertexAttributeDescriptions = config.hasVertexInput ? attributeDescriptions.data() : nullptr,
     };
 
     vk::PipelineInputAssemblyStateCreateInfo inputAssemblyInfo {
@@ -150,8 +154,8 @@ private:
 
 
     vk::PipelineDepthStencilStateCreateInfo depthStencil {
-      .depthTestEnable = vk::True,
-      .depthWriteEnable = vk::True,
+      .depthTestEnable = config.depthTestEnable ? vk::True : vk::False,
+      .depthWriteEnable = config.depthWrite ? vk::True : vk::False,
       .depthCompareOp = vk::CompareOp::eLess,
       .depthBoundsTestEnable = vk::False,
       .stencilTestEnable = vk::False,
@@ -187,20 +191,20 @@ private:
 
     vk::PipelineLayoutCreateInfo pipelineLayoutInfo {
       .setLayoutCount = 1,
-      .pSetLayouts = &*descriptorSetLayout,
+      .pSetLayouts = &*config.descriptorSetLayout,
       .pushConstantRangeCount = 1,
       .pPushConstantRanges = &pushConstantRange,
     };
 
-    layout = vk::raii::PipelineLayout { *logicalDevice, pipelineLayoutInfo };
+    layout = vk::raii::PipelineLayout { *config.logicalDevice, pipelineLayoutInfo };
 
 
-    vk::Format depthFormat = findDepthFormat(physicalDevice);
+    vk::Format depthFormat = findDepthFormat(config.physicalDevice);
 
     vk::PipelineRenderingCreateInfo renderingCreateInfo {
       .colorAttachmentCount = 1,
-      .pColorAttachmentFormats = &swapChain.getSurfaceFormat().format,
-      .depthAttachmentFormat = depthFormat,
+      .pColorAttachmentFormats = &config.colorFormat,
+      .depthAttachmentFormat = config.depthTestEnable ? depthFormat : vk::Format::eUndefined,
     };
 
     vk::GraphicsPipelineCreateInfo pipelineInfo {
@@ -219,7 +223,7 @@ private:
       .renderPass = nullptr,
     };
 
-    pipeline = vk::raii::Pipeline { *logicalDevice, nullptr, pipelineInfo };
+    pipeline = vk::raii::Pipeline { *config.logicalDevice, nullptr, pipelineInfo };
   }
 
   void initPipelineConfigurable(

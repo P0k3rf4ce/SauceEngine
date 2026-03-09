@@ -8,6 +8,16 @@
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 
+#include <string>
+#include <vector>
+
+#include <memory>
+#include <chrono>
+#include <filesystem>
+#include <string>
+#include <vector>
+
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -76,7 +86,7 @@ public:
   void createEmptyEntity();
   void createBoxEntity();
   void createBallEntity();
-  
+
   const sauce::PhysicalDevice& getPhysicalDevice() const { return physicalDevice; }
   const sauce::LogicalDevice& getLogicalDevice() const { return logicalDevice; }
   sauce::Renderer& getRenderer() { return *pRenderer; }
@@ -107,6 +117,18 @@ private:
   void buildEditorUI();
   void setupDefaultDockLayout(ImGuiID dockspaceId);
   void processInput();
+
+  bool saveSceneToZip(const std::string& zipPath,
+                               const std::string& scenePath,
+                               const std::vector<std::string>& assetPaths);
+  std::string loadFileToString(const std::string& path);
+  bool zipFolder(const std::filesystem::path& src, const std::filesystem::path& dst);
+  bool unzipToFolder(const std::filesystem::path& zipPath, const std::filesystem::path& outDir);
+  void loadSceneFromZip(const std::string& zipPath);
+
+  bool showExportZipDialog = false;
+  bool showImportZipDialog = false;
+
 
   void recordEditorCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t imageIndex);
   void uploadMeshGPUResources();

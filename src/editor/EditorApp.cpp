@@ -18,8 +18,10 @@
 #include <imgui_internal.h>
 #include <iostream>
 #include <filesystem>
+#include <fstream>
 #include <cmath>
 #include <cstring>
+#include <editor/zip_file.hpp>
 
 namespace sauce::editor {
 
@@ -160,6 +162,10 @@ void EditorApp::initVulkan() {
 
   // Create grid pipeline (no vertex input, alpha blending, no culling, no depth write)
   sauce::GraphicsPipelineConfig gridConfig {
+    .physicalDevice = physicalDevice,
+    .logicalDevice = logicalDevice,
+    .descriptorSetLayout = pRenderer->getDescriptorSetLayout(),
+    .colorFormat = OffscreenFramebuffer::COLOR_FORMAT,
     .hasVertexInput = false,
     .enableBlending = true,
     .enableCulling = false,
@@ -178,6 +184,10 @@ void EditorApp::initVulkan() {
 
   // Create unlit pipeline (vertex input, no blending, culling, depth write, push constants)
   sauce::GraphicsPipelineConfig unlitConfig {
+    .physicalDevice = physicalDevice,
+    .logicalDevice = logicalDevice,
+    .descriptorSetLayout = pRenderer->getDescriptorSetLayout(),
+    .colorFormat = OffscreenFramebuffer::COLOR_FORMAT,
     .hasVertexInput = true,
     .enableBlending = false,
     .enableCulling = true,
@@ -196,6 +206,10 @@ void EditorApp::initVulkan() {
 
   // Create lit pipeline (same config, PBR shaders)
   sauce::GraphicsPipelineConfig litConfig {
+    .physicalDevice = physicalDevice,
+    .logicalDevice = logicalDevice,
+    .descriptorSetLayout = pRenderer->getDescriptorSetLayout(),
+    .colorFormat = OffscreenFramebuffer::COLOR_FORMAT,
     .hasVertexInput = true,
     .enableBlending = false,
     .enableCulling = true,
@@ -880,7 +894,27 @@ void EditorApp::buildEditorUI() {
         dialogPathBuf[sizeof(dialogPathBuf) - 1] = '\0';
         showSaveAsDialog = true;
       }
+
       ImGui::Separator();
+
+    if (ImGui::MenuItem("Export Scene as ZIP...")) {
+        std::string defaultPath = (std::filesystem::current_path() / "scene_export.zip").string();
+        std::strncpy(dialogPathBuf, defaultPath.c_str(), sizeof(dialogPathBuf) - 1);
+        dialogPathBuf[sizeof(dialogPathBuf) - 1] = '\0';
+        showExportZipDialog = true;
+    }
+
+    if (ImGui::MenuItem("Import Scene from ZIP...")) {
+        std::string defaultPath = (std::filesystem::current_path() / "scene_import.zip").string();
+        std::strncpy(dialogPathBuf, defaultPath.c_str(), sizeof(dialogPathBuf) - 1);
+        dialogPathBuf[sizeof(dialogPathBuf) - 1] = '\0';
+        showImportZipDialog = true;
+    }
+
+
+
+      ImGui::Separator();
+
       if (ImGui::MenuItem("Exit", "Esc")) {
         glfwSetWindowShouldClose(window, true);
       }
@@ -996,6 +1030,77 @@ void EditorApp::buildEditorUI() {
     ImGui::EndPopup();
   }
 
+
+// Export Scene as ZIP dialog
+if (showExportZipDialog) {
+    ImGui::OpenPopup("Export Scene as ZIP");
+    showExportZipDialog = false;
+}
+
+if (ImGui::BeginPopupModal("Export Scene as ZIP", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::Text("ZIP file path:");
+    ImGui::SetNextItemWidth(400);
+    ImGui::InputText("##exportzip", dialogPathBuf, sizeof(dialogPathBuf));
+
+    ImGui::Spacing();
+
+    if (ImGui::Button("Export", ImVec2(120, 0))) {
+        std::string zipPath = dialogPathBuf;
+
+        // Collect asset paths (basic version)
+        std::vector<std::string> assets;
+        for (auto& entity : pScene->getEntities()) {
+            auto mrcs = entity.getComponents<MeshRendererComponent>();
+            for (auto* mrc : mrcs) {
+                if (!mrc->getModelPath().empty()) {
+                    assets.push_back(mrc->getModelPath());
+                }
+            }
+        }
+
+        if (saveSceneToZip(zipPath, pScene->getCurrentFilePath(), assets)) {
+            setStatusMessage("Exported scene to ZIP");
+            ImGui::CloseCurrentPopup();
+        }
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+        ImGui::CloseCurrentPopup();
+    }
+
+    ImGui::EndPopup();
+}
+// Import Scene from ZIP dialog
+if (showImportZipDialog) {
+    ImGui::OpenPopup("Import Scene from ZIP");
+    showImportZipDialog = false;
+}
+
+if (ImGui::BeginPopupModal("Import Scene from ZIP", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::Text("ZIP file path:");
+    ImGui::SetNextItemWidth(400);
+    ImGui::InputText("##importzip", dialogPathBuf, sizeof(dialogPathBuf));
+
+    ImGui::Spacing();
+
+    if (ImGui::Button("Import", ImVec2(120, 0))) {
+        loadSceneFromZip(dialogPathBuf);
+        setStatusMessage("Imported scene from ZIP");
+        ImGui::CloseCurrentPopup();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+        ImGui::CloseCurrentPopup();
+    }
+
+    ImGui::EndPopup();
+}
+
+
+
+  
   // Save Scene As dialog
   if (showSaveAsDialog) {
     ImGui::OpenPopup("Save Scene As");
@@ -1354,6 +1459,126 @@ void EditorApp::createBallEntity() {
         setStatusMessage("Created Ball");
     }
 }
+
+bool EditorApp::zipFolder(
+    const std::filesystem::path& src,
+    const std::filesystem::path& dst)
+{
+  if (!std::filesystem::exists(src)) {
+    setStatusMessage("Cannot zip folder: source path does not exist.");
+    return false;
+  }
+
+    miniz_cpp::zip_file zip;
+
+    for (const auto& entry :
+         std::filesystem::recursive_directory_iterator(src))
+    {
+        if (!entry.is_regular_file()) continue;
+
+        std::filesystem::path rel =
+            std::filesystem::relative(entry.path(), src);
+
+        std::string data = loadFileToString(entry.path().string());
+        if (!data.empty()) {
+            zip.writestr(rel.string(), data);
+        }
+    }
+
+    zip.save(dst.string()); 
+    return true;
+}
+
+
+
+std::string EditorApp::loadFileToString(const std::string& path)
+{
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        return {};
+    }
+
+    return std::string(
+        std::istreambuf_iterator<char>(file),
+        std::istreambuf_iterator<char>()
+    );
+}
+
+bool EditorApp::saveSceneToZip(const std::string& zipPath,
+                               const std::string& scenePath,
+                               const std::vector<std::string>& assetPaths)
+{
+    if (zipPath.empty()) {
+        setStatusMessage("Cannot export: no output path specified.");
+        return false;
+    }
+
+    // If the scene has been saved to disk, use that file directly.
+    // Otherwise, save to a temp file so we can still export.
+    std::string sceneFile = scenePath;
+    bool usedTmp = false;
+
+    if (sceneFile.empty() || !std::filesystem::exists(sceneFile)) {
+        auto tmpDir = std::filesystem::temp_directory_path() / "sauce_export";
+        std::filesystem::create_directories(tmpDir);
+        sceneFile = (tmpDir / "scene.gltf").string();
+
+        if (!pScene->saveToFile(sceneFile)) {
+            setStatusMessage("Cannot export: failed to save scene to temp file.");
+            return false;
+        }
+        usedTmp = true;
+    }
+
+    miniz_cpp::zip_file zip;
+
+    std::string sceneData = loadFileToString(sceneFile);
+    zip.writestr("scene.gltf", sceneData);
+
+    for (const auto& asset : assetPaths) {
+        std::string data = loadFileToString(asset);
+        if (!data.empty()) {
+            zip.writestr(asset, data);
+        }
+    }
+
+    zip.save(zipPath);
+
+    if (usedTmp) {
+        std::filesystem::remove_all(std::filesystem::temp_directory_path() / "sauce_export");
+    }
+
+    return true;
+}
+
+
+
+
+
+void EditorApp::loadSceneFromZip(const std::string& zipPath)
+{
+    miniz_cpp::zip_file zip;
+    zip.load(zipPath);
+
+    std::string extractDir = "temp_scene_extract";
+    std::filesystem::create_directories(extractDir);
+
+    zip.extractall(extractDir);
+
+    openScene(extractDir + "/scene.gltf");
+}
+
+bool EditorApp::unzipToFolder(
+    const std::filesystem::path& zipPath,
+    const std::filesystem::path& outDir)
+{
+    miniz_cpp::zip_file zip;
+    zip.load(zipPath.string());
+    zip.extractall(outDir.string());
+    return true;
+}
+
+
 
 void EditorApp::applySettings(const sauce::EditorSettings& s) {
   ImGui::GetIO().FontGlobalScale = s.imguiScale;

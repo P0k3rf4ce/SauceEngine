@@ -16,6 +16,10 @@ GizmoRenderer::GizmoRenderer(
   , pRenderer(&renderer)
 {
   sauce::GraphicsPipelineConfig gizmoConfig {
+    .physicalDevice = physicalDevice,
+    .logicalDevice = logicalDevice,
+    .descriptorSetLayout = pRenderer->getDescriptorSetLayout(),
+    .colorFormat = sauce::editor::OffscreenFramebuffer::COLOR_FORMAT,
     .hasVertexInput = true,
     .enableBlending = false,
     .enableCulling = false,

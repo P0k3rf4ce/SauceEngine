@@ -4,6 +4,7 @@
 #include <app/components/TransformComponent.hpp>
 #include <app/components/RigidBodyComponent.hpp>
 #include <app/components/MeshRendererComponent.hpp>
+#include <app/components/LightComponent.hpp>
 #include <functional>
 #include <cstring>
 
@@ -234,6 +235,10 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
   ubo.proj[1][1] *= -1; // Vulkan Y-flip
   std::memcpy(pRenderer->getCurrentUniformBufferMapped(), &ubo, sizeof(ubo));
 
+  const auto& gpuLights = pScene->collectGPULights();
+  uint32_t lightCount = pRenderer->updateLightSSBO(
+      gpuLights.data(), static_cast<uint32_t>(gpuLights.size()));
+
   cmd.begin({});
 
   // Transition swapchain image -> ColorAttachmentOptimal
@@ -335,6 +340,12 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
     cmd.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), extent));
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
       pRenderer->getPipeline().getLayout(), 0, *pRenderer->getCurrentDescriptorSet(), nullptr);
+
+    cmd.pushConstants<uint32_t>(
+      *pRenderer->getPipeline().getLayout(),
+      vk::ShaderStageFlagBits::eFragment,
+      0u, { lightCount }
+    );
 
     for (auto* mrc : mrcs) {
       auto mesh = mrc->getMesh();
