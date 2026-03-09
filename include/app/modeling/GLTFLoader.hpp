@@ -89,9 +89,11 @@ private:
                                           TextureType type,
                                           bool sRGB);
 
-    // Extension processing
-    // TODO: Implement extension extraction when needed
-    // void extractExtensions(...);
+    // KHR_lights_punctual
+    void parseLightsExtension(const tinygltf::Model& gltfModel);
+    void applyNodeLight(const tinygltf::Node& gltfNode, std::shared_ptr<ModelNode> node);
+
+    std::vector<LightInfo> parsedLights; // populated by parseLightsExtension
 
     // Helper functions
     Transform extractTransform(const tinygltf::Node& gltfNode);
