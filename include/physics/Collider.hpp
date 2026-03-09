@@ -1,3 +1,5 @@
+#pragma once
+
 #include <physics/ContactInfo.hpp>
 
 #include <glm/glm.hpp>

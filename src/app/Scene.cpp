@@ -3,6 +3,7 @@
 #include "app/modeling/GLTFExporter.hpp"
 #include "app/components/TransformComponent.hpp"
 #include "app/components/MeshRendererComponent.hpp"
+#include "app/components/RigidBodyComponent.hpp"
 #include "app/components/PointLightComponent.hpp"
 #include <unordered_map>
 #include <iostream>
@@ -111,10 +112,33 @@ void Scene::loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
     // Add TransformComponent
     entity.addComponent<TransformComponent>(node->getTransform());
 
-    // Add MeshRendererComponents for each mesh-material pair
+    // Add MeshRendererComponents and RigidBodyComponent for each mesh-material pair
     for (const auto& pair : node->getMeshMaterialPairs()) {
         entity.addComponent<MeshRendererComponent>(pair.mesh, pair.material);
         entity.getComponents<MeshRendererComponent>().back()->setModelPath(filePath);
+
+		entity.addComponent<RigidBodyComponent>(
+		  glm::vec3(0.f,0.f,0.f),
+		  glm::vec3(0.f,0.f,0.f),
+		  glm::quat(1.f,0.f,0.f,0.f),
+		  glm::vec3(0.f,0.f,0.f)
+		  );
+		// calculate center of mass
+		glm::vec3 com=RigidBodyComponent::meshCenterOfMass(pair.mesh);
+		entity.getComponents<RigidBodyComponent>().back()->setCenterOfMass(com);
+		// get inverse mass from tags, or compute one
+		float invmass=1.f;
+		if (pair.mesh->hasMetadata("InvMass")) {
+			sauce::modeling::PropertyValue propval=pair.mesh->getMetadata().at("InvMass");
+			float *invmassTag=std::get_if<float>(&propval);
+			if (invmassTag!=nullptr)
+				invmass=*invmassTag;
+			else 
+				invmass=RigidBodyComponent::meshInvMass(pair.mesh);
+		}
+		else
+			invmass=RigidBodyComponent::meshInvMass(pair.mesh);
+		entity.getComponents<RigidBodyComponent>().back()->setInvMass(invmass);
     }
 
     if (node->hasLight()) {

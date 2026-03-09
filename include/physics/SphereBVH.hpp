@@ -1,3 +1,5 @@
+#pragma once
+
 #include <vector>
 #include <algorithm>
 #include <app/modeling/Mesh.hpp>
@@ -14,7 +16,7 @@ struct SphereBVHNode: public Collider {
     
     std::vector<uint32_t> triangleIndices;
 
-    virtual bool checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const = 0;
+    bool checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const;
 
     bool isLeaf() const;
 };
@@ -23,7 +25,7 @@ class SphereBVH: public Collider {
 public:
     SphereBVH(const sauce::modeling::Mesh& mesh);
 
-    virtual bool checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const = 0;
+    bool checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const;
 
     const SphereBVHNode* getRoot() const;
 
