@@ -18,7 +18,7 @@ struct SphereBVHNode: public Collider {
     
     std::vector<uint32_t> triangleIndices;
 
-    virtual bool checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const;
+    bool checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const;
 
     static std::unique_ptr<SphereBVHNode> fromMesh(sauce::modeling::Mesh& mesh);
     bool isLeaf() const;
@@ -28,7 +28,7 @@ class SphereBVH: public Collider {
 public:
     static SphereBVH fromScene(const sauce::Scene& scene);
 
-    virtual bool checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const;
+    bool checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const;
 
     SphereBVHNode *getRoot() const;
 

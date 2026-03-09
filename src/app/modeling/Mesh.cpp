@@ -7,8 +7,43 @@
 namespace sauce {
 namespace modeling {
 
-Mesh::Mesh() {
+Mesh::Mesh(const std::vector<sauce::Vertex>& vertices, const std::vector<uint32_t>& indices)
+    : vertices(vertices)
+    , indices(indices) {
 }
+
+bool Mesh::isValid() const {
+    if (vertices.empty()) {
+        return false;
+    }
+
+    if (indices.empty()) {
+        return false;
+    }
+
+    // Check that all indices are in bounds
+    for (const auto& index : indices) {
+        if (index >= vertices.size()) {
+            return false;
+        }
+    }
+
+    // Check that indices count is a multiple of 3 (triangles)
+    if (indices.size() % 3 != 0) {
+        // TODO: Log warning or handle invalid index count
+    }
+
+    return true;
+}
+
+void Mesh::setMetadata(const std::string& key, const PropertyValue& value) {
+    metadata[key] = value;
+}
+
+bool Mesh::hasMetadata(const std::string& key) const {
+    return metadata.find(key) != metadata.end();
+}
+
 void Mesh::initVulkanResources(const sauce::LogicalDevice& logicalDevice, vk::raii::PhysicalDevice& physicalDevice, vk::raii::CommandPool& commandPool, vk::raii::Queue& queue) {
     vk::DeviceSize vertexBufferSize = sizeof(vertices[0]) * vertices.size();
 
@@ -42,50 +77,15 @@ void Mesh::initVulkanResources(const sauce::LogicalDevice& logicalDevice, vk::ra
 
     sauce::BufferUtils::copyBuffer(logicalDevice, commandPool, queue, stagingIndexBuffer, *indexBuffer, indexBufferSize);
 }
+
 void Mesh::bind(vk::raii::CommandBuffer& commandBuffer) {
     vk::Buffer vertexBuffers[] = { **vertexBuffer };
-    vk::DeviceSize offsets[] = { 0 };
     commandBuffer.bindVertexBuffers(0, *vertexBuffers, {0});
     commandBuffer.bindIndexBuffer(**indexBuffer, 0, vk::IndexType::eUint32);
 }
+
 void Mesh::draw(vk::raii::CommandBuffer& commandBuffer) {
     commandBuffer.drawIndexed(indices.size(), 1, 0, 0, 0);
-}
-Mesh::Mesh(const std::vector<sauce::Vertex>& vertices, const std::vector<uint32_t>& indices)
-    : vertices(vertices)
-    , indices(indices) {
-}
-
-bool Mesh::isValid() const {
-    if (vertices.empty()) {
-        return false;
-    }
-
-    if (indices.empty()) {
-        return false;
-    }
-
-    // Check that all indices are in bounds
-    for (const auto& index : indices) {
-        if (index >= vertices.size()) {
-            return false;
-        }
-    }
-
-    // Check that indices count is a multiple of 3 (triangles)
-    if (indices.size() % 3 != 0) {
-        // Warning: index count is not a multiple of 3
-    }
-
-    return true;
-}
-
-void Mesh::setMetadata(const std::string& key, const PropertyValue& value) {
-    metadata[key] = value;
-}
-
-bool Mesh::hasMetadata(const std::string& key) const {
-    return metadata.find(key) != metadata.end();
 }
 
 void Mesh::generateNormals() {

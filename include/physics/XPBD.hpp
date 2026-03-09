@@ -17,13 +17,15 @@ struct XPBDSolver {
   // we can probably hook up imgui to this at some point for tuning
   int solverIterations = 10;
 
-  void solvePositions(std::vector<sauce::RigidBodyComponent>& rigidBodies, std::vector<Constraint>& constraints, float deltatime) {
+  void solvePositions(std::vector<sauce::RigidBodyComponent>& rigidBodies, std::vector<std::unique_ptr<Constraint>>& constraints, float deltatime) {
 	  /*
 	   * adapted from https://matthias-research.github.io/pages/publications/posBasedDyn.pdf
 	   */
 	  glm::vec3 velocity;
 	  float w;
+	  std::vector<physics::Vertex> centers; // centers of mass for all rigid bodies
 
+	  centers.reserve(rigidBodies.size());
 	  for (auto& r : rigidBodies) {
 		  /* get vertices of r */
 		  auto o = r.getOwner();
@@ -42,19 +44,16 @@ struct XPBDSolver {
 		  r.setPosition(r.getPosition() + velocity*deltatime);
 		  auto constraints=generateCollisionConstraints(rigidBodies);
 
-		  for (int i=0; i<solverIterations; i++) {
-			  /*
-			   * TODO
-			   * generate center of mass from BVH spheres
-			   * also label all the physics::Vertex instances explicitly wherever they appear
-			   */
-			  //projectConstraints(v, constraints, deltatime);
-		  }
+		  centers.push_back({r.getCenterOfMass(), glm::vec3(0.f,0.f,0.f), r.getInvMass()});
+	  }
+
+	  for (int i=0; i<solverIterations; i++) {
+		  projectConstraints(centers, constraints, deltatime);
 	  }
   }
 
   void projectConstraints(
-      std::vector<Vertex>& vertices,
+      std::vector<physics::Vertex>& vertices,
       std::vector<std::unique_ptr<Constraint>>& constraints,
       float deltatime
   ) {

@@ -246,7 +246,7 @@ bool SphereBVHNode::isLeaf() const {
     return left == nullptr && right == nullptr;
 }
 
-bool SphereBVHNode::checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const {
+bool SphereBVHNode::checkCollision(const Collider& collider, std::vector<ContactInfo>& info) {
     const auto* otherSphere = dynamic_cast<const SphereCollider*>(&collider);
     if (!otherSphere) return false;
 
@@ -336,3 +336,22 @@ const SphereBVHNode *SphereBVH::getRoot() const {
 
 };
 
+    glm::vec3 extent = centroidMax - centroidMin;
+    int axis = 0; 
+    if (extent.y > extent.x) axis = 1;
+    if (extent.z > extent[axis]) axis = 2;
+
+    size_t mid = start + count / 2;
+    std::nth_element(triangles.begin() + start,
+                     triangles.begin() + mid,
+                     triangles.begin() + end,
+                     [axis](const TriangleInfo &a, const TriangleInfo &b) {
+                         return a.centroid[axis] < b.centroid[axis];
+                     });
+
+    node->left = buildRecursive(triangles, start, mid);
+    node->right = buildRecursive(triangles, mid, end);
+
+    return node;
+}
+};

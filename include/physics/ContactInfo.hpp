@@ -1,3 +1,5 @@
+#pragma once
+
 #include <glm/glm.hpp>
 
 namespace physics {
@@ -9,8 +11,8 @@ struct ContactInfo {
   ContactInfo(
       glm::vec3 contactPoint,
       glm::vec3 contactNormal,
-      const Collider* pCollider1,
-      const Collider* pCollider2,
+      std::shared_ptr<Collider> pCollider1,
+      std::shared_ptr<Collider> pCollider2,
       float depth,
       float restitution = 1.0f,
       float friction = 0.0f
@@ -22,8 +24,7 @@ struct ContactInfo {
   glm::vec3 contactPoint;
   glm::vec3 contactNormal;
 
-  const Collider* pCollider1;
-  const Collider* pCollider2;
+  std::shared_ptr<Collider> pCollider1, pCollider2;
 
   float depth;
   float restitution;

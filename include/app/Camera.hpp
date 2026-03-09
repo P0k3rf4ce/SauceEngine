@@ -62,6 +62,18 @@ public:
   }
 
   /**
+   * Sets camera to look at target from position
+   */
+  void lookAt(const glm::vec3& position, const glm::vec3& target, const glm::vec3& upVec) {
+    pos = position;
+    worldUp = upVec;
+    glm::vec3 direction = glm::normalize(target - position);
+    yaw = glm::degrees(atan2(direction.z, direction.x));
+    pitch = glm::degrees(asin(direction.y));
+    updateView();
+  }
+
+  /**
    * Translates the camera position by offset
    *
    * @param offs - offset by which to translate the camera
@@ -88,7 +100,13 @@ public:
   /**
    * Set camera FOV
    */
-  void setFOV(float fov) { this->fov=fov; }
+  void setFOV(float newFov) { this->fov = newFov; }
+
+  void setMovementSpeed(float speed) { this->movementSpeed = speed; }
+  float getMovementSpeed() const { return movementSpeed; }
+
+  void setMouseSensitivity(float sensitivity) { this->mouseSensitivity = sensitivity; }
+  float getMouseSensitivity() const { return mouseSensitivity; }
 
   /**
    * Get view matrix from the current view vectors
@@ -144,8 +162,8 @@ public:
 	 * @param constrainPitch - whether or not to clamp pitch when out of bounds
 	 */
 	void processMouseMovement(float xoffset, float yoffset, bool constrainPitch = true) {
-    yaw += xoffset;
-		pitch += yoffset;
+    yaw += xoffset * mouseSensitivity;
+		pitch += yoffset * mouseSensitivity;
 
 		if (constrainPitch) {
 			pitch = std::max(std::min(pitch, CameraCreateInfo::PITCH_MAX), CameraCreateInfo::PITCH_MIN);

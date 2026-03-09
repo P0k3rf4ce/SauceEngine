@@ -81,6 +81,8 @@ std::shared_ptr<Model> GLTFLoader::processScene(const tinygltf::Model& gltfModel
         return nullptr;
     }
 
+    parseLightsExtension(gltfModel);
+
     const auto& scene = gltfModel.scenes[sceneIndex];
     auto model = std::make_shared<Model>();
 
@@ -131,6 +133,8 @@ std::shared_ptr<ModelNode> GLTFLoader::processNode(const tinygltf::Model& gltfMo
             }
         }
     }
+
+    applyNodeLight(gltfNode, node);
 
     // Process children
     processNodeChildren(gltfModel, gltfNode, node);
@@ -481,6 +485,77 @@ std::shared_ptr<Texture> GLTFLoader::processImage(const tinygltf::Model& gltfMod
     }
 
     return textureCache.getDefaultTexture(type);
+}
+
+void GLTFLoader::parseLightsExtension(const tinygltf::Model& gltfModel) {
+    parsedLights.clear();
+
+    auto extIt = gltfModel.extensions.find("KHR_lights_punctual");
+    if (extIt == gltfModel.extensions.end()) return;
+
+    const auto& extValue = extIt->second;
+    if (!extValue.Has("lights") || !extValue.Get("lights").IsArray()) return;
+
+    const auto& lightsArray = extValue.Get("lights");
+    for (size_t i = 0; i < lightsArray.ArrayLen(); ++i) {
+        const auto& lightVal = lightsArray.Get(static_cast<int>(i));
+        LightInfo info{};
+
+        if (lightVal.Has("name") && lightVal.Get("name").IsString()) {
+            info.name = lightVal.Get("name").Get<std::string>();
+        }
+
+        if (lightVal.Has("type") && lightVal.Get("type").IsString()) {
+            const auto& typeStr = lightVal.Get("type").Get<std::string>();
+            if (typeStr == "directional") info.type = LightInfo::Type::Directional;
+            else if (typeStr == "point")  info.type = LightInfo::Type::Point;
+            else if (typeStr == "spot")   info.type = LightInfo::Type::Spot;
+        }
+
+        if (lightVal.Has("color") && lightVal.Get("color").IsArray()) {
+            const auto& c = lightVal.Get("color");
+            if (c.ArrayLen() >= 3) {
+                info.color = glm::vec3(
+                    static_cast<float>(c.Get(0).IsNumber() ? c.Get(0).GetNumberAsDouble() : 1.0),
+                    static_cast<float>(c.Get(1).IsNumber() ? c.Get(1).GetNumberAsDouble() : 1.0),
+                    static_cast<float>(c.Get(2).IsNumber() ? c.Get(2).GetNumberAsDouble() : 1.0)
+                );
+            }
+        }
+
+        if (lightVal.Has("intensity") && lightVal.Get("intensity").IsNumber()) {
+            info.intensity = static_cast<float>(lightVal.Get("intensity").GetNumberAsDouble());
+        }
+
+        if (lightVal.Has("range") && lightVal.Get("range").IsNumber()) {
+            info.range = static_cast<float>(lightVal.Get("range").GetNumberAsDouble());
+        }
+
+        if (lightVal.Has("spot") && lightVal.Get("spot").IsObject()) {
+            const auto& spot = lightVal.Get("spot");
+            if (spot.Has("innerConeAngle") && spot.Get("innerConeAngle").IsNumber()) {
+                info.innerConeAngle = static_cast<float>(spot.Get("innerConeAngle").GetNumberAsDouble());
+            }
+            if (spot.Has("outerConeAngle") && spot.Get("outerConeAngle").IsNumber()) {
+                info.outerConeAngle = static_cast<float>(spot.Get("outerConeAngle").GetNumberAsDouble());
+            }
+        }
+
+        parsedLights.push_back(info);
+    }
+}
+
+void GLTFLoader::applyNodeLight(const tinygltf::Node& gltfNode, std::shared_ptr<ModelNode> node) {
+    auto extIt = gltfNode.extensions.find("KHR_lights_punctual");
+    if (extIt == gltfNode.extensions.end()) return;
+
+    const auto& extValue = extIt->second;
+    if (!extValue.Has("light") || !extValue.Get("light").IsInt()) return;
+
+    int lightIndex = extValue.Get("light").GetNumberAsInt();
+    if (lightIndex < 0 || lightIndex >= static_cast<int>(parsedLights.size())) return;
+
+    node->setLightInfo(parsedLights[lightIndex]);
 }
 
 } // namespace modeling
