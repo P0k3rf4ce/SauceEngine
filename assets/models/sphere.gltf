@@ -6,14 +6,13 @@
     "scenes": [
         {
             "nodes": [
-                0,
-                1
+                0
             ]
         }
     ],
     "nodes": [
         {
-            "name": "Mesh",
+            "name": "Ball",
             "matrix": [
                 1.0,
                 0.0,
@@ -33,28 +32,6 @@
                 1.0
             ],
             "mesh": 0
-        },
-        {
-            "name": "Camera",
-            "matrix": [
-                1.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                1.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                1.0,
-                0.0,
-                0.0,
-                0.0,
-                3.0,
-                1.0
-            ],
-            "camera": 0
         }
     ],
     "meshes": [
@@ -139,16 +116,6 @@
     "materials": [
         {
             "name": "::nvidia::sdk_examples::tutorials::dxr_sphere_mat"
-        }
-    ],
-    "cameras": [
-        {
-            "name": "Camera",
-            "type": "perspective",
-            "perspective": {
-                "znear": 0.01,
-                "yfov": 0.7853982
-            }
         }
     ]
 }
