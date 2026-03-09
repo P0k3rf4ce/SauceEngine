@@ -7,7 +7,10 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <optional>
 #include <unordered_map>
+
+#include <glm/glm.hpp>
 
 namespace sauce {
 namespace modeling {
@@ -15,6 +18,17 @@ namespace modeling {
 struct MeshMaterialPair {
     std::shared_ptr<Mesh> mesh;
     std::shared_ptr<Material> material;
+};
+
+struct LightInfo {
+    enum class Type { Directional = 0, Point = 1, Spot = 2 };
+    Type      type{Type::Point};
+    glm::vec3 color{1.0f};
+    float     intensity{1.0f};
+    float     range{0.0f};
+    float     innerConeAngle{0.0f};
+    float     outerConeAngle{0.7853981f}; // pi/4
+    std::string name;
 };
 
 class ModelNode {
@@ -38,6 +52,10 @@ public:
     const std::vector<MeshMaterialPair>& getMeshMaterialPairs() const { return meshMaterialPairs; }
     void addMeshMaterialPair(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material);
 
+    const std::optional<LightInfo>& getLightInfo() const { return lightInfo; }
+    void setLightInfo(const LightInfo& info) { lightInfo = info; }
+    bool hasLight() const { return lightInfo.has_value(); }
+
     // Metadata access (for GLTF extensions)
     const std::unordered_map<std::string, PropertyValue>& getMetadata() const { return metadata; }
     void setMetadata(const std::string& key, const PropertyValue& value);
@@ -52,6 +70,7 @@ private:
     ModelNode* parent;  // Raw pointer to avoid circular shared_ptr
     std::vector<std::shared_ptr<ModelNode>> children;
     std::vector<MeshMaterialPair> meshMaterialPairs;
+    std::optional<LightInfo> lightInfo;
     std::unordered_map<std::string, PropertyValue> metadata;
 };
 
