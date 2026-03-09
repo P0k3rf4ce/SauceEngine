@@ -5,6 +5,7 @@
 #include <editor/EditorCamera.hpp>
 #include <vector>
 #include <cmath>
+#include <glm/gtc/quaternion.hpp>
 
 namespace sauce::editor {
 
@@ -24,12 +25,10 @@ public:
   virtual GizmoMeshData generateMesh() const = 0;
 
   virtual GizmoAxis hitTest(const Ray& ray,
-                            const glm::vec3& position, float scale) const = 0;
+                            const glm::vec3& position, const glm::quat& rotation, float scale) const = 0;
 
-  virtual void beginInteraction(GizmoAxis axis, const Ray& ray,
-                                const glm::vec3& entityPos) = 0;
-  virtual glm::vec3 updateInteraction(const Ray& ray,
-                                       const glm::vec3& entityPos) = 0;
+  virtual void beginInteraction(GizmoAxis axis, const Ray& ray, const glm::vec3& entityPos, const glm::quat& rotation) = 0;
+  virtual glm::vec3 updateInteraction(const Ray& ray, const glm::vec3& entityPos, const glm::quat& rotation) = 0;
   virtual void endInteraction() = 0;
 
   bool isInteracting() const { return interacting; }
