@@ -14,6 +14,7 @@
 #include <app/BufferUtils.hpp>
 #include <app/Camera.hpp>
 #include <app/GraphicsPipeline.hpp>
+#include <app/IBLGenerator.hpp>
 #include <app/ImGuiRenderer.hpp>
 #include <app/ImageUtils.hpp>
 #include <app/LogicalDevice.hpp>
@@ -109,6 +110,7 @@ public:
 
     createDepthResources(createInfo.physicalDevice, createInfo.logicalDevice);
     createDefaultTextures(createInfo.physicalDevice, createInfo.logicalDevice);
+    createDefaultIBLTextures(createInfo.physicalDevice, createInfo.logicalDevice);
     createMaterialBuffer(createInfo.physicalDevice, createInfo.logicalDevice);
     createLightSSBO(createInfo.physicalDevice, createInfo.logicalDevice);
   
@@ -142,7 +144,7 @@ public:
   const vk::raii::CommandPool& getCommandPool() const { return commandPool; }
 
   void createDescriptorSetLayout(const sauce::LogicalDevice& logicalDevice) {
-    std::array<vk::DescriptorSetLayoutBinding, 13> bindings;
+    std::array<vk::DescriptorSetLayoutBinding, 19> bindings;
 
     // UBO
     bindings[0] = { .binding = 0, .descriptorType = vk::DescriptorType::eUniformBuffer,  .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment };
@@ -150,11 +152,21 @@ public:
     bindings[1] = { .binding = 1, .descriptorType = vk::DescriptorType::eUniformBuffer,  .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
     // Light SSBO
     bindings[2] = { .binding = 2, .descriptorType = vk::DescriptorType::eStorageBuffer,  .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
-    // Texture and Sampler pairs
+    // Material texture and sampler pairs (bindings 3-12)
     for (uint32_t i = 0; i < 5; ++i) {
       bindings[3 + i * 2] = { .binding = 3 + i * 2, .descriptorType = vk::DescriptorType::eSampledImage, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
       bindings[4 + i * 2] = { .binding = 4 + i * 2, .descriptorType = vk::DescriptorType::eSampler,      .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
     }
+    // IBL texture and sampler pairs (bindings 13-18)
+    // Irradiance cubemap
+    bindings[13] = { .binding = 13, .descriptorType = vk::DescriptorType::eSampledImage, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
+    bindings[14] = { .binding = 14, .descriptorType = vk::DescriptorType::eSampler,      .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
+    // Prefilter cubemap
+    bindings[15] = { .binding = 15, .descriptorType = vk::DescriptorType::eSampledImage, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
+    bindings[16] = { .binding = 16, .descriptorType = vk::DescriptorType::eSampler,      .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
+    // BRDF LUT
+    bindings[17] = { .binding = 17, .descriptorType = vk::DescriptorType::eSampledImage, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
+    bindings[18] = { .binding = 18, .descriptorType = vk::DescriptorType::eSampler,      .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
 
     vk::DescriptorSetLayoutCreateInfo dsLayoutInfo {
       .bindingCount = static_cast<uint32_t>(bindings.size()),
@@ -168,8 +180,8 @@ public:
     std::array<vk::DescriptorPoolSize, 4> poolSizes {{
       { vk::DescriptorType::eUniformBuffer, 2u * MAX_FRAMES_IN_FLIGHT },
       { vk::DescriptorType::eStorageBuffer, 1u * MAX_FRAMES_IN_FLIGHT },
-      { vk::DescriptorType::eSampledImage,  5u * MAX_FRAMES_IN_FLIGHT },
-      { vk::DescriptorType::eSampler,       5u * MAX_FRAMES_IN_FLIGHT },
+      { vk::DescriptorType::eSampledImage,  8u * MAX_FRAMES_IN_FLIGHT }, // 5 material + 3 IBL
+      { vk::DescriptorType::eSampler,       8u * MAX_FRAMES_IN_FLIGHT }, // 5 material + 3 IBL
     }};
 
     vk::DescriptorPoolCreateInfo poolCreateInfo {
@@ -195,10 +207,16 @@ public:
     vk::DescriptorImageInfo  imageInfo     { .imageView = *defaultImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
     vk::DescriptorImageInfo  samplerInfo   { .sampler = *defaultSampler };
 
+    // IBL descriptor image infos (use default cubemap/LUT until real IBL maps are set)
+    vk::DescriptorImageInfo irradianceImageInfo { .imageView = *defaultCubemapView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    vk::DescriptorImageInfo iblSamplerInfo      { .sampler = *iblSampler };
+    vk::DescriptorImageInfo prefilterImageInfo  { .imageView = *defaultCubemapView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    vk::DescriptorImageInfo brdfLUTImageInfo    { .imageView = *defaultImageView,   .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
       vk::DescriptorBufferInfo uboInfo { .buffer = uniformBuffers[i], .offset = 0, .range = sizeof(UniformBufferObject) };
 
-      std::array<vk::WriteDescriptorSet, 13> writes;
+      std::array<vk::WriteDescriptorSet, 19> writes;
       writes[0] = { .dstSet = descriptorSets[i], .dstBinding = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eUniformBuffer,  .pBufferInfo = &uboInfo };
       writes[1] = { .dstSet = descriptorSets[i], .dstBinding = 1, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eUniformBuffer,  .pBufferInfo = &materialInfo };
       writes[2] = { .dstSet = descriptorSets[i], .dstBinding = 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eStorageBuffer,  .pBufferInfo = &lightSSBOInfo };
@@ -206,6 +224,13 @@ public:
         writes[3 + t * 2] = { .dstSet = descriptorSets[i], .dstBinding = 3 + t * 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampledImage, .pImageInfo = &imageInfo };
         writes[4 + t * 2] = { .dstSet = descriptorSets[i], .dstBinding = 4 + t * 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampler,      .pImageInfo = &samplerInfo };
       }
+      // IBL descriptors
+      writes[13] = { .dstSet = descriptorSets[i], .dstBinding = 13, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampledImage, .pImageInfo = &irradianceImageInfo };
+      writes[14] = { .dstSet = descriptorSets[i], .dstBinding = 14, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampler,      .pImageInfo = &iblSamplerInfo };
+      writes[15] = { .dstSet = descriptorSets[i], .dstBinding = 15, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampledImage, .pImageInfo = &prefilterImageInfo };
+      writes[16] = { .dstSet = descriptorSets[i], .dstBinding = 16, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampler,      .pImageInfo = &iblSamplerInfo };
+      writes[17] = { .dstSet = descriptorSets[i], .dstBinding = 17, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampledImage, .pImageInfo = &brdfLUTImageInfo };
+      writes[18] = { .dstSet = descriptorSets[i], .dstBinding = 18, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampler,      .pImageInfo = &iblSamplerInfo };
 
       logicalDevice->updateDescriptorSets(writes, {});
     }
@@ -619,6 +644,127 @@ public:
     defaultSampler = vk::raii::Sampler{ *logicalDevice, samplerInfo };
   }
 
+  // Creates a 1x1 black cubemap and a linear-clamp sampler used as fallbacks for IBL textures.
+  void createDefaultIBLTextures(const sauce::PhysicalDevice& physicalDevice, const sauce::LogicalDevice& logicalDevice) {
+    // Create 1x1 cubemap (6 faces) with black pixels as default irradiance/prefilter
+    uint8_t blackPixel[4] = {0, 0, 0, 255};
+    vk::DeviceSize faceSize = sizeof(blackPixel);
+    vk::DeviceSize totalSize = faceSize * 6;
+
+    vk::raii::Buffer stagingBuffer = nullptr;
+    vk::raii::DeviceMemory stagingMemory = nullptr;
+    sauce::BufferUtils::createBuffer(
+        physicalDevice, logicalDevice, totalSize,
+        vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+        stagingBuffer, stagingMemory
+    );
+    void* mapped = stagingMemory.mapMemory(0, totalSize);
+    for (uint32_t face = 0; face < 6; ++face) {
+      memcpy(static_cast<uint8_t*>(mapped) + face * faceSize, blackPixel, faceSize);
+    }
+    stagingMemory.unmapMemory();
+
+    ImageUtils::createImage(
+        physicalDevice, logicalDevice, 1, 1,
+        vk::Format::eR8G8B8A8Unorm, vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        defaultCubemap, defaultCubemapMemory,
+        1, 6, vk::ImageCreateFlagBits::eCubeCompatible
+    );
+
+    ImageUtils::transitionImageLayout(
+        logicalDevice, commandPool, *pQueue, defaultCubemap,
+        vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal,
+        {}, vk::AccessFlagBits2::eTransferWrite,
+        vk::PipelineStageFlagBits2::eNone, vk::PipelineStageFlagBits2::eTransfer,
+        1, 6
+    );
+
+    // Copy each face from staging buffer using a single-time command buffer
+    {
+      vk::CommandBufferAllocateInfo allocInfo {
+        .commandPool = commandPool,
+        .level = vk::CommandBufferLevel::ePrimary,
+        .commandBufferCount = 1,
+      };
+      vk::raii::CommandBuffer cmd = std::move(logicalDevice->allocateCommandBuffers(allocInfo).front());
+      cmd.begin(vk::CommandBufferBeginInfo{ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+
+      std::array<vk::BufferImageCopy, 6> copyRegions;
+      for (uint32_t face = 0; face < 6; ++face) {
+        copyRegions[face] = {
+          .bufferOffset = face * faceSize,
+          .bufferRowLength = 0,
+          .bufferImageHeight = 0,
+          .imageSubresource = {
+            .aspectMask = vk::ImageAspectFlagBits::eColor,
+            .mipLevel = 0,
+            .baseArrayLayer = face,
+            .layerCount = 1,
+          },
+          .imageOffset = {0, 0, 0},
+          .imageExtent = {1, 1, 1},
+        };
+      }
+      cmd.copyBufferToImage(*stagingBuffer, *defaultCubemap, vk::ImageLayout::eTransferDstOptimal, copyRegions);
+
+      cmd.end();
+      pQueue->submit(vk::SubmitInfo{
+        .commandBufferCount = 1,
+        .pCommandBuffers = &*cmd,
+      }, nullptr);
+      pQueue->waitIdle();
+    }
+
+    ImageUtils::transitionImageLayout(
+        logicalDevice, commandPool, *pQueue, defaultCubemap,
+        vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
+        vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eShaderRead,
+        vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eFragmentShader,
+        1, 6
+    );
+
+    defaultCubemapView = ImageUtils::createImageView(
+        logicalDevice, defaultCubemap, vk::Format::eR8G8B8A8Unorm,
+        vk::ImageAspectFlagBits::eColor, vk::ImageViewType::eCube, 1, 6
+    );
+
+    // IBL sampler: linear filtering, clamp-to-edge
+    vk::SamplerCreateInfo iblSamplerInfo {
+      .magFilter = vk::Filter::eLinear,
+      .minFilter = vk::Filter::eLinear,
+      .mipmapMode = vk::SamplerMipmapMode::eLinear,
+      .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+      .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+      .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+      .minLod = 0.0f,
+      .maxLod = 4.0f, // prefilter map has 5 mip levels
+    };
+    iblSampler = vk::raii::Sampler{ *logicalDevice, iblSamplerInfo };
+  }
+
+  // Updates the IBL descriptor bindings with real IBL maps from IBLGenerator.
+  void setIBLMaps(const sauce::LogicalDevice& logicalDevice, const IBLMaps& maps) {
+    vk::DescriptorImageInfo irradianceImageInfo { .imageView = *maps.irradianceMapView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    vk::DescriptorImageInfo prefilterImageInfo  { .imageView = *maps.prefilterMapView,  .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    vk::DescriptorImageInfo brdfLUTImageInfo    { .imageView = *maps.brdfLUTView,       .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    vk::DescriptorImageInfo iblSamplerImageInfo { .sampler = *maps.sampler };
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+      std::array<vk::WriteDescriptorSet, 6> writes;
+      writes[0] = { .dstSet = descriptorSets[i], .dstBinding = 13, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampledImage, .pImageInfo = &irradianceImageInfo };
+      writes[1] = { .dstSet = descriptorSets[i], .dstBinding = 14, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampler,      .pImageInfo = &iblSamplerImageInfo };
+      writes[2] = { .dstSet = descriptorSets[i], .dstBinding = 15, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampledImage, .pImageInfo = &prefilterImageInfo };
+      writes[3] = { .dstSet = descriptorSets[i], .dstBinding = 16, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampler,      .pImageInfo = &iblSamplerImageInfo };
+      writes[4] = { .dstSet = descriptorSets[i], .dstBinding = 17, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampledImage, .pImageInfo = &brdfLUTImageInfo };
+      writes[5] = { .dstSet = descriptorSets[i], .dstBinding = 18, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampler,      .pImageInfo = &iblSamplerImageInfo };
+
+      logicalDevice->updateDescriptorSets(writes, {});
+    }
+  }
+
   // Creates a host-visible uniform buffer holding default PBR material properties.
   void createMaterialBuffer(const sauce::PhysicalDevice& physicalDevice, const sauce::LogicalDevice& logicalDevice) {
     MaterialData defaults{};
@@ -693,6 +839,12 @@ private:
   vk::raii::DeviceMemory defaultImageMemory = nullptr;
   vk::raii::ImageView defaultImageView = nullptr;
   vk::raii::Sampler defaultSampler = nullptr;
+
+  // Default IBL resources (black cubemap + linear-clamp sampler)
+  vk::raii::Image defaultCubemap = nullptr;
+  vk::raii::DeviceMemory defaultCubemapMemory = nullptr;
+  vk::raii::ImageView defaultCubemapView = nullptr;
+  vk::raii::Sampler iblSampler = nullptr;
 };
 
 }
