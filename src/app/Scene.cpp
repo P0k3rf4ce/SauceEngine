@@ -5,6 +5,7 @@
 #include "app/components/MeshRendererComponent.hpp"
 #include "app/components/RigidBodyComponent.hpp"
 #include "app/components/PointLightComponent.hpp"
+#include "app/components/DirectionalLightComponent.hpp"
 #include <unordered_map>
 #include <iostream>
 
@@ -146,6 +147,8 @@ void Scene::loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
         const auto& info = node->getLightInfo().value();
         if (info.type == modeling::LightInfo::Type::Point) {
             entity.addComponent<PointLightComponent>(info.color, info.intensity, info.range);
+        } else if (info.type == modeling::LightInfo::Type::Directional) {
+            entity.addComponent<DirectionalLightComponent>(info.color, info.intensity);
         }
     }
 
@@ -201,10 +204,21 @@ const std::vector<GPULight>& Scene::collectGPULights() {
         if (!lc || !lc->getActive()) continue;
 
         glm::vec3 worldPos{0.0f};
+        glm::vec3 direction{0.0f, 0.0f, -1.0f};
+        
         auto* tc = entity.getComponent<TransformComponent>();
-        if (tc) worldPos = tc->getTranslation();
+        if (tc) {
+            worldPos = tc->getTranslation();
+            direction = tc->getRotation() * direction;
+        }
 
-        gpuLightBuffer.push_back(lc->toGPULight(worldPos));
+        GPULight gpuLight = lc->toGPULight(worldPos);
+
+        if (lc->getLightType() == LightType::Directional || lc->getLightType() == LightType::Spot) {
+            gpuLight.direction = direction;
+        }
+
+        gpuLightBuffer.push_back(gpuLight);
     }
     return gpuLightBuffer;
 }
