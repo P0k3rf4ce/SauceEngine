@@ -16,7 +16,7 @@ namespace sauce {
 struct GraphicsPipelineConfig {
   const sauce::PhysicalDevice& physicalDevice;
   const sauce::LogicalDevice& logicalDevice;
-  const vk::raii::DescriptorSetLayout& descriptorSetLayout;
+  std::vector<vk::DescriptorSetLayout> descriptorSetLayouts;
   vk::Format colorFormat;
   std::string shaderPath;
   const std::string vertEntryPoint = "vertMain";
@@ -82,7 +82,7 @@ struct GraphicsPipeline {
   GraphicsPipeline(
       const sauce::PhysicalDevice& physicalDevice,
       const sauce::LogicalDevice& logicalDevice,
-      const vk::raii::DescriptorSetLayout& descriptorSetLayout,
+      const std::vector<vk::DescriptorSetLayout>& descriptorSetLayouts,
       vk::Format colorFormat,
       const std::string& vertShaderPath,
       const std::string& fragShaderPath,
@@ -106,7 +106,7 @@ struct GraphicsPipeline {
       fragShaderCreateInfo,
     };
 
-    initPipelineConfigurable(physicalDevice, logicalDevice, descriptorSetLayout, colorFormat, shaderStages, config);
+    initPipelineConfigurable(physicalDevice, logicalDevice, descriptorSetLayouts, colorFormat, shaderStages, config);
   }
 
 
@@ -190,8 +190,8 @@ private:
     };
 
     vk::PipelineLayoutCreateInfo pipelineLayoutInfo {
-      .setLayoutCount = 1,
-      .pSetLayouts = &*config.descriptorSetLayout,
+      .setLayoutCount = static_cast<uint32_t>(config.descriptorSetLayouts.size()),
+      .pSetLayouts = config.descriptorSetLayouts.data(),
       .pushConstantRangeCount = 1,
       .pPushConstantRanges = &pushConstantRange,
     };
@@ -229,7 +229,7 @@ private:
   void initPipelineConfigurable(
       const sauce::PhysicalDevice& physicalDevice,
       const sauce::LogicalDevice& logicalDevice,
-      const vk::raii::DescriptorSetLayout& descriptorSetLayout,
+      const std::vector<vk::DescriptorSetLayout>& descriptorSetLayouts,
       vk::Format colorFormat,
       vk::PipelineShaderStageCreateInfo* shaderStages,
       const GraphicsPipelineConfig& config
@@ -316,8 +316,8 @@ private:
     };
 
     vk::PipelineLayoutCreateInfo pipelineLayoutInfo {
-      .setLayoutCount = 1,
-      .pSetLayouts = &*descriptorSetLayout,
+      .setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size()),
+      .pSetLayouts = descriptorSetLayouts.data(),
       .pushConstantRangeCount = config.hasPushConstants ? 1u : 0u,
       .pPushConstantRanges = config.hasPushConstants ? &pushRange : nullptr,
     };

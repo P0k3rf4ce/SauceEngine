@@ -339,7 +339,7 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
       static_cast<float>(extent.width), static_cast<float>(extent.height), 0.0f, 1.0f));
     cmd.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), extent));
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-      pRenderer->getPipeline().getLayout(), 0, *pRenderer->getCurrentDescriptorSet(), nullptr);
+      pRenderer->getPipeline().getLayout(), 0, { *pRenderer->getCurrentDescriptorSet() }, nullptr);
 
     cmd.pushConstants<uint32_t>(
       *pRenderer->getPipeline().getLayout(),
@@ -349,6 +349,7 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
 
     for (auto* mrc : mrcs) {
       auto mesh = mrc->getMesh();
+      auto material = mrc->getMaterial();
       if (!mesh || !mesh->hasGPUData()) continue;
       mesh->bind(cmd);
       mesh->draw(cmd);

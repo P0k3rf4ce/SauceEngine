@@ -164,7 +164,7 @@ void EditorApp::initVulkan() {
   sauce::GraphicsPipelineConfig gridConfig {
     .physicalDevice = physicalDevice,
     .logicalDevice = logicalDevice,
-    .descriptorSetLayout = pRenderer->getDescriptorSetLayout(),
+    .descriptorSetLayouts = { *pRenderer->getDescriptorSetLayout0() },
     .colorFormat = OffscreenFramebuffer::COLOR_FORMAT,
     .hasVertexInput = false,
     .enableBlending = true,
@@ -175,7 +175,7 @@ void EditorApp::initVulkan() {
   };
   pGridPipeline = std::make_unique<sauce::GraphicsPipeline>(
     physicalDevice, logicalDevice,
-    pRenderer->getDescriptorSetLayout(),
+    gridConfig.descriptorSetLayouts,
     OffscreenFramebuffer::COLOR_FORMAT,
     "shaders/editor_grid.vert.spv",
     "shaders/editor_grid.frag.spv",
@@ -186,7 +186,7 @@ void EditorApp::initVulkan() {
   sauce::GraphicsPipelineConfig unlitConfig {
     .physicalDevice = physicalDevice,
     .logicalDevice = logicalDevice,
-    .descriptorSetLayout = pRenderer->getDescriptorSetLayout(),
+    .descriptorSetLayouts = { *pRenderer->getDescriptorSetLayout0() },
     .colorFormat = OffscreenFramebuffer::COLOR_FORMAT,
     .hasVertexInput = true,
     .enableBlending = false,
@@ -197,7 +197,7 @@ void EditorApp::initVulkan() {
   };
   pUnlitPipeline = std::make_unique<sauce::GraphicsPipeline>(
     physicalDevice, logicalDevice,
-    pRenderer->getDescriptorSetLayout(),
+    unlitConfig.descriptorSetLayouts,
     OffscreenFramebuffer::COLOR_FORMAT,
     "shaders/editor_unlit.vert.spv",
     "shaders/editor_unlit.frag.spv",
@@ -208,7 +208,7 @@ void EditorApp::initVulkan() {
   sauce::GraphicsPipelineConfig litConfig {
     .physicalDevice = physicalDevice,
     .logicalDevice = logicalDevice,
-    .descriptorSetLayout = pRenderer->getDescriptorSetLayout(),
+    .descriptorSetLayouts = { *pRenderer->getDescriptorSetLayout0() },
     .colorFormat = OffscreenFramebuffer::COLOR_FORMAT,
     .hasVertexInput = true,
     .enableBlending = false,
@@ -219,7 +219,7 @@ void EditorApp::initVulkan() {
   };
   pLitPipeline = std::make_unique<sauce::GraphicsPipeline>(
     physicalDevice, logicalDevice,
-    pRenderer->getDescriptorSetLayout(),
+    litConfig.descriptorSetLayouts,
     OffscreenFramebuffer::COLOR_FORMAT,
     "shaders/editor_lit.vert.spv",
     "shaders/editor_lit.frag.spv",
@@ -229,7 +229,7 @@ void EditorApp::initVulkan() {
   // Create gizmo renderer
   pGizmoRenderer = std::make_unique<GizmoRenderer>(
     physicalDevice, logicalDevice,
-    pRenderer->getDescriptorSetLayout(),
+    pRenderer->getDescriptorSetLayout0(),
     OffscreenFramebuffer::COLOR_FORMAT,
     *pRenderer
   );
@@ -613,14 +613,14 @@ void EditorApp::recordEditorCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t
   // Draw grid
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, **pGridPipeline);
   cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-    pGridPipeline->getLayout(), 0, *pRenderer->getCurrentDescriptorSet(), nullptr);
+    pGridPipeline->getLayout(), 0, { *pRenderer->getCurrentDescriptorSet() }, nullptr);
   cmd.draw(6, 1, 0, 0);  // Fullscreen quad (6 vertices, no vertex buffer)
 
   // Draw scene meshes with active pipeline (unlit or lit based on viewport mode)
   auto* activePipeline = (viewportMode == ViewportMode::Lit) ? pLitPipeline.get() : pUnlitPipeline.get();
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, **activePipeline);
   cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-    activePipeline->getLayout(), 0, *pRenderer->getCurrentDescriptorSet(), nullptr);
+    activePipeline->getLayout(), 0, { *pRenderer->getCurrentDescriptorSet() }, nullptr);
 
   for (auto& entity : pScene->getEntitiesMut()) {
     if (!entity.getActive()) continue;

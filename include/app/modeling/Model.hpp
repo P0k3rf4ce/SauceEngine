@@ -4,7 +4,8 @@
 #include "app/modeling/Mesh.hpp"
 #include "app/modeling/Material.hpp"
 #include "app/modeling/PropertyValue.hpp"
-#include <vulkan/vulkan_raii.hpp> // ??
+#include "app/LogicalDevice.hpp"
+#include <vulkan/vulkan_raii.hpp>
 #include <memory>
 #include <vector>
 #include <unordered_map>
@@ -40,19 +41,16 @@ public:
 
     // This assumes that the flat lists are populated
     void initVulkanResources(
-        vk::raii::Device& device,
+        const sauce::LogicalDevice& logicalDevice,
         vk::raii::PhysicalDevice& physicalDevice,
         vk::raii::DescriptorPool& pool,
-        vk::raii::DescriptorSetLayout& layout)
+        vk::raii::DescriptorSetLayout& layout,
+        const vk::raii::ImageView& defaultView,
+        const vk::raii::Sampler& defaultSampler)
     {
-        for (auto& mesh : allMeshes) {
-            mesh->initVulkanResources(device, physicalDevice);
-        }
-        for (auto& material: allMaterials) {
-          material->initVulkanResources(device, physicalDevice);
-        }
+        if (allMaterials.empty()) return;
 
-        std::vector<vk::DescriptorSetLayout> layouts(allMeshes.size(), *layout);
+        std::vector<vk::DescriptorSetLayout> layouts(allMaterials.size(), *layout);
         
         vk::DescriptorSetAllocateInfo allocInfo{
           .descriptorPool = *pool,
@@ -60,7 +58,7 @@ public:
           .pSetLayouts = layouts.data(),
         };
 
-        descriptorSets = device.allocateDescriptorSets(allocInfo);
+        descriptorSets = logicalDevice->allocateDescriptorSets(allocInfo);
 
         for (size_t i = 0; i < allMaterials.size(); ++i) {
             auto& material = allMaterials[i];
@@ -68,12 +66,12 @@ public:
             std::vector<vk::WriteDescriptorSet> writes;
 
             auto bufferInfos = material->getDescriptorBufferInfos();
-            auto imageInfos  = material->getDescriptorImageInfos();
+            auto imageInfos  = material->getDescriptorImageInfos(defaultView, defaultSampler);
 
             if (!bufferInfos.empty()) {
                 writes.emplace_back(vk::WriteDescriptorSet {
                   .dstSet = *descriptorSets[i],
-                  .dstBinding = 0,
+                  .dstBinding = 5, // Material Properties UBO is binding 5
                   .dstArrayElement = 0,
                   .descriptorCount = static_cast<uint32_t>(bufferInfos.size()),
                   .descriptorType = vk::DescriptorType::eUniformBuffer,
@@ -81,45 +79,55 @@ public:
                 });
             }
 
-            //if (!imageInfos.empty()) {
-            //    writes.emplace_back(vk::WriteDescriptorSet {
-            //      .dstSet = *descriptorSets[i],
-            //      .dstBinding = 1,
-            //      .dstArrayElement = 0,
-            //      .descriptorCount = static_cast<uint32_t>(imageInfos.size()),
-            //      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-            //      .pBufferInfo = imageInfos.data(),
-            //    });
-            //}
+            if (!imageInfos.empty()) {
+                writes.emplace_back(vk::WriteDescriptorSet {
+                  .dstSet = *descriptorSets[i],
+                  .dstBinding = 0, // Albedo, Normal, etc. start at binding 0
+                  .dstArrayElement = 0,
+                  .descriptorCount = static_cast<uint32_t>(imageInfos.size()),
+                  .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                  .pImageInfo = imageInfos.data(),
+                });
+            }
 
-            device.updateDescriptorSets(writes, nullptr);
+            logicalDevice->updateDescriptorSets(writes, nullptr);
         }
     }
 
-    void draw(vk::raii::CommandBuffer& buffer)
+    void draw(vk::raii::CommandBuffer& buffer, const vk::raii::PipelineLayout& pipelineLayout)
     {
+        // Model::draw is currently only used if we draw all materials.
+        // But in recordSceneCommandBuffer, we draw per-entity.
+        // If we use this draw, we bind Set Index 1.
         for (size_t i = 0; i < allMaterials.size(); ++i) {
-            auto& material = allMaterials[i];
-            auto& mesh = allMeshes[i];
+            // This is a bit problematic because Model doesn't know which mesh belongs to which material here
+            // unless they are 1:1.
+            // Let's assume they are 1:1 for now as per traverseNode.
+            if (i < allMeshes.size()) {
+              auto& mesh = allMeshes[i];
+              mesh->bind(buffer);
+              
+              buffer.bindDescriptorSets(
+                  vk::PipelineBindPoint::eGraphics,
+                  pipelineLayout,
+                  1, // Set Index 1
+                  *descriptorSets[i],
+                  nullptr
+              );
 
-            mesh->bind(buffer);
-
-            buffer.bindDescriptorSets(
-                vk::PipelineBindPoint::eGraphics,
-                mesh->getPipelineLayout(),
-                0,
-                *descriptorSets[i],
-                nullptr
-            );
-
-            mesh->draw(buffer);
+              mesh->draw(buffer);
+            }
         }
+    }
+
+    const vk::raii::DescriptorSet& getDescriptorSet(size_t index) const {
+      return descriptorSets[index];
     }
 
 private:
     std::shared_ptr<ModelNode> rootNode;
     std::vector<std::shared_ptr<Mesh>> allMeshes;
-    std::vector<std::shared_ptr<Material>> allMaterials; // Same size as allMeshes
+    std::vector<std::shared_ptr<Material>> allMaterials;
     std::vector<vk::raii::DescriptorSet> descriptorSets;
     std::unordered_map<std::string, PropertyValue> metadata;
 

@@ -82,22 +82,45 @@ void Material::initVulkanResources(
     updateUniformBuffer(logicalDevice);
 }
 
-MaterialDescriptorInfo Material::getDescriptorInfo() const {
-    MaterialDescriptorInfo info{};
+std::vector<vk::DescriptorBufferInfo> Material::getDescriptorBufferInfos() const {
+    std::vector<vk::DescriptorBufferInfo> infos;
+    if (uniformBuffer) {
+        infos.push_back(vk::DescriptorBufferInfo{
+            .buffer = **uniformBuffer,
+            .offset = 0,
+            .range = sizeof(MaterialUBO)
+        });
+    }
+    return infos;
+}
 
-    // UBO descriptor
-    info.bufferInfo.buffer = **uniformBuffer;
-    info.bufferInfo.offset = 0;
-    info.bufferInfo.range = sizeof(MaterialUBO);
+std::vector<vk::DescriptorImageInfo> Material::getDescriptorImageInfos(
+    const vk::raii::ImageView& defaultView,
+    const vk::raii::Sampler& defaultSampler) const
+{
+    std::vector<vk::DescriptorImageInfo> infos;
+    // Order: Albedo, Normal, MetallicRoughness, Emissive, AO
+    std::array<TextureType, 5> types = {
+        TextureType::BaseColor,
+        TextureType::Normal,
+        TextureType::MetallicRoughness,
+        TextureType::Emissive,
+        TextureType::Occlusion
+    };
 
-    // Collect DescriptorImageInfos from all child Textures
-    for (const auto& [type, texture] : textures) {
-        if (texture) {
-            info.imageInfos.push_back(texture->getDescriptorInfo());
+    for (auto type : types) {
+        auto it = textures.find(type);
+        if (it != textures.end() && it->second && it->second->hasGPUData()) {
+            infos.push_back(it->second->getDescriptorInfo());
+        } else {
+            infos.push_back(vk::DescriptorImageInfo{
+                .sampler = *defaultSampler,
+                .imageView = *defaultView,
+                .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+            });
         }
     }
-
-    return info;
+    return infos;
 }
 
 } // namespace modeling
