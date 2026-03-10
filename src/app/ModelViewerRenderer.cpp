@@ -20,7 +20,7 @@ ModelViewerRenderer::ModelViewerRenderer(const RendererCreateInfo& createInfo) {
   sauce::GraphicsPipelineConfig mainPipelineConfig {
     .physicalDevice = createInfo.physicalDevice,
     .logicalDevice = createInfo.logicalDevice,
-    .descriptorSetLayout = descriptorSetLayout,
+    .descriptorSetLayouts = { *descriptorSetLayout },
     .colorFormat = pSwapChain->getSurfaceFormat().format,
   };
   pPipeline = std::make_unique<sauce::GraphicsPipeline>(mainPipelineConfig, "shaders/shader_3d.vert.spv", "shaders/shader_3d.frag.spv");

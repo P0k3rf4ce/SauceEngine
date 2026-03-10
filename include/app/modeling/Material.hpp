@@ -9,7 +9,6 @@
 #include <unordered_map>
 #include <vector>
 #include <memory>
-#include <vulkan/vulkan_raii.hpp>
 
 
 namespace sauce {
@@ -49,11 +48,6 @@ struct MaterialUBO {
     glm::vec4 emissiveFactor_alphaCutoff; // xyz = emissive, w = alphaCutoff
 };
 
-struct MaterialDescriptorInfo {
-    vk::DescriptorBufferInfo bufferInfo;
-    std::vector<vk::DescriptorImageInfo> imageInfos;
-};
-
 class Material {
 public:
     Material(const std::string& name = "");
@@ -62,12 +56,10 @@ public:
     const MaterialProperties& getProperties() const { return properties; }
     MaterialProperties& getProperties() { return properties; }
 
-    void initVulkanResources(
-        vk::raii::Device& device,
-        vk::raii::PhysicalDevice& physicalDevice);
-
     std::vector<vk::DescriptorBufferInfo> getDescriptorBufferInfos() const;
-    std::vector<vk::DescriptorImageInfo>  getDescriptorImageInfos() const;
+    std::vector<vk::DescriptorImageInfo>  getDescriptorImageInfos(
+        const vk::raii::ImageView& defaultView,
+        const vk::raii::Sampler& defaultSampler) const;
 
     std::shared_ptr<Texture> getTexture(TextureType type) const;
     void setTexture(TextureType type, std::shared_ptr<Texture> texture);
@@ -87,7 +79,6 @@ public:
         vk::raii::CommandPool& commandPool,
         vk::raii::Queue& queue
     );
-    MaterialDescriptorInfo getDescriptorInfo() const;
 
 private:
     std::string name;
