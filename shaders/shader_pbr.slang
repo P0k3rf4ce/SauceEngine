@@ -421,7 +421,7 @@ float4 fragMain(VSOutput vertIn) : SV_TARGET {
 
     // Indirect diffuse: sample irradiance cubemap with surface normal
     float3 irradiance = irradianceMap.Sample(irradianceSampler, N).rgb;
-    float3 indirectDiffuse = irradiance * albedo;
+    float3 indirectDiffuse = irradiance * (albedo / PI);
 
     // Indirect specular: sample prefilter cubemap at reflection direction
     // using roughness to select mip level, combined with BRDF LUT
