@@ -185,8 +185,14 @@ public:
   const vk::raii::DescriptorSetLayout& getDescriptorSetLayout1() const { return descriptorSetLayout1; }
   uint32_t getFrameIndex() const { return frameIndex; }
   const vk::raii::DescriptorSet& getCurrentDescriptorSet() const { return descriptorSets[frameIndex]; }
-  const vk::raii::DescriptorSet& getEnvironmentDescriptorSet() const { return environmentDescriptorSets[0]; }
-  const vk::raii::DescriptorSet& getDefaultMaterialDescriptorSet() const { return defaultMaterialDescriptorSets[0]; }
+  const vk::raii::DescriptorSet& getEnvironmentDescriptorSet() const { 
+    assert(!environmentDescriptorSets.empty() && "Environment descriptor sets not initialized!");
+    return environmentDescriptorSets[0]; 
+  }
+  const vk::raii::DescriptorSet& getDefaultMaterialDescriptorSet() const { 
+    assert(!defaultMaterialDescriptorSets.empty() && "Default material descriptor sets not initialized!");
+    return defaultMaterialDescriptorSets[0]; 
+  }
   void* getCurrentUniformBufferMapped() const { return uniformBuffersMapped[frameIndex]; }
 
   void setFramebufferResized() { framebufferResized = true; }
@@ -277,14 +283,14 @@ public:
 
   void createDescriptorSets(const sauce::LogicalDevice& logicalDevice) {
     std::array<vk::DescriptorPoolSize, 3> poolSizes {{
-      { vk::DescriptorType::eUniformBuffer, 1u * MAX_FRAMES_IN_FLIGHT + 1u },
-      { vk::DescriptorType::eStorageBuffer, 1u * MAX_FRAMES_IN_FLIGHT },
-      { vk::DescriptorType::eCombinedImageSampler, 3u + 1u + 5u }, // 3 for env, 1 for post, 5 for default material
+      { vk::DescriptorType::eUniformBuffer, 1024u },
+      { vk::DescriptorType::eStorageBuffer, 1024u },
+      { vk::DescriptorType::eCombinedImageSampler, 1024u },
     }};
 
     vk::DescriptorPoolCreateInfo poolCreateInfo {
       .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-      .maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT + 1 + 1 + 1), // env, post, default mat
+      .maxSets = 1024u,
       .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
       .pPoolSizes = poolSizes.data(),
     };
