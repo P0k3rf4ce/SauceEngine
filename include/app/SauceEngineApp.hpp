@@ -74,9 +74,9 @@ private:
   sauce::PhysicalDevice physicalDevice = nullptr;
   sauce::LogicalDevice logicalDevice = nullptr;
 
-  std::unique_ptr<sauce::Scene> pScene;
-
   std::unique_ptr<sauce::Renderer> pRenderer;
+
+  std::unique_ptr<sauce::Scene> pScene;
 
   std::unique_ptr<sauce::ImGuiRenderer> pImGuiRenderer;
 
