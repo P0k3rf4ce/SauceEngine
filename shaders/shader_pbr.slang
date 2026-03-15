@@ -5,11 +5,13 @@
 // Descriptor Layout (Set 0): Global
 //   Binding  0: ConstantBuffer<UniformBuffer>   (Vertex + Fragment) — MVP + camera
 //   Binding  1: StructuredBuffer<Light>         (Fragment)          — SSBO light array
-//   Binding  2: SamplerCube irradianceMap       (Fragment)
-//   Binding  3: SamplerCube prefilterMap        (Fragment)
-//   Binding  4: Sampler2D   brdfLUT             (Fragment)
 //
-// Descriptor Layout (Set 1): Material
+// Descriptor Layout (Set 1): Environment
+//   Binding  0: SamplerCube irradianceMap       (Fragment)
+//   Binding  1: SamplerCube prefilterMap        (Fragment)
+//   Binding  2: Sampler2D   brdfLUT             (Fragment)
+//
+// Descriptor Layout (Set 2): Material
 //   Binding  0: Sampler2D   baseColorMap        (Fragment)          — Albedo
 //   Binding  1: Sampler2D   normalMap           (Fragment)          — Normal
 //   Binding  2: Sampler2D   metallicRoughnessMap(Fragment)          — glTF: G=roughness, B=metallic
@@ -93,37 +95,37 @@ struct Light {
 StructuredBuffer<Light> lights;
 
 // ============================================================================
-// IBL Maps (Set 0)
+// IBL Maps (Set 1)
 // ============================================================================
-[[vk::binding(2, 0)]]
+[[vk::binding(0, 1)]]
 SamplerCube irradianceMap;
 
-[[vk::binding(3, 0)]]
+[[vk::binding(1, 1)]]
 SamplerCube prefilterMap;
 
-[[vk::binding(4, 0)]]
+[[vk::binding(2, 1)]]
 Sampler2D brdfLUT;
 
 // ============================================================================
-// Material Textures (Set 1)
+// Material Textures (Set 2)
 // ============================================================================
-[[vk::binding(0, 1)]]
+[[vk::binding(0, 2)]]
 Sampler2D baseColorMap;
 
-[[vk::binding(1, 1)]]
+[[vk::binding(1, 2)]]
 Sampler2D normalMap;
 
-[[vk::binding(2, 1)]]
+[[vk::binding(2, 2)]]
 Sampler2D metallicRoughnessMap;
 
-[[vk::binding(3, 1)]]
+[[vk::binding(3, 2)]]
 Sampler2D emissiveMap;
 
-[[vk::binding(4, 1)]]
+[[vk::binding(4, 2)]]
 Sampler2D occlusionMap;
 
 // ============================================================================
-// Material Data (Set 1)
+// Material Data (Set 2)
 // ============================================================================
 struct MaterialData {
     float4 baseColorFactor;         // RGBA base color multiplier
@@ -135,7 +137,7 @@ struct MaterialData {
     float  _pad0;
 };
 
-[[vk::binding(5, 1)]]
+[[vk::binding(5, 2)]]
 ConstantBuffer<MaterialData> material;
 
 // ============================================================================

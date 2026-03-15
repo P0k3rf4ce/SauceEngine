@@ -7,6 +7,8 @@
 namespace sauce {
 namespace modeling {
 
+std::unique_ptr<vk::raii::DescriptorSetLayout> Material::descriptorSetLayout = nullptr;
+
 Material::Material(const std::string& name)
     : name(name) {
 }
@@ -37,6 +39,45 @@ bool Material::hasMetadata(const std::string& key) const {
 
 // --- Vulkan resource management ---
 
+void Material::initDescriptorSetLayout(const sauce::LogicalDevice& logicalDevice) {
+    if (descriptorSetLayout) return;
+
+    std::array<vk::DescriptorSetLayoutBinding, 6> materialBindings;
+    // Albedo, Normal, MetallicRoughness, Emissive, AO textures
+    for (uint32_t i = 0; i < 5; ++i) {
+        materialBindings[i] = {
+            .binding = i,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment
+        };
+    }
+    // Material Properties UBO
+    materialBindings[5] = {
+        .binding = 5,
+        .descriptorType = vk::DescriptorType::eUniformBuffer,
+        .descriptorCount = 1,
+        .stageFlags = vk::ShaderStageFlagBits::eFragment
+    };
+
+    vk::DescriptorSetLayoutCreateInfo materialDsLayoutInfo {
+        .bindingCount = static_cast<uint32_t>(materialBindings.size()),
+        .pBindings = materialBindings.data(),
+    };
+    descriptorSetLayout = std::make_unique<vk::raii::DescriptorSetLayout>(*logicalDevice, materialDsLayoutInfo);
+}
+
+const vk::raii::DescriptorSetLayout& Material::getDescriptorSetLayout() {
+    if (!descriptorSetLayout) {
+        throw std::runtime_error("Material descriptor set layout not initialized!");
+    }
+    return *descriptorSetLayout;
+}
+
+void Material::cleanup() {
+    descriptorSetLayout.reset();
+}
+
 void Material::updateUniformBuffer(const sauce::LogicalDevice& logicalDevice) const {
     if (!uniformBufferMemory) return;
 
@@ -57,7 +98,10 @@ void Material::initVulkanResources(
     const sauce::LogicalDevice& logicalDevice,
     vk::raii::PhysicalDevice& physicalDevice,
     vk::raii::CommandPool& commandPool,
-    vk::raii::Queue& queue
+    vk::raii::Queue& queue,
+    const vk::raii::DescriptorPool& pool,
+    const vk::raii::ImageView& defaultView,
+    const vk::raii::Sampler& defaultSampler
 ) {
     // 1. Initialize Vulkan resources on all child Textures
     for (auto& [type, texture] : textures) {
@@ -80,6 +124,41 @@ void Material::initVulkanResources(
 
     // 3. Upload initial material data
     updateUniformBuffer(logicalDevice);
+
+    // 4. Allocate descriptor set
+    vk::DescriptorSetLayout layoutHandle = *getDescriptorSetLayout();
+    vk::DescriptorSetAllocateInfo allocInfo {
+        .descriptorPool = *pool,
+        .descriptorSetCount = 1,
+        .pSetLayouts = &layoutHandle,
+    };
+
+    auto sets = logicalDevice->allocateDescriptorSets(allocInfo);
+    descriptorSet = std::make_unique<vk::raii::DescriptorSet>(std::move(sets[0]));
+
+    // 5. Update descriptor set
+    auto imageInfos = getDescriptorImageInfos(defaultView, defaultSampler);
+    auto bufferInfos = getDescriptorBufferInfos();
+
+    std::vector<vk::WriteDescriptorSet> writes;
+    for (uint32_t i = 0; i < 5; ++i) {
+        writes.push_back({
+            .dstSet = **descriptorSet,
+            .dstBinding = i,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .pImageInfo = &imageInfos[i]
+        });
+    }
+    writes.push_back({
+        .dstSet = **descriptorSet,
+        .dstBinding = 5,
+        .descriptorCount = 1,
+        .descriptorType = vk::DescriptorType::eUniformBuffer,
+        .pBufferInfo = &bufferInfos[0]
+    });
+
+    logicalDevice->updateDescriptorSets(writes, {});
 }
 
 std::vector<vk::DescriptorBufferInfo> Material::getDescriptorBufferInfos() const {

@@ -205,12 +205,24 @@ void SauceEngineApp::uploadMeshGPUResources() {
     auto mrcs = entity.getComponents<MeshRendererComponent>();
     for (auto* mrc : mrcs) {
       auto mesh = mrc->getMesh();
-      if (!mesh || !mesh->isValid()) continue;
-      if (!mesh->hasGPUData()) {
+      if (mesh && mesh->isValid() && !mesh->hasGPUData()) {
         auto& physDev = const_cast<vk::raii::PhysicalDevice&>(*physicalDevice);
         auto& cmdPool = const_cast<vk::raii::CommandPool&>(pRenderer->getCommandPool());
         auto& queue = const_cast<vk::raii::Queue&>(pRenderer->getQueue());
         mesh->initVulkanResources(logicalDevice, physDev, cmdPool, queue);
+      }
+
+      auto material = mrc->getMaterial();
+      if (material && !material->hasDescriptorSet()) {
+        auto& physDev = const_cast<vk::raii::PhysicalDevice&>(*physicalDevice);
+        auto& cmdPool = const_cast<vk::raii::CommandPool&>(pRenderer->getCommandPool());
+        auto& queue = const_cast<vk::raii::Queue&>(pRenderer->getQueue());
+        material->initVulkanResources(
+          logicalDevice, physDev, cmdPool, queue,
+          pRenderer->getDescriptorPool(),
+          pRenderer->getDefaultImageView(),
+          pRenderer->getDefaultSampler()
+        );
       }
     }
   }
@@ -338,8 +350,14 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
     cmd.setViewport(0, vk::Viewport(0.0f, 0.0f,
       static_cast<float>(extent.width), static_cast<float>(extent.height), 0.0f, 1.0f));
     cmd.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), extent));
+    
+    // Bind Set 0: Per-frame
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
       pRenderer->getPipeline().getLayout(), 0, { *pRenderer->getCurrentDescriptorSet() }, nullptr);
+    
+    // Bind Set 1: Environment
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+      pRenderer->getPipeline().getLayout(), 1, { pRenderer->getEnvironmentDescriptorSet() }, nullptr);
 
     cmd.pushConstants<uint32_t>(
       *pRenderer->getPipeline().getLayout(),
@@ -352,6 +370,16 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
       auto material = mrc->getMaterial();
       if (!mesh || !mesh->hasGPUData()) continue;
       mesh->bind(cmd);
+
+      // Bind Set 2: Material
+      if (material && material->hasDescriptorSet()) {
+        cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+          pRenderer->getPipeline().getLayout(), 2, { material->getDescriptorSet() }, nullptr);
+      } else {
+        cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+          pRenderer->getPipeline().getLayout(), 2, { pRenderer->getDefaultMaterialDescriptorSet() }, nullptr);
+      }
+      
       mesh->draw(cmd);
     }
 

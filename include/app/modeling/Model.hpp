@@ -39,18 +39,30 @@ public:
         if (rootNode) traverseNode(rootNode);
     }
 
-    // This assumes that the flat lists are populated
     void initVulkanResources(
         const sauce::LogicalDevice& logicalDevice,
         vk::raii::PhysicalDevice& physicalDevice,
+        vk::raii::CommandPool& commandPool,
+        vk::raii::Queue& queue,
         vk::raii::DescriptorPool& pool,
-        vk::raii::DescriptorSetLayout& layout,
         const vk::raii::ImageView& defaultView,
         const vk::raii::Sampler& defaultSampler)
     {
-        if (allMaterials.empty()) return;
+        for (auto& mesh : allMeshes) {
+            mesh->initVulkanResources(logicalDevice, physicalDevice, commandPool, queue);
+        }
 
-        std::vector<vk::DescriptorSetLayout> layouts(allMaterials.size(), *layout);
+        for (auto& material : allMaterials) {
+            material->initVulkanResources(logicalDevice, physicalDevice, commandPool, queue, pool, defaultView, defaultSampler);
+        }
+
+        if (allMaterials.empty()) return;
+        
+        // Model-level descriptor sets are now redundant as Materials manage their own,
+        // but we'll keep the allocation logic if it's expected by other parts of the engine.
+        // However, we should use Material::getDescriptorSetLayout() for consistency.
+        
+        std::vector<vk::DescriptorSetLayout> layouts(allMaterials.size(), *Material::getDescriptorSetLayout());
         
         vk::DescriptorSetAllocateInfo allocInfo{
           .descriptorPool = *pool,
@@ -110,7 +122,7 @@ public:
               buffer.bindDescriptorSets(
                   vk::PipelineBindPoint::eGraphics,
                   pipelineLayout,
-                  1, // Set Index 1
+                  2, // Set Index 2: Material
                   *descriptorSets[i],
                   nullptr
               );
