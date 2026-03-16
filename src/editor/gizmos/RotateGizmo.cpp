@@ -65,7 +65,7 @@ GizmoMeshData RotateGizmo::generateMesh() const {
   return data;
 }
 
-GizmoAxis RotateGizmo::hitTest(const Ray& ray, const glm::vec3& position, float scale) const {
+GizmoAxis RotateGizmo::hitTest(const Ray& ray, const glm::vec3& position, const glm::quat& /*rotation*/, float scale) const {
   float hitThreshold = 0.1f * scale;
   float bestDist = hitThreshold;
   GizmoAxis bestAxis = GizmoAxis::None;
@@ -109,14 +109,14 @@ float RotateGizmo::angleOnPlane(const Ray& ray, const glm::vec3& center, const g
   return std::atan2(glm::dot(dir, bitangent), glm::dot(dir, tangent));
 }
 
-void RotateGizmo::beginInteraction(GizmoAxis axis, const Ray& ray, const glm::vec3& entityPos) {
+void RotateGizmo::beginInteraction(GizmoAxis axis, const Ray& ray, const glm::vec3& entityPos, const glm::quat& /*rotation*/) {
   activeAxis = axis;
   interacting = true;
   lastEntityPos = entityPos;
   lastAngle = angleOnPlane(ray, entityPos, axisDirection(axis));
 }
 
-glm::vec3 RotateGizmo::updateInteraction(const Ray& ray, const glm::vec3& entityPos) {
+glm::vec3 RotateGizmo::updateInteraction(const Ray& ray, const glm::vec3& entityPos, const glm::quat& /*rotation*/) {
   if (!interacting || activeAxis == GizmoAxis::None) return glm::vec3(0.0f);
 
   glm::vec3 normal = axisDirection(activeAxis);

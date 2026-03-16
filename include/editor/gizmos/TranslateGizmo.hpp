@@ -8,9 +8,9 @@ class TranslateGizmo : public Gizmo {
 public:
   GizmoType getType() const override { return GizmoType::Translate; }
   GizmoMeshData generateMesh() const override;
-  GizmoAxis hitTest(const Ray& ray, const glm::vec3& position, float scale) const override;
-  void beginInteraction(GizmoAxis axis, const Ray& ray, const glm::vec3& entityPos) override;
-  glm::vec3 updateInteraction(const Ray& ray, const glm::vec3& entityPos) override;
+  GizmoAxis hitTest(const Ray& ray, const glm::vec3& position, const glm::quat& rotation, float scale) const override;
+  void beginInteraction(GizmoAxis axis, const Ray& ray, const glm::vec3& entityPos, const glm::quat& rotation) override;
+  glm::vec3 updateInteraction(const Ray& ray, const glm::vec3& entityPos, const glm::quat& rotation) override;
   void endInteraction() override;
 
 private:

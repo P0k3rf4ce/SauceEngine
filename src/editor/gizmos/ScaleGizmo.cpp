@@ -1,5 +1,6 @@
 #include <editor/gizmos/ScaleGizmo.hpp>
 #include <cmath>
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 
 namespace sauce::editor {

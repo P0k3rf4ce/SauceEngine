@@ -1,6 +1,7 @@
 #include <physics/SphereBVH.hpp>
 #include <physics/SphereCollider.hpp>
 #include <vector>
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
 namespace physics {

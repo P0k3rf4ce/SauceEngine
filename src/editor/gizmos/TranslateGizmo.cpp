@@ -111,7 +111,7 @@ GizmoMeshData TranslateGizmo::generateMesh() const {
   return data;
 }
 
-GizmoAxis TranslateGizmo::hitTest(const Ray& ray, const glm::vec3& position, float scale) const {
+GizmoAxis TranslateGizmo::hitTest(const Ray& ray, const glm::vec3& position, const glm::quat& /*rotation*/, float scale) const {
   float hitThreshold = 0.08f * scale;
   float shaftLen = (SHAFT_LENGTH + CONE_LENGTH) * scale;
 
@@ -129,14 +129,14 @@ GizmoAxis TranslateGizmo::hitTest(const Ray& ray, const glm::vec3& position, flo
   return bestAxis;
 }
 
-void TranslateGizmo::beginInteraction(GizmoAxis axis, const Ray& ray, const glm::vec3& entityPos) {
+void TranslateGizmo::beginInteraction(GizmoAxis axis, const Ray& ray, const glm::vec3& entityPos, const glm::quat& /*rotation*/) {
   activeAxis = axis;
   interacting = true;
   lastEntityPos = entityPos;
   initialT = projectRayOntoAxis(ray, entityPos, axisDirection(axis));
 }
 
-glm::vec3 TranslateGizmo::updateInteraction(const Ray& ray, const glm::vec3& entityPos) {
+glm::vec3 TranslateGizmo::updateInteraction(const Ray& ray, const glm::vec3& entityPos, const glm::quat& /*rotation*/) {
   if (!interacting || activeAxis == GizmoAxis::None) return glm::vec3(0.0f);
 
   glm::vec3 dir = axisDirection(activeAxis);

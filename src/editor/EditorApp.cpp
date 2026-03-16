@@ -21,14 +21,11 @@
 #include <fstream>
 #include <cmath>
 #include <cstring>
-<<<<<<< 206-editor-play-mode
 #include <csignal>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
-=======
 #include <editor/zip_file.hpp>
->>>>>>> editor-dev
 
 namespace sauce::editor {
 
@@ -1279,9 +1276,9 @@ void EditorApp::mouseButtonCallback(GLFWwindow* window, int button, int action, 
 
             float dist = glm::length(app->editorCamera.getPosition() - tc->getTranslation());
             float gizmoScale = dist * GizmoRenderer::SCALE_FACTOR;
-            GizmoAxis hitAxis = gizmo->hitTest(ray, tc->getTranslation(), gizmoScale);
+            GizmoAxis hitAxis = gizmo->hitTest(ray, tc->getTranslation(), tc->getRotation(), gizmoScale);
             if (hitAxis != GizmoAxis::None) {
-              gizmo->beginInteraction(hitAxis, ray, tc->getTranslation());
+              gizmo->beginInteraction(hitAxis, ray, tc->getTranslation(), tc->getRotation());
               app->gizmoInteracting = true;
             }
           }
@@ -1338,7 +1335,7 @@ void EditorApp::cursorPosCallback(GLFWwindow* window, double xpos, double ypos) 
         float localY = yposf - vpPos.y;
         Ray ray = app->editorCamera.screenToWorldRay(localX, localY, vpSize.x, vpSize.y);
 
-        glm::vec3 delta = gizmo->updateInteraction(ray, tc->getTranslation());
+        glm::vec3 delta = gizmo->updateInteraction(ray, tc->getTranslation(), tc->getRotation());
 
         GizmoType type = app->pGizmoRenderer->getActiveGizmoType();
         if (type == GizmoType::Translate) {
