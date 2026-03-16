@@ -2,26 +2,22 @@
 // PBR Shader — Cook-Torrance BRDF (GGX/Smith/Fresnel-Schlick) + IBL
 // Uses SSBO for dynamic light array and IBL maps for ambient lighting.
 //
-// Descriptor Layout (Set 0):
+// Descriptor Layout (Set 0): Global
 //   Binding  0: ConstantBuffer<UniformBuffer>   (Vertex + Fragment) — MVP + camera
-//   Binding  1: ConstantBuffer<MaterialData>    (Fragment)          — PBR material properties
-//   Binding  2: StructuredBuffer<Light>         (Fragment)          — SSBO light array
-//   Binding  3: Texture2D   baseColorMap        (Fragment)          — Base color texture
-//   Binding  4: SamplerState baseColorSampler   (Fragment)
-//   Binding  5: Texture2D   normalMap           (Fragment)          — Normal map
-//   Binding  6: SamplerState normalSampler      (Fragment)
-//   Binding  7: Texture2D   metallicRoughnessMap(Fragment)          — glTF: G=roughness, B=metallic
-//   Binding  8: SamplerState metallicRoughnessSampler (Fragment)
-//   Binding  9: Texture2D   occlusionMap        (Fragment)          — Occlusion map
-//   Binding 10: SamplerState occlusionSampler   (Fragment)
-//   Binding 11: Texture2D   emissiveMap         (Fragment)          — Emissive map
-//   Binding 12: SamplerState emissiveSampler    (Fragment)
-//   Binding 13: TextureCube irradianceMap       (Fragment)          — IBL diffuse irradiance cubemap
-//   Binding 14: SamplerState irradianceSampler  (Fragment)
-//   Binding 15: TextureCube prefilterMap        (Fragment)          — IBL specular prefilter cubemap
-//   Binding 16: SamplerState prefilterSampler   (Fragment)
-//   Binding 17: Texture2D   brdfLUT             (Fragment)          — IBL BRDF integration LUT
-//   Binding 18: SamplerState brdfLUTSampler     (Fragment)
+//   Binding  1: StructuredBuffer<Light>         (Fragment)          — SSBO light array
+//
+// Descriptor Layout (Set 1): Environment (IBL)
+//   Binding  0: SamplerCube irradianceMap       (Fragment)          — IBL diffuse irradiance cubemap
+//   Binding  1: SamplerCube prefilterMap        (Fragment)          — IBL specular prefilter cubemap
+//   Binding  2: Sampler2D   brdfLUT             (Fragment)          — IBL BRDF integration LUT
+//
+// Descriptor Layout (Set 2): Material
+//   Binding  0: Sampler2D   baseColorMap        (Fragment)          — Albedo
+//   Binding  1: Sampler2D   normalMap           (Fragment)          — Normal
+//   Binding  2: Sampler2D   metallicRoughnessMap(Fragment)          — glTF: G=roughness, B=metallic
+//   Binding  3: Sampler2D   emissiveMap         (Fragment)          — Emissive
+//   Binding  4: Sampler2D   occlusionMap        (Fragment)          — AO
+//   Binding  5: ConstantBuffer<MaterialData>    (Fragment)          — PBR material properties
 //
 // Push Constants:
 //   uint lightCount — number of active lights in the SSBO
@@ -84,22 +80,6 @@ struct UniformBuffer {
 ConstantBuffer<UniformBuffer> ubo;
 
 // ============================================================================
-// Material Data — mirrors MaterialProperties in Material.hpp
-// ============================================================================
-struct MaterialData {
-    float4 baseColorFactor;         // RGBA base color multiplier
-    float  metallicFactor;          // Metallic multiplier  [0..1]
-    float  roughnessFactor;         // Roughness multiplier [0..1]
-    float  normalScale;             // Normal map XY scale
-    float  occlusionStrength;       // AO blend strength    [0..1]
-    float3 emissiveFactor;          // Emissive RGB multiplier
-    float  _pad0;
-};
-
-[[vk::binding(1, 0)]]
-ConstantBuffer<MaterialData> material;
-
-// ============================================================================
 // Light — unified struct for directional (0), point (1), and spot (2) lights
 // ============================================================================
 struct Light {
@@ -114,8 +94,54 @@ struct Light {
     float2 _padding;
 };
 
-[[vk::binding(2, 0)]]
+[[vk::binding(1, 0)]]
 StructuredBuffer<Light> lights;
+
+// ============================================================================
+// IBL Maps (Set 1)
+// ============================================================================
+[[vk::binding(0, 1)]]
+SamplerCube irradianceMap;
+
+[[vk::binding(1, 1)]]
+SamplerCube prefilterMap;
+
+[[vk::binding(2, 1)]]
+Sampler2D brdfLUT;
+
+// ============================================================================
+// Material Textures (Set 2)
+// ============================================================================
+[[vk::binding(0, 2)]]
+Sampler2D baseColorMap;
+
+[[vk::binding(1, 2)]]
+Sampler2D normalMap;
+
+[[vk::binding(2, 2)]]
+Sampler2D metallicRoughnessMap;
+
+[[vk::binding(3, 2)]]
+Sampler2D emissiveMap;
+
+[[vk::binding(4, 2)]]
+Sampler2D occlusionMap;
+
+// ============================================================================
+// Material Data (Set 2)
+// ============================================================================
+struct MaterialData {
+    float4 baseColorFactor;         // RGBA base color multiplier
+    float  metallicFactor;          // Metallic multiplier  [0..1]
+    float  roughnessFactor;         // Roughness multiplier [0..1]
+    float  normalScale;             // Normal map XY scale
+    float  occlusionStrength;       // AO blend strength    [0..1]
+    float3 emissiveFactor;          // Emissive RGB multiplier
+    float  _pad0;
+};
+
+[[vk::binding(5, 2)]]
+ConstantBuffer<MaterialData> material;
 
 // ============================================================================
 // Push Constants
@@ -124,52 +150,6 @@ StructuredBuffer<Light> lights;
 cbuffer PushConstants {
     uint lightCount;
 };
-
-// ============================================================================
-// Texture Samplers (separate image + sampler descriptors)
-// ============================================================================
-[[vk::binding(3, 0)]]
-Texture2D<float4> baseColorMap;
-[[vk::binding(4, 0)]]
-SamplerState baseColorSampler;
-
-[[vk::binding(5, 0)]]
-Texture2D<float4> normalMap;
-[[vk::binding(6, 0)]]
-SamplerState normalSampler;
-
-[[vk::binding(7, 0)]]
-Texture2D<float4> metallicRoughnessMap;
-[[vk::binding(8, 0)]]
-SamplerState metallicRoughnessSampler;
-
-[[vk::binding(9, 0)]]
-Texture2D<float4> occlusionMap;
-[[vk::binding(10, 0)]]
-SamplerState occlusionSampler;
-
-[[vk::binding(11, 0)]]
-Texture2D<float4> emissiveMap;
-[[vk::binding(12, 0)]]
-SamplerState emissiveSampler;
-
-// ============================================================================
-// IBL Texture Samplers
-// ============================================================================
-[[vk::binding(13, 0)]]
-TextureCube<float4> irradianceMap;
-[[vk::binding(14, 0)]]
-SamplerState irradianceSampler;
-
-[[vk::binding(15, 0)]]
-TextureCube<float4> prefilterMap;
-[[vk::binding(16, 0)]]
-SamplerState prefilterSampler;
-
-[[vk::binding(17, 0)]]
-Texture2D<float4> brdfLUT;
-[[vk::binding(18, 0)]]
-SamplerState brdfLUTSampler;
 
 // ============================================================================
 // Vertex Output / Fragment Input
@@ -233,7 +213,7 @@ float3x3 constructTBN(float3 N, float4 T) {
 
 // Sample the normal map and transform from tangent space to world space.
 float3 getNormalFromMap(float3x3 tbn, float2 texCoord, float nScale) {
-    float3 n = normalMap.Sample(normalSampler, texCoord).xyz;
+    float3 n = normalMap.Sample(texCoord).xyz;
     n = n * 2.0 - 1.0;            // [0,1] -> [-1,1]
     n.xy *= nScale;
     n = normalize(n);
@@ -353,23 +333,23 @@ LightContribution computeLightContribution(Light light, float3 worldPos) {
 float4 fragMain(VSOutput vertIn) : SV_TARGET {
 
     // ---- Sample material textures ----
-    float4 baseColor = baseColorMap.Sample(baseColorSampler, vertIn.texCoord)
+    float4 baseColor = baseColorMap.Sample(vertIn.texCoord)
                      * material.baseColorFactor;
     float3 albedo = baseColor.rgb;
     float  alpha  = baseColor.a;
 
     // glTF metallic-roughness: G = roughness, B = metallic
-    float4 mrSample  = metallicRoughnessMap.Sample(metallicRoughnessSampler, vertIn.texCoord);
+    float4 mrSample  = metallicRoughnessMap.Sample(vertIn.texCoord);
     float  metallic  = mrSample.b * material.metallicFactor;
     float  roughness = mrSample.g * material.roughnessFactor;
     roughness = clamp(roughness, 0.04, 1.0); // avoid zero roughness (NaN in GGX)
 
     // Ambient occlusion — blend with strength
-    float ao = occlusionMap.Sample(occlusionSampler, vertIn.texCoord).r;
+    float ao = occlusionMap.Sample(vertIn.texCoord).r;
     ao = 1.0 + material.occlusionStrength * (ao - 1.0);
 
     // Emissive
-    float3 emissive = emissiveMap.Sample(emissiveSampler, vertIn.texCoord).rgb
+    float3 emissive = emissiveMap.Sample(vertIn.texCoord).rgb
                     * material.emissiveFactor;
 
     // ---- Surface normal (normal mapping) ----
@@ -420,15 +400,15 @@ float4 fragMain(VSOutput vertIn) : SV_TARGET {
     float3 kD_ibl = (1.0 - kS_ibl) * (1.0 - metallic);
 
     // Indirect diffuse: sample irradiance cubemap with surface normal
-    float3 irradiance = irradianceMap.Sample(irradianceSampler, N).rgb;
+    float3 irradiance = irradianceMap.Sample(N).rgb;
     float3 indirectDiffuse = irradiance * (albedo / PI);
 
     // Indirect specular: sample prefilter cubemap at reflection direction
     // using roughness to select mip level, combined with BRDF LUT
     float3 R = reflect(-V, N);
     const float MAX_REFLECTION_LOD = 4.0; // prefilter map mip levels - 1
-    float3 prefilteredColor = prefilterMap.SampleLevel(prefilterSampler, R, roughness * MAX_REFLECTION_LOD).rgb;
-    float2 brdf = brdfLUT.Sample(brdfLUTSampler, float2(NdotV_ibl, roughness)).rg;
+    float3 prefilteredColor = prefilterMap.SampleLevel(R, roughness * MAX_REFLECTION_LOD).rgb;
+    float2 brdf = brdfLUT.Sample(float2(NdotV_ibl, roughness)).rg;
     float3 indirectSpecular = prefilteredColor * (F_ibl * brdf.x + brdf.y);
 
     // Combine indirect diffuse and specular, modulated by AO

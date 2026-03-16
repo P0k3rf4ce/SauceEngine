@@ -29,7 +29,7 @@ function (add_slang_compute_target TARGET)
   add_custom_target (${TARGET} DEPENDS ${arg_shader_OUTPUT})
 endfunction()
 
-find_program(SLANGC_EXECUTABLE slangc)
+find_program(SLANGC_EXECUTABLE slangc HINTS "$ENV{VULKAN_SDK}/bin")
 if(!SLANGC_EXECUTABLE)
   message(FATAL_ERROR "slangc not found!\nIt should be part of Vulkan SDK; alternatively, install from: https://github.com/shader-slang/slang/releases")
 endif()
@@ -43,6 +43,37 @@ add_slang_compute_target(iblBrdfLutTarget SOURCES ibl_brdf_lut.slang OUTPUT ibl_
 add_slang_compute_target(iblIrradianceTarget SOURCES ibl_irradiance.slang OUTPUT ibl_irradiance.spv)
 add_slang_compute_target(iblPrefilterTarget SOURCES ibl_prefilter.slang OUTPUT ibl_prefilter.spv)
 
+# GLSL editor shaders compiled with glslc
+# Prefer the imported target from find_package(Vulkan), fall back to PATH / VULKAN_SDK
+if(TARGET Vulkan::glslc)
+  set(GLSLC Vulkan::glslc)
+else()
+  find_program(GLSLC glslc HINTS "$ENV{VULKAN_SDK}/bin")
+  if(NOT GLSLC)
+    message(WARNING "glslc not found - editor shaders will not be compiled")
+  endif()
+endif()
+
+function(add_glsl_shader_target TARGET SOURCE OUTPUT)
+  add_custom_command(
+    OUTPUT ${SHADERS_DIR}/${OUTPUT}
+    COMMAND ${GLSLC} ${SHADERS_DIR}/${SOURCE} -o ${SHADERS_DIR}/${OUTPUT}
+    DEPENDS ${SHADERS_DIR}/${SOURCE}
+    COMMENT "Compiling GLSL shader ${SOURCE} -> ${OUTPUT}"
+    VERBATIM
+  )
+  add_custom_target(${TARGET} DEPENDS ${SHADERS_DIR}/${OUTPUT})
+endfunction()
+
+if(GLSLC)
+  add_glsl_shader_target(editorGridVert editor_grid.vert editor_grid.vert.spv)
+  add_glsl_shader_target(editorGridFrag editor_grid.frag editor_grid.frag.spv)
+  add_glsl_shader_target(editorUnlitVert editor_unlit.vert editor_unlit.vert.spv)
+  add_glsl_shader_target(editorUnlitFrag editor_unlit.frag editor_unlit.frag.spv)
+  add_glsl_shader_target(editorLitVert editor_lit.vert editor_lit.vert.spv)
+  add_glsl_shader_target(editorLitFrag editor_lit.frag editor_lit.frag.spv)
+endif()
+
 add_custom_target(shaders DEPENDS
   shaderTarget
   shaderLightsTarget
@@ -51,5 +82,10 @@ add_custom_target(shaders DEPENDS
   iblBrdfLutTarget
   iblIrradianceTarget
   iblPrefilterTarget
+  $<$<BOOL:${GLSLC}>:editorGridVert>
+  $<$<BOOL:${GLSLC}>:editorGridFrag>
+  $<$<BOOL:${GLSLC}>:editorUnlitVert>
+  $<$<BOOL:${GLSLC}>:editorUnlitFrag>
+  $<$<BOOL:${GLSLC}>:editorLitVert>
+  $<$<BOOL:${GLSLC}>:editorLitFrag>
 )
-

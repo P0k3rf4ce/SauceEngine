@@ -13,15 +13,13 @@ struct StretchConstraint : public Constraint {
   StretchConstraint() = default;
 
   StretchConstraint(uint32_t a, uint32_t b, float rest, float comp = 0.0f)
-      : indexA(a), indexB(b), restLength(rest) {
-    compliance = comp;
-  }
+      : Constraint(comp), indexA(a), indexB(b), restLength(rest) {}
 
-  void solve(std::vector<Vertex>& vertices, float deltatime) override {
+  void solve(std::vector<physics::Vertex>& vertices, float deltatime) override {
     if (indexA >= vertices.size() || indexB >= vertices.size()) return;
 
-    Vertex& va = vertices[indexA];
-    Vertex& vb = vertices[indexB];
+    physics::Vertex& va = vertices[indexA];
+    physics::Vertex& vb = vertices[indexB];
 
     const float w1 = va.invMass;
     const float w2 = vb.invMass;

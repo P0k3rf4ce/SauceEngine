@@ -1,7 +1,12 @@
 #include <app/SauceEngineApp.hpp>
 #include <app/ui/components/HelloWorldWindow.hpp>
 #include <app/ui/components/DebugStatsWindow.hpp>
+#include <app/components/TransformComponent.hpp>
+#include <app/components/RigidBodyComponent.hpp>
+#include <app/components/MeshRendererComponent.hpp>
+#include <app/components/LightComponent.hpp>
 #include <functional>
+#include <cstring>
 
 namespace sauce {
 
@@ -16,7 +21,16 @@ SauceEngineApp::~SauceEngineApp() {
 
 void SauceEngineApp::run() {
   initWindow();
-  initVulkan(); // ImGui initialized here
+  initVulkan();
+
+  // Load scene file if specified
+  if (!sceneFile.empty() && pScene) {
+    if (pScene->loadFromFile(sceneFile) && !pScene->getEntities().empty()) {
+      uploadMeshGPUResources();
+      setupSceneRenderer();
+    }
+  }
+
 
   // Call custom UI builder after ImGui is initialized
   if (pCustomUIBuilder) {
@@ -92,7 +106,17 @@ void SauceEngineApp::initWindow() {
   }
 
 void SauceEngineApp::processInput(float deltaTime) {
-    if (!pScene) {
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+      glfwSetWindowShouldClose(window, true);
+
+    if (glfwGetKey(window, GLFW_KEY_GRAVE_ACCENT) == GLFW_PRESS && !gravePressedLastFrame) {
+      cursorCaptured = !cursorCaptured;
+      glfwSetInputMode(window, GLFW_CURSOR, cursorCaptured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+      firstMouse = true;
+    }
+    gravePressedLastFrame = glfwGetKey(window, GLFW_KEY_GRAVE_ACCENT) == GLFW_PRESS;
+
+    if (!cursorCaptured || !pScene) {
       return;
     }
 
@@ -106,14 +130,11 @@ void SauceEngineApp::processInput(float deltaTime) {
       camera.processDirection(Camera::Movement::LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
       camera.processDirection(Camera::Movement::RIGHT, deltaTime);
-
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-      glfwSetWindowShouldClose(window, true);
   }
 
 void SauceEngineApp::mouseCallback(GLFWwindow* window, double xposIn, double yposIn) {
     auto* app = static_cast<SauceEngineApp*>(glfwGetWindowUserPointer(window));
-    if (!app) {
+    if (!app || !app->cursorCaptured) {
       return;
     }
 
@@ -147,6 +168,7 @@ void SauceEngineApp::mainLoop() {
 
       glfwPollEvents();
       processInput(deltaTime);
+      syncRigidBodiesToTransforms();
 
       pImGuiRenderer->newFrame();
       buildExampleUI();
@@ -160,5 +182,284 @@ void SauceEngineApp::mainLoop() {
 void SauceEngineApp::buildExampleUI() {
     pImGuiComponentManager->renderAll();
   }
+
+void SauceEngineApp::syncRigidBodiesToTransforms() {
+    if (!pScene) {
+      return;
+    }
+
+    for (auto& entity : pScene->getEntitiesMut()) {
+      auto* rigidBody = entity.getComponent<RigidBodyComponent>();
+      auto* transform = entity.getComponent<TransformComponent>();
+      if (!rigidBody || !transform) {
+        continue;
+      }
+
+      transform->setTranslation(rigidBody->getPosition());
+      transform->setRotation(rigidBody->getOrientation());
+    }
+  }
+
+void SauceEngineApp::uploadMeshGPUResources() {
+  for (auto& entity : pScene->getEntitiesMut()) {
+    auto mrcs = entity.getComponents<MeshRendererComponent>();
+    for (auto* mrc : mrcs) {
+      auto mesh = mrc->getMesh();
+      if (mesh && mesh->isValid() && !mesh->hasGPUData()) {
+        auto& physDev = const_cast<vk::raii::PhysicalDevice&>(*physicalDevice);
+        auto& cmdPool = const_cast<vk::raii::CommandPool&>(pRenderer->getCommandPool());
+        auto& queue = const_cast<vk::raii::Queue&>(pRenderer->getQueue());
+        mesh->initVulkanResources(logicalDevice, physDev, cmdPool, queue);
+      }
+
+      auto material = mrc->getMaterial();
+      if (material && !material->hasDescriptorSet()) {
+        auto& physDev = const_cast<vk::raii::PhysicalDevice&>(*physicalDevice);
+        auto& cmdPool = const_cast<vk::raii::CommandPool&>(pRenderer->getCommandPool());
+        auto& queue = const_cast<vk::raii::Queue&>(pRenderer->getQueue());
+        material->initVulkanResources(
+          logicalDevice, physDev, cmdPool, queue,
+          pRenderer->getDescriptorPool(),
+          pRenderer->getDefaultImageView(),
+          pRenderer->getDefaultSampler()
+        );
+      }
+    }
+  }
+}
+
+void SauceEngineApp::setupSceneRenderer() {
+  pRenderer->setCommandBufferRecorder(
+    [this](vk::raii::CommandBuffer& cmd, uint32_t imageIndex) {
+      recordSceneCommandBuffer(cmd, imageIndex);
+    }
+  );
+}
+
+void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t imageIndex) {
+  // Write camera matrices to UBO (host side, before GPU execution)
+  sauce::UniformBufferObject ubo {
+    .model = glm::mat4(1.0f),
+    .view = pScene->getCameraRO().getViewMatrix(),
+    .proj = pScene->getCameraRO().getProjectionMatrix(),
+    .cameraPos = pScene->getCameraRO().getPos(),
+  };
+  ubo.proj[1][1] *= -1; // Vulkan Y-flip
+  std::memcpy(pRenderer->getCurrentUniformBufferMapped(), &ubo, sizeof(ubo));
+
+  const auto& gpuLights = pScene->collectGPULights();
+  uint32_t lightCount = pRenderer->updateLightSSBO(
+      gpuLights.data(), static_cast<uint32_t>(gpuLights.size()));
+
+  cmd.begin({});
+
+  // Transition swapchain image -> ColorAttachmentOptimal
+  pRenderer->transitionImageLayout(
+    cmd,
+    pRenderer->getSwapChain().getImages()[imageIndex],
+    vk::ImageLayout::eUndefined,
+    vk::ImageLayout::eColorAttachmentOptimal,
+    {},
+    vk::AccessFlagBits2::eColorAttachmentWrite,
+    vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+    vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+    vk::ImageAspectFlagBits::eColor
+  );
+
+  // Transition depth image -> DepthAttachmentOptimal
+  pRenderer->transitionImageLayout(
+    cmd,
+    *pRenderer->getDepthImage(),
+    vk::ImageLayout::eUndefined,
+    vk::ImageLayout::eDepthAttachmentOptimal,
+    vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+    vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+    vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+    vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+    vk::ImageAspectFlagBits::eDepth
+  );
+
+  auto& swapChain = pRenderer->getSwapChain();
+  vk::Extent2D extent = swapChain.getExtent();
+
+  vk::ClearValue clearColor = vk::ClearColorValue { 0.0f, 0.0f, 0.0f, 1.0f };
+  vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
+
+  bool firstDraw = true;
+
+  for (auto& entity : pScene->getEntitiesMut()) {
+    if (!entity.getActive()) continue;
+
+    auto mrcs = entity.getComponents<MeshRendererComponent>();
+    if (mrcs.empty()) continue;
+
+    // Get model matrix from transform
+    glm::mat4 modelMatrix = glm::mat4(1.0f);
+    auto* tc = entity.getComponent<TransformComponent>();
+    if (tc) {
+      modelMatrix = tc->getLocalMatrix();
+    }
+
+    // Update model matrix in UBO via vkCmdUpdateBuffer (GPU-side, outside render pass)
+    cmd.updateBuffer<glm::mat4>(*pRenderer->getCurrentUniformBuffer(), 0, modelMatrix);
+
+    // Barrier: transfer write -> vertex shader uniform read
+    vk::BufferMemoryBarrier2 bufBarrier {
+      .srcStageMask = vk::PipelineStageFlagBits2::eTransfer,
+      .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
+      .dstStageMask = vk::PipelineStageFlagBits2::eVertexShader,
+      .dstAccessMask = vk::AccessFlagBits2::eUniformRead,
+      .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+      .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+      .buffer = *pRenderer->getCurrentUniformBuffer(),
+      .offset = 0,
+      .size = sizeof(glm::mat4),
+    };
+    vk::DependencyInfo depInfo {
+      .bufferMemoryBarrierCount = 1,
+      .pBufferMemoryBarriers = &bufBarrier,
+    };
+    cmd.pipelineBarrier2(depInfo);
+
+    // Begin rendering (clear on first, load on subsequent)
+    vk::RenderingAttachmentInfo colorAttachment {
+      .imageView = swapChain.getImageViews()[imageIndex],
+      .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+      .loadOp = firstDraw ? vk::AttachmentLoadOp::eClear : vk::AttachmentLoadOp::eLoad,
+      .storeOp = vk::AttachmentStoreOp::eStore,
+      .clearValue = clearColor,
+    };
+    vk::RenderingAttachmentInfo depthAttachment {
+      .imageView = pRenderer->getDepthImageView(),
+      .imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+      .loadOp = firstDraw ? vk::AttachmentLoadOp::eClear : vk::AttachmentLoadOp::eLoad,
+      .storeOp = vk::AttachmentStoreOp::eStore,
+      .clearValue = clearDepth,
+    };
+    vk::RenderingInfo renderingInfo {
+      .renderArea = { .offset = { 0, 0 }, .extent = extent },
+      .layerCount = 1,
+      .colorAttachmentCount = 1,
+      .pColorAttachments = &colorAttachment,
+      .pDepthAttachment = &depthAttachment,
+    };
+
+    cmd.beginRendering(renderingInfo);
+
+    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pRenderer->getPipeline());
+    cmd.setViewport(0, vk::Viewport(0.0f, 0.0f,
+      static_cast<float>(extent.width), static_cast<float>(extent.height), 0.0f, 1.0f));
+    cmd.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), extent));
+    
+    // Bind Set 0: Per-frame
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+      pRenderer->getPipeline().getLayout(), 0, { *pRenderer->getCurrentDescriptorSet() }, nullptr);
+    
+    // Bind Set 1: Environment
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+      pRenderer->getPipeline().getLayout(), 1, { pRenderer->getEnvironmentDescriptorSet() }, nullptr);
+
+    cmd.pushConstants<uint32_t>(
+      *pRenderer->getPipeline().getLayout(),
+      vk::ShaderStageFlagBits::eFragment,
+      0u, { lightCount }
+    );
+
+    const uint32_t lightCount = 0;
+    cmd.pushConstants<uint32_t>(pRenderer->getPipeline().getLayout(),
+      vk::ShaderStageFlagBits::eFragment, 0, lightCount);
+
+    for (auto* mrc : mrcs) {
+      auto mesh = mrc->getMesh();
+      auto material = mrc->getMaterial();
+      if (!mesh || !mesh->hasGPUData()) continue;
+      mesh->bind(cmd);
+
+      // Bind Set 2: Material
+      if (material && material->hasDescriptorSet()) {
+        cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+          pRenderer->getPipeline().getLayout(), 2, { material->getDescriptorSet() }, nullptr);
+      } else {
+        cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+          pRenderer->getPipeline().getLayout(), 2, { pRenderer->getDefaultMaterialDescriptorSet() }, nullptr);
+      }
+      
+      mesh->draw(cmd);
+    }
+
+    cmd.endRendering();
+    firstDraw = false;
+  }
+
+  // If no entities were drawn, still clear the screen
+  if (firstDraw) {
+    vk::RenderingAttachmentInfo colorAttachment {
+      .imageView = swapChain.getImageViews()[imageIndex],
+      .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+      .loadOp = vk::AttachmentLoadOp::eClear,
+      .storeOp = vk::AttachmentStoreOp::eStore,
+      .clearValue = clearColor,
+    };
+    vk::RenderingAttachmentInfo depthAttachment {
+      .imageView = pRenderer->getDepthImageView(),
+      .imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+      .loadOp = vk::AttachmentLoadOp::eClear,
+      .storeOp = vk::AttachmentStoreOp::eDontCare,
+      .clearValue = clearDepth,
+    };
+    vk::RenderingInfo renderingInfo {
+      .renderArea = { .offset = { 0, 0 }, .extent = extent },
+      .layerCount = 1,
+      .colorAttachmentCount = 1,
+      .pColorAttachments = &colorAttachment,
+      .pDepthAttachment = &depthAttachment,
+    };
+    cmd.beginRendering(renderingInfo);
+    cmd.endRendering();
+  }
+
+  // ImGui pass (load existing framebuffer contents)
+  {
+    vk::RenderingAttachmentInfo colorAttachment {
+      .imageView = swapChain.getImageViews()[imageIndex],
+      .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+      .loadOp = vk::AttachmentLoadOp::eLoad,
+      .storeOp = vk::AttachmentStoreOp::eStore,
+    };
+    vk::RenderingAttachmentInfo depthAttachment {
+      .imageView = pRenderer->getDepthImageView(),
+      .imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+      .loadOp = vk::AttachmentLoadOp::eLoad,
+      .storeOp = vk::AttachmentStoreOp::eDontCare,
+    };
+    vk::RenderingInfo renderingInfo {
+      .renderArea = { .offset = { 0, 0 }, .extent = extent },
+      .layerCount = 1,
+      .colorAttachmentCount = 1,
+      .pColorAttachments = &colorAttachment,
+      .pDepthAttachment = &depthAttachment,
+    };
+    cmd.beginRendering(renderingInfo);
+    if (pImGuiRenderer) {
+      pImGuiRenderer->render(cmd, imageIndex);
+    }
+    cmd.endRendering();
+  }
+
+  // Transition to present
+  pRenderer->transitionImageLayout(
+    cmd,
+    pRenderer->getSwapChain().getImages()[imageIndex],
+    vk::ImageLayout::eColorAttachmentOptimal,
+    vk::ImageLayout::ePresentSrcKHR,
+    vk::AccessFlagBits2::eColorAttachmentWrite,
+    {},
+    vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+    vk::PipelineStageFlagBits2::eBottomOfPipe,
+    vk::ImageAspectFlagBits::eColor
+  );
+
+  cmd.end();
+}
 
 } // namespace sauce

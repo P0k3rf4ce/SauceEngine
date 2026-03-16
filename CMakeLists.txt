@@ -32,6 +32,9 @@ target_link_libraries(${EXEC_NAME} PRIVATE glfw)
 find_package(imgui CONFIG REQUIRED)
 target_link_libraries(${EXEC_NAME} PRIVATE imgui::imgui)
 
+find_package(nlohmann_json CONFIG REQUIRED)
+target_link_libraries(${EXEC_NAME} PRIVATE nlohmann_json::nlohmann_json)
+
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
 target_include_directories(${EXEC_NAME} PRIVATE ${TINYGLTF_INCLUDE_DIRS})
 
@@ -52,8 +55,12 @@ target_sources(${EXEC_NAME} PRIVATE
   src/app/modeling/ModelNode.cpp
   src/app/modeling/Model.cpp
   src/app/modeling/GLTFLoader.cpp
+  src/app/modeling/GLTFExporter.cpp
   src/app/components/TransformComponent.cpp
+  src/app/components/RigidBodyComponent.cpp
   src/app/components/MeshRendererComponent.cpp
+  src/app/components/PointLightComponent.cpp
+  src/app/components/DirectionalLightComponent.cpp
   src/app/Scene.cpp
   src/app/ImGuiRenderer.cpp
   src/app/SauceEngineApp.cpp
@@ -63,7 +70,12 @@ target_sources(${EXEC_NAME} PRIVATE
 )
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/shaders)
-add_dependencies(${EXEC_NAME} shaders)
+# add_dependencies(${EXEC_NAME} shaders)  # Requires slangc; pre-compiled .spv files used instead
+
+add_custom_command(TARGET ${EXEC_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${PROJECT_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:${EXEC_NAME}>/shaders
+)
 
 # Model test executable
 add_executable(modeltest src/modeltest.cpp)
@@ -111,6 +123,7 @@ target_sources(modelviewer PRIVATE
     src/app/modeling/Model.cpp
     src/app/modeling/GLTFLoader.cpp
     src/app/ImGuiRenderer.cpp
+    src/app/components/RigidBodyComponent.cpp
 )
 
 target_link_libraries(modelviewer PUBLIC Vulkan::Vulkan)
@@ -118,6 +131,59 @@ target_link_libraries(modelviewer PRIVATE glfw)
 target_link_libraries(modelviewer PRIVATE imgui::imgui)
 
 add_dependencies(modelviewer shaders)
+
+add_custom_command(TARGET modelviewer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${PROJECT_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:modelviewer>/shaders
+)
+
+# SauceEditor executable
+add_executable(sauceeditor src/editor/main.cpp)
+
+target_include_directories(sauceeditor PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${TINYGLTF_INCLUDE_DIRS}
+)
+
+if (!WIN32)
+    target_compile_options(sauceeditor PUBLIC -Wall -Wpedantic -Wextra -Wreorder-init-list -g -O2)
+endif()
+
+file(GLOB_RECURSE EDITOR_SOURCES
+    "${PROJECT_SOURCE_DIR}/src/editor/*.cpp"
+)
+
+target_sources(sauceeditor PRIVATE
+    ${EDITOR_SOURCES}
+    src/app/modeling/Transform.cpp
+    src/app/modeling/Texture.cpp
+    src/app/modeling/TextureCache.cpp
+    src/app/modeling/Material.cpp
+    src/app/modeling/Mesh.cpp
+    src/app/modeling/ModelNode.cpp
+    src/app/modeling/Model.cpp
+    src/app/modeling/GLTFLoader.cpp
+    src/app/modeling/GLTFExporter.cpp
+    src/app/components/TransformComponent.cpp
+    src/app/components/RigidBodyComponent.cpp
+    src/app/components/MeshRendererComponent.cpp
+    src/app/components/PointLightComponent.cpp
+    src/app/components/DirectionalLightComponent.cpp
+    src/app/Scene.cpp
+    src/app/ImGuiRenderer.cpp
+    src/app/Log.cpp
+    src/app/Settings.cpp
+)
+
+target_link_libraries(sauceeditor PUBLIC Vulkan::Vulkan)
+target_link_libraries(sauceeditor PRIVATE glfw)
+target_link_libraries(sauceeditor PRIVATE imgui::imgui)
+target_link_libraries(sauceeditor PRIVATE nlohmann_json::nlohmann_json)
+
+# Editor only needs GLSL shaders, not the Slang ones
+if(TARGET editorGridVert)
+  add_dependencies(sauceeditor editorGridVert editorGridFrag editorUnlitVert editorUnlitFrag)
+endif()
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/launcher)
 

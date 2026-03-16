@@ -1,9 +1,11 @@
 #pragma once
 
 #include "app/Component.hpp"
+#include "app/modeling/Mesh.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <memory>
 
 namespace sauce {
 
@@ -28,6 +30,7 @@ public:
   }
 
   const glm::vec3& getPosition()                    const { return position; }
+  const glm::vec3& getCenterOfMass()                const { return centerOfMass; }
   const glm::vec3& getVelocity()                    const { return velocity; }
   const glm::quat& getOrientation()                 const { return orientation; }
   const glm::vec3& getAngularVelocity()             const { return angularVelocity; }
@@ -36,6 +39,7 @@ public:
   const glm::mat3& getInvInertiaTensor()            const { return invInertiaTensor; }
 
   void setPosition(const glm::vec3& p)              { position = p; }
+  void setCenterOfMass(const glm::vec3& p)          { centerOfMass = p; }
   void setVelocity(const glm::vec3& v)              { velocity = v; }
   void setOrientation(const glm::quat& q)           { orientation = q; }
   void setAngularVelocity(const glm::vec3& w)       { angularVelocity = w; }
@@ -44,15 +48,21 @@ public:
   void setInvInertiaTensor(const glm::mat3& I)      { invInertiaTensor = I; }
   void clearExternalForces()                        { externalForces = glm::vec3(0.0f); }
 
+  // approximate center of mass given a mesh
+  static glm::vec3 meshCenterOfMass(std::shared_ptr<modeling::Mesh> m);
+  // approximate inverse mass given a mesh
+  static float meshInvMass(std::shared_ptr<modeling::Mesh> m);
+
   // No implementation for this for now
-  virtual void render() override;
+  virtual void render() override {};
 
   // Moves the object using its external forces with no regard for constraints.
-  virtual void update(float deltatime) override;
+  virtual void update(float deltatime) override {};
   virtual ~RigidBodyComponent() = default;
 
 private:
   glm::vec3 position;
+  glm::vec3 centerOfMass;
   glm::vec3 velocity;
   glm::quat orientation;
   glm::vec3 angularVelocity;
