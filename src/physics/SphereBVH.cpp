@@ -293,12 +293,6 @@ std::unique_ptr<SphereBVHNode> SphereBVHNode::fromMesh(sauce::modeling::Mesh& me
     return buildNode(triangles, 0, triangles.size());
 }
 
-bool SphereBVHNode::isLeaf() const {
-    return left == nullptr && right == nullptr;
-}
-
-
-
 // SphereBVH
 SphereBVH SphereBVH::fromScene(const sauce::Scene& scene) {
     
