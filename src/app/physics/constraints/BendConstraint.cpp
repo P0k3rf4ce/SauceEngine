@@ -1,4 +1,4 @@
-#include "app/physics/constraints/BendConstraint.hpp"
+#include <physics/constraints/BendConstraint.hpp>
 
 namespace{
     constexpr float EPS = 1e-8f;
@@ -7,9 +7,8 @@ namespace{
 /**
  * Preconditions:
  * 1. vertices.length() == 4 (this constraint uses exactly four vertices) 
- * 2. lagrangeMultiplers.length() == 1 ()
  */
-void BendConstraint::solve(std::vector<Vertex>& vertices, std::vector<glm::vec3>& lagrangeMultipliers, float deltatime) const {
+void physics::BendConstraint::solve(std::vector<physics::Vertex>& vertices, float deltatime) {
     Vertex& v1 = vertices[0];
     Vertex& v2 = vertices[1];
     Vertex& v3 = vertices[2];
@@ -65,8 +64,6 @@ void BendConstraint::solve(std::vector<Vertex>& vertices, std::vector<glm::vec3>
     glm::vec3 g2 = -g1 - g3 - g4;
 
     float a = compliance/(deltatime*deltatime);
-
-    float& lambda = lagrangeMultipliers[0].x;
 
     float denominator = w1*glm::dot(g1, g1) + w2*glm::dot(g2, g2) +w3*glm::dot(g3, g3) + w4*glm::dot(g4, g4) + a;
     // negligible in this case
