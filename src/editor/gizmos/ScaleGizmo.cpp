@@ -1,5 +1,6 @@
 #include <editor/gizmos/ScaleGizmo.hpp>
 #include <cmath>
+#include <glm/gtx/quaternion.hpp>
 
 namespace sauce::editor {
 
@@ -102,7 +103,7 @@ GizmoMeshData ScaleGizmo::generateMesh() const {
   return data;
 }
 
-GizmoAxis ScaleGizmo::hitTest(const Ray& ray, const glm::vec3& position, float scale) const {
+GizmoAxis ScaleGizmo::hitTest(const Ray& ray, const glm::vec3& position, const glm::quat& rotation,  float scale) const {
   float hitThreshold = 0.08f * scale;
   float shaftLen = SHAFT_LENGTH * scale;
 
@@ -110,7 +111,7 @@ GizmoAxis ScaleGizmo::hitTest(const Ray& ray, const glm::vec3& position, float s
   GizmoAxis bestAxis = GizmoAxis::None;
 
   for (auto axis : { GizmoAxis::X, GizmoAxis::Y, GizmoAxis::Z }) {
-    glm::vec3 dir = axisDirection(axis);
+    glm::vec3 dir = rotation * axisDirection(axis);
     float dist = distanceRayToLine(ray, position, dir, shaftLen);
     if (dist < bestDist) {
       bestDist = dist;
@@ -120,17 +121,18 @@ GizmoAxis ScaleGizmo::hitTest(const Ray& ray, const glm::vec3& position, float s
   return bestAxis;
 }
 
-void ScaleGizmo::beginInteraction(GizmoAxis axis, const Ray& ray, const glm::vec3& entityPos) {
+void ScaleGizmo::beginInteraction(GizmoAxis axis, const Ray& ray, const glm::vec3& entityPos, const glm::quat& rotation) {
   activeAxis = axis;
   interacting = true;
   lastEntityPos = entityPos;
-  initialT = projectRayOntoAxis(ray, entityPos, axisDirection(axis));
+  glm::vec3 dir = rotation * axisDirection(axis);
+  initialT = projectRayOntoAxis(ray, entityPos, dir);
 }
 
-glm::vec3 ScaleGizmo::updateInteraction(const Ray& ray, const glm::vec3& entityPos) {
+glm::vec3 ScaleGizmo::updateInteraction(const Ray& ray, const glm::vec3& entityPos, const glm::quat& rotation) {
   if (!interacting || activeAxis == GizmoAxis::None) return glm::vec3(0.0f);
 
-  glm::vec3 dir = axisDirection(activeAxis);
+  glm::vec3 dir = rotation * axisDirection(activeAxis);
   float currentT = projectRayOntoAxis(ray, lastEntityPos, dir);
   float deltaT = currentT - initialT;
   initialT = currentT;
