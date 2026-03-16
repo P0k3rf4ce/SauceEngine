@@ -6,6 +6,13 @@
 #include <string>
 #include <algorithm>
 
+#ifdef _WIN32
+#  include <windows.h>
+#  include <shellapi.h>
+#elif defined(__APPLE__) || defined(__linux__)
+#  include <unistd.h>
+#endif
+
 namespace sauce::ui {
 
 class SettingsWindow : public ImGuiComponent {
@@ -77,13 +84,7 @@ public:
     ImGui::Separator();
     ImGui::Spacing();
     if (ImGui::SmallButton("store.palantir.com")) {
-      #ifdef _WIN32
-        system("start https://store.palantir.com");
-      #elif __APPLE__
-        system("open https://store.palantir.com");
-      #else
-        system("xdg-open https://store.palantir.com");
-      #endif
+      openStoreUrl();
     }
     if (ImGui::IsItemHovered()) {
       ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
@@ -93,6 +94,22 @@ public:
   }
 
 private:
+  static void openStoreUrl() {
+#ifdef _WIN32
+    ShellExecuteA(nullptr, "open", "https://store.palantir.com", nullptr, nullptr, SW_SHOWNORMAL);
+#elif defined(__APPLE__) || defined(__linux__)
+    pid_t pid = fork();
+    if (pid == 0) {
+#  ifdef __APPLE__
+      execlp("open", "open", "https://store.palantir.com", static_cast<char*>(nullptr));
+#  else
+      execlp("xdg-open", "xdg-open", "https://store.palantir.com", static_cast<char*>(nullptr));
+#  endif
+      _exit(127);
+    }
+#endif
+  }
+
   sauce::SettingsManager& settings;
   char workingDirBuf[512] = {};
 };
