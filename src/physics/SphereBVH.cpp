@@ -313,7 +313,7 @@ SphereBVH SphereBVH::fromScene(const sauce::Scene& scene) {
     }
     
     // Combine every BVH into a large one or the scene
-    return SphereBVH(buildBVH(spheres, 0, entities.size()));
+    return SphereBVH(buildBVH(spheres, 0, spheres.size()));
 }
 
 bool SphereBVH::checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const {
