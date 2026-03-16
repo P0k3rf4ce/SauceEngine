@@ -365,6 +365,10 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
       0u, { lightCount }
     );
 
+    const uint32_t lightCount = 0;
+    cmd.pushConstants<uint32_t>(pRenderer->getPipeline().getLayout(),
+      vk::ShaderStageFlagBits::eFragment, 0, lightCount);
+
     for (auto* mrc : mrcs) {
       auto mesh = mrc->getMesh();
       auto material = mrc->getMaterial();

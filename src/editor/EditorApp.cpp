@@ -21,7 +21,14 @@
 #include <fstream>
 #include <cmath>
 #include <cstring>
+<<<<<<< 206-editor-play-mode
+#include <csignal>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+=======
 #include <editor/zip_file.hpp>
+>>>>>>> editor-dev
 
 namespace sauce::editor {
 
@@ -41,6 +48,11 @@ EditorApp::EditorApp() {
 
 EditorApp::~EditorApp() {
   SAUCE_LOG("Editor", "SauceEditor shutting down");
+
+  // Stop play mode if active
+  if (playModeActive) {
+    stopPlayMode();
+  }
 
   if (pRenderer) {
     logicalDevice->waitIdle();
@@ -803,6 +815,23 @@ void EditorApp::mainLoop() {
       }
     }
 
+    // Check if play mode process has exited on its own
+    if (playModeActive && playProcessPid > 0) {
+      int status;
+      pid_t result = waitpid(playProcessPid, &status, WNOHANG);
+      if (result != 0) {
+        // Process has exited
+        playProcessPid = -1;
+        playModeActive = false;
+        if (!playModeTempFile.empty()) {
+          std::error_code ec2;
+          std::filesystem::remove(playModeTempFile, ec2);
+          playModeTempFile.clear();
+        }
+        setStatusMessage("Play mode ended");
+      }
+    }
+
     // Upload mesh GPU resources for any newly imported models
     uploadMeshGPUResources();
 
@@ -947,6 +976,39 @@ void EditorApp::buildEditorUI() {
       }
       ImGui::EndMenu();
     }
+
+    // Play mode controls - centered in menu bar
+    {
+      float menuBarWidth = ImGui::GetWindowWidth();
+      float buttonWidth = 80.0f;
+      float totalWidth = playModeActive ? (buttonWidth * 1 + 8.0f) : buttonWidth;
+      float cursorX = (menuBarWidth - totalWidth) * 0.5f;
+
+      // Ensure we don't overlap menus
+      if (cursorX < ImGui::GetCursorPosX())
+        cursorX = ImGui::GetCursorPosX() + 20.0f;
+
+      ImGui::SetCursorPosX(cursorX);
+
+      if (!playModeActive) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.55f, 0.15f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.70f, 0.20f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.10f, 0.45f, 0.10f, 1.0f));
+        if (ImGui::Button("Play", ImVec2(buttonWidth, 0))) {
+          startPlayMode();
+        }
+        ImGui::PopStyleColor(3);
+      } else {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.70f, 0.15f, 0.15f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.85f, 0.20f, 0.20f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.55f, 0.10f, 0.10f, 1.0f));
+        if (ImGui::Button("Stop", ImVec2(buttonWidth, 0))) {
+          stopPlayMode();
+        }
+        ImGui::PopStyleColor(3);
+      }
+    }
+
     ImGui::EndMenuBar();
   }
 
@@ -1360,6 +1422,13 @@ void EditorApp::keyCallback(GLFWwindow* window, int key, int /*scancode*/, int a
       app->selectionManager.deselect();
       return;
     }
+    if (key == GLFW_KEY_P) {
+      if (app->playModeActive)
+        app->stopPlayMode();
+      else
+        app->startPlayMode();
+      return;
+    }
   }
 
   if (ImGui::GetIO().WantCaptureKeyboard) return;
@@ -1602,6 +1671,93 @@ void EditorApp::applySettings(const sauce::EditorSettings& s) {
 
   SAUCE_LOG_VERBOSE("Settings", "Settings applied (scale={:.2f}, sensitivity={:.2f}, speed={:.1f}, fov={:.0f})",
       s.imguiScale, s.mouseSensitivity, s.cameraSpeed, s.fieldOfView);
+}
+
+void EditorApp::startPlayMode() {
+  if (playModeActive) return;
+
+  // Save scene to a temporary .glb file
+  namespace fs = std::filesystem;
+  fs::path tempDir = fs::temp_directory_path() / "sauceengine_play";
+  std::error_code ec;
+  fs::create_directories(tempDir, ec);
+  if (ec) {
+    setStatusMessage("Play: Failed to create temp directory");
+    SAUCE_LOG("Play", "Failed to create temp dir: {}", ec.message());
+    return;
+  }
+
+  playModeTempFile = (tempDir / "play_scene.glb").string();
+
+  // Save original file path before saveToFile overwrites it
+  std::string originalPath = pScene->getCurrentFilePath();
+
+  if (!pScene->saveToFile(playModeTempFile)) {
+    setStatusMessage("Play: Failed to save scene");
+    SAUCE_LOG("Play", "Failed to save scene to temp file");
+    return;
+  }
+
+  // Restore the original scene file path (saveToFile updates it)
+  pScene->setCurrentFilePath(originalPath);
+
+  // Find the SauceEngine executable relative to the editor executable
+  fs::path engineExe = fs::current_path() / "build" / "SauceEngine";
+  if (!fs::exists(engineExe)) {
+    // Try alongside the current executable
+    engineExe = "SauceEngine";
+  }
+
+  SAUCE_LOG("Play", "Starting play mode: {} {}", engineExe.string(), playModeTempFile);
+
+  pid_t pid = fork();
+  if (pid == 0) {
+    // Child process - exec SauceEngine with the temp scene file
+    execlp(engineExe.c_str(), engineExe.c_str(), playModeTempFile.c_str(), nullptr);
+    // If exec fails
+    _exit(1);
+  } else if (pid > 0) {
+    playProcessPid = pid;
+    playModeActive = true;
+    setStatusMessage("Play mode started");
+    SAUCE_LOG("Play", "SauceEngine launched with PID {}", pid);
+  } else {
+    setStatusMessage("Play: Failed to launch engine");
+    SAUCE_LOG("Play", "fork() failed");
+  }
+}
+
+void EditorApp::stopPlayMode() {
+  if (!playModeActive) return;
+
+  if (playProcessPid > 0) {
+    SAUCE_LOG("Play", "Stopping SauceEngine (PID {})", playProcessPid);
+    kill(playProcessPid, SIGTERM);
+
+    // Wait briefly for clean exit, then force kill
+    int status;
+    pid_t result = waitpid(playProcessPid, &status, WNOHANG);
+    if (result == 0) {
+      // Process still running, give it a moment
+      usleep(100000); // 100ms
+      result = waitpid(playProcessPid, &status, WNOHANG);
+      if (result == 0) {
+        kill(playProcessPid, SIGKILL);
+        waitpid(playProcessPid, &status, 0);
+      }
+    }
+    playProcessPid = -1;
+  }
+
+  // Clean up temp file
+  if (!playModeTempFile.empty()) {
+    std::error_code ec;
+    std::filesystem::remove(playModeTempFile, ec);
+    playModeTempFile.clear();
+  }
+
+  playModeActive = false;
+  setStatusMessage("Play mode stopped");
 }
 
 } // namespace sauce::editor

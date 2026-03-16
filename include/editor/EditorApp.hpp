@@ -40,6 +40,7 @@
 #include <memory>
 #include <chrono>
 #include <filesystem>
+#include <sys/types.h>
 
 namespace sauce {
 class MeshRendererComponent;
@@ -107,6 +108,11 @@ public:
   void saveSceneAs(const std::string& path);
 
   void setInitialSceneFile(const std::string& path) { initialSceneFile = path; }
+
+  // Play mode
+  void startPlayMode();
+  void stopPlayMode();
+  bool isInPlayMode() const { return playModeActive; }
 
 private:
   void initWindow();
@@ -201,6 +207,11 @@ private:
   char dialogPathBuf[512] = {};
 
   std::string initialSceneFile;
+
+  // Play mode state
+  bool playModeActive = false;
+  pid_t playProcessPid = -1;
+  std::string playModeTempFile;
 
   sauce::SettingsManager settingsManager;
   std::string lastWorkingDirectory;
