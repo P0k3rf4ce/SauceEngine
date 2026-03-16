@@ -40,7 +40,14 @@
 #include <memory>
 #include <chrono>
 #include <filesystem>
+
+#if defined(_WIN32)
+#include <cstdint>
+using EditorProcessId = std::int64_t;
+#else
 #include <sys/types.h>
+using EditorProcessId = pid_t;
+#endif
 
 namespace sauce {
 class MeshRendererComponent;
@@ -210,7 +217,7 @@ private:
 
   // Play mode state
   bool playModeActive = false;
-  pid_t playProcessPid = -1;
+  EditorProcessId playProcessPid = -1;
   std::string playModeTempFile;
 
   sauce::SettingsManager settingsManager;
