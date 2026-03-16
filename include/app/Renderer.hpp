@@ -23,6 +23,7 @@
 #include <app/Scene.hpp>
 #include <app/SwapChain.hpp>
 
+#include <app/IBLGenerator.hpp>
 #include <cstring>
 
 namespace sauce {
@@ -118,7 +119,7 @@ public:
     sauce::GraphicsPipelineConfig mainPipelineConfig {
       .physicalDevice = createInfo.physicalDevice,
       .logicalDevice = createInfo.logicalDevice,
-      .descriptorSetLayout = descriptorSetLayout,
+      .descriptorSetLayouts = { *descriptorSetLayout0, *descriptorSetLayout1, *modeling::Material::getDescriptorSetLayout() },
       .colorFormat = pSwapChain->getSurfaceFormat().format,
       .shaderPath = "shaders/shader_pbr.spv",
     };
@@ -127,7 +128,7 @@ public:
     sauce::GraphicsPipelineConfig postProcessPipelineConfig {
       .physicalDevice = createInfo.physicalDevice,
       .logicalDevice = createInfo.logicalDevice,
-      .descriptorSetLayout = postProcessDescriptorSetLayout,
+      .descriptorSetLayouts = { *postProcessDescriptorSetLayout },
       .colorFormat = pSwapChain->getSurfaceFormat().format,
       .shaderPath = "shaders/postprocess.spv",
       .hasVertexInput = false,
@@ -173,12 +174,25 @@ public:
     }
   }
 
+  ~Renderer() {
+    modeling::Material::cleanup();
+  }
+
   const vk::raii::Queue& getQueue() const { return *pQueue; }
   const sauce::SwapChain& getSwapChain() const { return *pSwapChain; }
   const vk::raii::CommandPool& getCommandPool() const { return commandPool; }
-  const vk::raii::DescriptorSetLayout& getDescriptorSetLayout() const { return descriptorSetLayout; }
+  const vk::raii::DescriptorSetLayout& getDescriptorSetLayout0() const { return descriptorSetLayout0; }
+  const vk::raii::DescriptorSetLayout& getDescriptorSetLayout1() const { return descriptorSetLayout1; }
   uint32_t getFrameIndex() const { return frameIndex; }
   const vk::raii::DescriptorSet& getCurrentDescriptorSet() const { return descriptorSets[frameIndex]; }
+  const vk::raii::DescriptorSet& getEnvironmentDescriptorSet() const { 
+    assert(!environmentDescriptorSets.empty() && "Environment descriptor sets not initialized!");
+    return environmentDescriptorSets[0]; 
+  }
+  const vk::raii::DescriptorSet& getDefaultMaterialDescriptorSet() const { 
+    assert(!defaultMaterialDescriptorSets.empty() && "Default material descriptor sets not initialized!");
+    return defaultMaterialDescriptorSets[0]; 
+  }
   void* getCurrentUniformBufferMapped() const { return uniformBuffersMapped[frameIndex]; }
 
   void setFramebufferResized() { framebufferResized = true; }
@@ -187,6 +201,9 @@ public:
   const vk::raii::ImageView& getDepthImageView() const { return depthImageView; }
   const GraphicsPipeline& getPipeline() const { return *pPipeline; }
   const vk::raii::Buffer& getCurrentUniformBuffer() const { return uniformBuffers[frameIndex]; }
+  const vk::raii::DescriptorPool& getDescriptorPool() const { return descriptorPool; }
+  const vk::raii::ImageView& getDefaultImageView() const { return defaultImageView; }
+  const vk::raii::Sampler& getDefaultSampler() const { return defaultSampler; }
 
   void setCommandBufferRecorder(CommandBufferRecorder recorder) {
     customRecorder = std::move(recorder);
@@ -223,27 +240,33 @@ public:
   }
 
   void createDescriptorSetLayout(const sauce::LogicalDevice& logicalDevice) {
-    std::array<vk::DescriptorSetLayoutBinding, 13> bindings;
-
-    // UBO
-    bindings[0] = { .binding = 0, .descriptorType = vk::DescriptorType::eUniformBuffer,  .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment };
-    // MaterialData
-    bindings[1] = { .binding = 1, .descriptorType = vk::DescriptorType::eUniformBuffer,  .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
+    // Set 0: Per-Frame Layout
+    std::array<vk::DescriptorSetLayoutBinding, 2> perFrameBindings;
+    // Camera UBO
+    perFrameBindings[0] = { .binding = 0, .descriptorType = vk::DescriptorType::eUniformBuffer,  .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment };
     // Light SSBO
-    bindings[2] = { .binding = 2, .descriptorType = vk::DescriptorType::eStorageBuffer,  .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
-    // Texture and Sampler pairs
-    for (uint32_t i = 0; i < 5; ++i) {
-      bindings[3 + i * 2] = { .binding = 3 + i * 2, .descriptorType = vk::DescriptorType::eSampledImage, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
-      bindings[4 + i * 2] = { .binding = 4 + i * 2, .descriptorType = vk::DescriptorType::eSampler,      .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
-    }
+    perFrameBindings[1] = { .binding = 1, .descriptorType = vk::DescriptorType::eStorageBuffer,  .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
 
-
-    vk::DescriptorSetLayoutCreateInfo dsLayoutInfo {
-      .bindingCount = static_cast<uint32_t>(bindings.size()),
-      .pBindings = bindings.data(),
+    vk::DescriptorSetLayoutCreateInfo perFrameDsLayoutInfo {
+      .bindingCount = static_cast<uint32_t>(perFrameBindings.size()),
+      .pBindings = perFrameBindings.data(),
     };
+    descriptorSetLayout0 = vk::raii::DescriptorSetLayout{ *logicalDevice, perFrameDsLayoutInfo };
 
-    descriptorSetLayout = vk::raii::DescriptorSetLayout{ *logicalDevice, dsLayoutInfo };
+    // Set 1: Environment Layout (IBL Maps)
+    std::array<vk::DescriptorSetLayoutBinding, 3> environmentBindings;
+    // IBL Maps: Irradiance, Prefilter, BRDF LUT
+    environmentBindings[0] = { .binding = 0, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
+    environmentBindings[1] = { .binding = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
+    environmentBindings[2] = { .binding = 2, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
+
+    vk::DescriptorSetLayoutCreateInfo environmentDsLayoutInfo {
+      .bindingCount = static_cast<uint32_t>(environmentBindings.size()),
+      .pBindings = environmentBindings.data(),
+    };
+    descriptorSetLayout1 = vk::raii::DescriptorSetLayout{ *logicalDevice, environmentDsLayoutInfo };
+
+    modeling::Material::initDescriptorSetLayout(logicalDevice);
 
     vk::DescriptorSetLayoutBinding samplerLayoutBinding {
       .binding = 0,
@@ -259,51 +282,77 @@ public:
   }
 
   void createDescriptorSets(const sauce::LogicalDevice& logicalDevice) {
-    std::array<vk::DescriptorPoolSize, 5> poolSizes {{
-      { vk::DescriptorType::eUniformBuffer, 2u * MAX_FRAMES_IN_FLIGHT },
-      { vk::DescriptorType::eStorageBuffer, 1u * MAX_FRAMES_IN_FLIGHT },
-      { vk::DescriptorType::eSampledImage,  5u * MAX_FRAMES_IN_FLIGHT },
-      { vk::DescriptorType::eSampler,       5u * MAX_FRAMES_IN_FLIGHT },
-      { vk::DescriptorType::eCombinedImageSampler, 1u * MAX_FRAMES_IN_FLIGHT },
+    std::array<vk::DescriptorPoolSize, 3> poolSizes {{
+      { vk::DescriptorType::eUniformBuffer, 1024u },
+      { vk::DescriptorType::eStorageBuffer, 1024u },
+      { vk::DescriptorType::eCombinedImageSampler, 1024u },
     }};
 
     vk::DescriptorPoolCreateInfo poolCreateInfo {
       .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-      .maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT + 1), // +1 for post process
+      .maxSets = 1024u,
       .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
       .pPoolSizes = poolSizes.data(),
     };
 
     descriptorPool = vk::raii::DescriptorPool{ *logicalDevice, poolCreateInfo };
 
-    std::vector<vk::DescriptorSetLayout> layouts{ MAX_FRAMES_IN_FLIGHT, *descriptorSetLayout };
+    // Per-frame sets
+    std::vector<vk::DescriptorSetLayout> layouts{ MAX_FRAMES_IN_FLIGHT, *descriptorSetLayout0 };
     vk::DescriptorSetAllocateInfo dsAllocInfo {
       .descriptorPool = descriptorPool,
       .descriptorSetCount = static_cast<uint32_t>(layouts.size()),
       .pSetLayouts = layouts.data()
     };
-
     descriptorSets = logicalDevice->allocateDescriptorSets(dsAllocInfo);
 
-    vk::DescriptorBufferInfo materialInfo { .buffer = *materialBuffer, .offset = 0, .range = sizeof(MaterialData) };
-    vk::DescriptorBufferInfo lightSSBOInfo { .buffer = *lightSSBO,     .offset = 0, .range = lightSSBOSize };
-    vk::DescriptorImageInfo  imageInfo     { .imageView = *defaultImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
-    vk::DescriptorImageInfo  samplerInfo   { .sampler = *defaultSampler };
+    // Environment set
+    vk::DescriptorSetAllocateInfo envAllocInfo {
+      .descriptorPool = descriptorPool,
+      .descriptorSetCount = 1,
+      .pSetLayouts = &*descriptorSetLayout1
+    };
+    environmentDescriptorSets = logicalDevice->allocateDescriptorSets(envAllocInfo);
+
+    // Default material set
+    vk::DescriptorSetLayout materialLayout = *modeling::Material::getDescriptorSetLayout();
+    vk::DescriptorSetAllocateInfo matAllocInfo {
+      .descriptorPool = descriptorPool,
+      .descriptorSetCount = 1,
+      .pSetLayouts = &materialLayout
+    };
+    defaultMaterialDescriptorSets = logicalDevice->allocateDescriptorSets(matAllocInfo);
+
+    vk::DescriptorBufferInfo lightSSBOInfo { .buffer = *lightSSBO, .offset = 0, .range = lightSSBOSize };
+    
+    // Fallback for IBL maps
+    vk::DescriptorImageInfo iblInfo { .sampler = *defaultSampler, .imageView = *defaultImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
       vk::DescriptorBufferInfo uboInfo { .buffer = uniformBuffers[i], .offset = 0, .range = sizeof(UniformBufferObject) };
 
-      std::array<vk::WriteDescriptorSet, 13> writes;
+      std::array<vk::WriteDescriptorSet, 2> writes;
       writes[0] = { .dstSet = descriptorSets[i], .dstBinding = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eUniformBuffer,  .pBufferInfo = &uboInfo };
-      writes[1] = { .dstSet = descriptorSets[i], .dstBinding = 1, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eUniformBuffer,  .pBufferInfo = &materialInfo };
-      writes[2] = { .dstSet = descriptorSets[i], .dstBinding = 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eStorageBuffer,  .pBufferInfo = &lightSSBOInfo };
-      for (uint32_t t = 0; t < 5; ++t) {
-        writes[3 + t * 2] = { .dstSet = descriptorSets[i], .dstBinding = 3 + t * 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampledImage, .pImageInfo = &imageInfo };
-        writes[4 + t * 2] = { .dstSet = descriptorSets[i], .dstBinding = 4 + t * 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampler,      .pImageInfo = &samplerInfo };
-      }
+      writes[1] = { .dstSet = descriptorSets[i], .dstBinding = 1, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eStorageBuffer,  .pBufferInfo = &lightSSBOInfo };
 
       logicalDevice->updateDescriptorSets(writes, {});
     }
+
+    std::array<vk::WriteDescriptorSet, 3> envWrites;
+    envWrites[0] = { .dstSet = environmentDescriptorSets[0], .dstBinding = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &iblInfo };
+    envWrites[1] = { .dstSet = environmentDescriptorSets[0], .dstBinding = 1, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &iblInfo };
+    envWrites[2] = { .dstSet = environmentDescriptorSets[0], .dstBinding = 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &iblInfo };
+    logicalDevice->updateDescriptorSets(envWrites, {});
+
+    vk::DescriptorBufferInfo matUboInfo { .buffer = *materialBuffer, .offset = 0, .range = sizeof(MaterialData) };
+    vk::DescriptorImageInfo defaultImageInfo { .sampler = *defaultSampler, .imageView = *defaultImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+
+    std::array<vk::WriteDescriptorSet, 6> matWrites;
+    for (uint32_t i = 0; i < 5; ++i) {
+      matWrites[i] = { .dstSet = defaultMaterialDescriptorSets[0], .dstBinding = i, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &defaultImageInfo };
+    }
+    matWrites[5] = { .dstSet = defaultMaterialDescriptorSets[0], .dstBinding = 5, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eUniformBuffer, .pBufferInfo = &matUboInfo };
+    logicalDevice->updateDescriptorSets(matWrites, {});
   }
 
   void createPostProcessDescriptorSets(const sauce::LogicalDevice& logicalDevice) {
@@ -586,6 +635,8 @@ public:
     commandBuffers[frameIndex].bindVertexBuffers(0, *vertexBuffer, {0});
     commandBuffers[frameIndex].bindIndexBuffer( *indexBuffer, 0, vk::IndexType::eUint16 );
     commandBuffers[frameIndex].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pPipeline->getLayout(), 0, *descriptorSets[frameIndex], nullptr);
+    commandBuffers[frameIndex].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pPipeline->getLayout(), 1, *environmentDescriptorSets[0], nullptr);
+    commandBuffers[frameIndex].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pPipeline->getLayout(), 2, *defaultMaterialDescriptorSets[0], nullptr);
 
     commandBuffers[frameIndex].setViewport(
         0, vk::Viewport(0.0f, 0.0f, static_cast<float>(pSwapChain->getExtent().width),
@@ -599,7 +650,7 @@ public:
         0u, { lightCount }
     );
 
-    commandBuffers[frameIndex].drawIndexed(indices.size(), 1, 0, 0, 0);
+    commandBuffers[frameIndex].drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
     commandBuffers[frameIndex].endRendering();
 
@@ -867,6 +918,8 @@ public:
     return count;
   }
 
+  const vk::raii::Buffer& getMaterialBuffer() const { return materialBuffer; }
+
 private:
   // Stored references for swapchain recreation
   const sauce::PhysicalDevice* pPhysicalDevice;
@@ -892,10 +945,13 @@ private:
   std::unique_ptr<sauce::GraphicsPipeline> pPipeline;
   std::unique_ptr<sauce::GraphicsPipeline> pPostProcessPipeline;
 
-  vk::raii::DescriptorSetLayout descriptorSetLayout = nullptr;
+  vk::raii::DescriptorSetLayout descriptorSetLayout0 = nullptr;
+  vk::raii::DescriptorSetLayout descriptorSetLayout1 = nullptr;
   vk::raii::DescriptorSetLayout postProcessDescriptorSetLayout = nullptr;
   vk::raii::DescriptorPool descriptorPool = nullptr;
   std::vector<vk::raii::DescriptorSet> descriptorSets;
+  std::vector<vk::raii::DescriptorSet> environmentDescriptorSets;
+  std::vector<vk::raii::DescriptorSet> defaultMaterialDescriptorSets;
   std::vector<vk::raii::DescriptorSet> postProcessDescriptorSets;
 
 
@@ -933,6 +989,8 @@ private:
   vk::raii::DeviceMemory offscreenImageMemory = nullptr;
   vk::raii::ImageView offscreenImageView = nullptr;
   vk::raii::Sampler offscreenSampler = nullptr;
+
+  std::unique_ptr<IBLMaps> pIBLMaps;
 };
 
 }
