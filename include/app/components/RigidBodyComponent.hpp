@@ -1,9 +1,11 @@
 #pragma once
 
 #include "app/Component.hpp"
+#include "app/modeling/Mesh.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <memory>
 
 namespace sauce {
 
@@ -46,11 +48,16 @@ public:
   void setInvInertiaTensor(const glm::mat3& I)      { invInertiaTensor = I; }
   void clearExternalForces()                        { externalForces = glm::vec3(0.0f); }
 
+  // approximate center of mass given a mesh
+  static glm::vec3 meshCenterOfMass(std::shared_ptr<modeling::Mesh> m);
+  // approximate inverse mass given a mesh
+  static float meshInvMass(std::shared_ptr<modeling::Mesh> m);
+
   // No implementation for this for now
-  virtual void render() override;
+  virtual void render() override {};
 
   // Moves the object using its external forces with no regard for constraints.
-  virtual void update(float deltatime) override;
+  virtual void update(float deltatime) override {};
   virtual ~RigidBodyComponent() = default;
 
 private:

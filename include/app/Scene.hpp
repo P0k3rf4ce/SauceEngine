@@ -2,8 +2,10 @@
 
 #include <app/Camera.hpp>
 #include <app/Entity.hpp>
+#include <app/components/LightComponent.hpp>
 #include <memory>
 #include <string>
+#include <vector>
 #include <unordered_map>
 
 #include <physics/XPBD.hpp>
@@ -80,12 +82,20 @@ public:
     return entities;
   }
 
+  /**
+   * Collects GPULight data from all active entities that have a LightComponent.
+   * Each light's world position is taken from the entity's TransformComponent.
+   * Returns a reference to an internal buffer (valid until the next call).
+   */
+  const std::vector<GPULight>& collectGPULights();
+
 private:
   std::vector<sauce::Entity> entities;
 
   std::unique_ptr<sauce::Camera> pCamera;
 
   std::string currentFilePath;
+  std::vector<GPULight> gpuLightBuffer;
 
   // Helper functions for GLTF loading
   void loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,

@@ -16,6 +16,10 @@ GizmoRenderer::GizmoRenderer(
   , pRenderer(&renderer)
 {
   sauce::GraphicsPipelineConfig gizmoConfig {
+    .physicalDevice = physicalDevice,
+    .logicalDevice = logicalDevice,
+    .descriptorSetLayouts = { *descriptorSetLayout },
+    .colorFormat = sauce::editor::OffscreenFramebuffer::COLOR_FORMAT,
     .hasVertexInput = true,
     .enableBlending = false,
     .enableCulling = false,
@@ -27,7 +31,7 @@ GizmoRenderer::GizmoRenderer(
 
   pipeline = std::make_unique<sauce::GraphicsPipeline>(
     physicalDevice, logicalDevice,
-    descriptorSetLayout,
+    gizmoConfig.descriptorSetLayouts,
     colorFormat,
     "shaders/editor_unlit.vert.spv",
     "shaders/editor_unlit.frag.spv",

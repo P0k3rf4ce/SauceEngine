@@ -57,7 +57,10 @@ target_sources(${EXEC_NAME} PRIVATE
   src/app/modeling/GLTFLoader.cpp
   src/app/modeling/GLTFExporter.cpp
   src/app/components/TransformComponent.cpp
+  src/app/components/RigidBodyComponent.cpp
   src/app/components/MeshRendererComponent.cpp
+  src/app/components/PointLightComponent.cpp
+  src/app/components/DirectionalLightComponent.cpp
   src/app/Scene.cpp
   src/app/ImGuiRenderer.cpp
   src/app/SauceEngineApp.cpp
@@ -68,6 +71,11 @@ target_sources(${EXEC_NAME} PRIVATE
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/shaders)
 # add_dependencies(${EXEC_NAME} shaders)  # Requires slangc; pre-compiled .spv files used instead
+
+add_custom_command(TARGET ${EXEC_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${PROJECT_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:${EXEC_NAME}>/shaders
+)
 
 # Model test executable
 add_executable(modeltest src/modeltest.cpp)
@@ -115,6 +123,7 @@ target_sources(modelviewer PRIVATE
     src/app/modeling/Model.cpp
     src/app/modeling/GLTFLoader.cpp
     src/app/ImGuiRenderer.cpp
+    src/app/components/RigidBodyComponent.cpp
 )
 
 target_link_libraries(modelviewer PUBLIC Vulkan::Vulkan)
@@ -122,6 +131,11 @@ target_link_libraries(modelviewer PRIVATE glfw)
 target_link_libraries(modelviewer PRIVATE imgui::imgui)
 
 add_dependencies(modelviewer shaders)
+
+add_custom_command(TARGET modelviewer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${PROJECT_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:modelviewer>/shaders
+)
 
 # SauceEditor executable
 add_executable(sauceeditor src/editor/main.cpp)
@@ -151,7 +165,10 @@ target_sources(sauceeditor PRIVATE
     src/app/modeling/GLTFLoader.cpp
     src/app/modeling/GLTFExporter.cpp
     src/app/components/TransformComponent.cpp
+    src/app/components/RigidBodyComponent.cpp
     src/app/components/MeshRendererComponent.cpp
+    src/app/components/PointLightComponent.cpp
+    src/app/components/DirectionalLightComponent.cpp
     src/app/Scene.cpp
     src/app/ImGuiRenderer.cpp
     src/app/Log.cpp

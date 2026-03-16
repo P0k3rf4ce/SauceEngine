@@ -2,7 +2,9 @@
 #include <app/ui/components/HelloWorldWindow.hpp>
 #include <app/ui/components/DebugStatsWindow.hpp>
 #include <app/components/TransformComponent.hpp>
+#include <app/components/RigidBodyComponent.hpp>
 #include <app/components/MeshRendererComponent.hpp>
+#include <app/components/LightComponent.hpp>
 #include <functional>
 #include <cstring>
 
@@ -166,6 +168,7 @@ void SauceEngineApp::mainLoop() {
 
       glfwPollEvents();
       processInput(deltaTime);
+      syncRigidBodiesToTransforms();
 
       pImGuiRenderer->newFrame();
       buildExampleUI();
@@ -180,17 +183,46 @@ void SauceEngineApp::buildExampleUI() {
     pImGuiComponentManager->renderAll();
   }
 
+void SauceEngineApp::syncRigidBodiesToTransforms() {
+    if (!pScene) {
+      return;
+    }
+
+    for (auto& entity : pScene->getEntitiesMut()) {
+      auto* rigidBody = entity.getComponent<RigidBodyComponent>();
+      auto* transform = entity.getComponent<TransformComponent>();
+      if (!rigidBody || !transform) {
+        continue;
+      }
+
+      transform->setTranslation(rigidBody->getPosition());
+      transform->setRotation(rigidBody->getOrientation());
+    }
+  }
+
 void SauceEngineApp::uploadMeshGPUResources() {
   for (auto& entity : pScene->getEntitiesMut()) {
     auto mrcs = entity.getComponents<MeshRendererComponent>();
     for (auto* mrc : mrcs) {
       auto mesh = mrc->getMesh();
-      if (!mesh || !mesh->isValid()) continue;
-      if (!mesh->hasGPUData()) {
+      if (mesh && mesh->isValid() && !mesh->hasGPUData()) {
         auto& physDev = const_cast<vk::raii::PhysicalDevice&>(*physicalDevice);
         auto& cmdPool = const_cast<vk::raii::CommandPool&>(pRenderer->getCommandPool());
         auto& queue = const_cast<vk::raii::Queue&>(pRenderer->getQueue());
         mesh->initVulkanResources(logicalDevice, physDev, cmdPool, queue);
+      }
+
+      auto material = mrc->getMaterial();
+      if (material && !material->hasDescriptorSet()) {
+        auto& physDev = const_cast<vk::raii::PhysicalDevice&>(*physicalDevice);
+        auto& cmdPool = const_cast<vk::raii::CommandPool&>(pRenderer->getCommandPool());
+        auto& queue = const_cast<vk::raii::Queue&>(pRenderer->getQueue());
+        material->initVulkanResources(
+          logicalDevice, physDev, cmdPool, queue,
+          pRenderer->getDescriptorPool(),
+          pRenderer->getDefaultImageView(),
+          pRenderer->getDefaultSampler()
+        );
       }
     }
   }
@@ -214,6 +246,10 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
   };
   ubo.proj[1][1] *= -1; // Vulkan Y-flip
   std::memcpy(pRenderer->getCurrentUniformBufferMapped(), &ubo, sizeof(ubo));
+
+  const auto& gpuLights = pScene->collectGPULights();
+  uint32_t lightCount = pRenderer->updateLightSSBO(
+      gpuLights.data(), static_cast<uint32_t>(gpuLights.size()));
 
   cmd.begin({});
 
@@ -314,8 +350,20 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
     cmd.setViewport(0, vk::Viewport(0.0f, 0.0f,
       static_cast<float>(extent.width), static_cast<float>(extent.height), 0.0f, 1.0f));
     cmd.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), extent));
+    
+    // Bind Set 0: Per-frame
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-      pRenderer->getPipeline().getLayout(), 0, *pRenderer->getCurrentDescriptorSet(), nullptr);
+      pRenderer->getPipeline().getLayout(), 0, { *pRenderer->getCurrentDescriptorSet() }, nullptr);
+    
+    // Bind Set 1: Environment
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+      pRenderer->getPipeline().getLayout(), 1, { pRenderer->getEnvironmentDescriptorSet() }, nullptr);
+
+    cmd.pushConstants<uint32_t>(
+      *pRenderer->getPipeline().getLayout(),
+      vk::ShaderStageFlagBits::eFragment,
+      0u, { lightCount }
+    );
 
     const uint32_t lightCount = 0;
     cmd.pushConstants<uint32_t>(pRenderer->getPipeline().getLayout(),
@@ -323,8 +371,19 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
 
     for (auto* mrc : mrcs) {
       auto mesh = mrc->getMesh();
+      auto material = mrc->getMaterial();
       if (!mesh || !mesh->hasGPUData()) continue;
       mesh->bind(cmd);
+
+      // Bind Set 2: Material
+      if (material && material->hasDescriptorSet()) {
+        cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+          pRenderer->getPipeline().getLayout(), 2, { material->getDescriptorSet() }, nullptr);
+      } else {
+        cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+          pRenderer->getPipeline().getLayout(), 2, { pRenderer->getDefaultMaterialDescriptorSet() }, nullptr);
+      }
+      
       mesh->draw(cmd);
     }
 

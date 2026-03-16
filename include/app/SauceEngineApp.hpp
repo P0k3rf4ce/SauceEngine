@@ -74,9 +74,9 @@ private:
   sauce::PhysicalDevice physicalDevice = nullptr;
   sauce::LogicalDevice logicalDevice = nullptr;
 
-  std::unique_ptr<sauce::Scene> pScene;
-
   std::unique_ptr<sauce::Renderer> pRenderer;
+
+  std::unique_ptr<sauce::Scene> pScene;
 
   std::unique_ptr<sauce::ImGuiRenderer> pImGuiRenderer;
 
@@ -93,6 +93,7 @@ private:
 
   void uploadMeshGPUResources();
   void setupSceneRenderer();
+  void syncRigidBodiesToTransforms();
   void recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t imageIndex);
 
 public:

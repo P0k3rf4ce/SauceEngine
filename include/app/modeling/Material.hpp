@@ -9,7 +9,6 @@
 #include <unordered_map>
 #include <vector>
 #include <memory>
-#include <vulkan/vulkan_raii.hpp>
 
 
 namespace sauce {
@@ -49,11 +48,6 @@ struct MaterialUBO {
     glm::vec4 emissiveFactor_alphaCutoff; // xyz = emissive, w = alphaCutoff
 };
 
-struct MaterialDescriptorInfo {
-    vk::DescriptorBufferInfo bufferInfo;
-    std::vector<vk::DescriptorImageInfo> imageInfos;
-};
-
 class Material {
 public:
     Material(const std::string& name = "");
@@ -62,12 +56,10 @@ public:
     const MaterialProperties& getProperties() const { return properties; }
     MaterialProperties& getProperties() { return properties; }
 
-    void initVulkanResources(
-        vk::raii::Device& device,
-        vk::raii::PhysicalDevice& physicalDevice);
-
     std::vector<vk::DescriptorBufferInfo> getDescriptorBufferInfos() const;
-    std::vector<vk::DescriptorImageInfo>  getDescriptorImageInfos() const;
+    std::vector<vk::DescriptorImageInfo>  getDescriptorImageInfos(
+        const vk::raii::ImageView& defaultView,
+        const vk::raii::Sampler& defaultSampler) const;
 
     std::shared_ptr<Texture> getTexture(TextureType type) const;
     void setTexture(TextureType type, std::shared_ptr<Texture> texture);
@@ -81,13 +73,22 @@ public:
     bool hasMetadata(const std::string& key) const;
 
     // Vulkan resource management
+    static void initDescriptorSetLayout(const sauce::LogicalDevice& logicalDevice);
+    static const vk::raii::DescriptorSetLayout& getDescriptorSetLayout();
+    static void cleanup();
+
+    const vk::raii::DescriptorSet& getDescriptorSet() const { return *descriptorSet; }
+    bool hasDescriptorSet() const { return (bool)descriptorSet; }
+
     void initVulkanResources(
         const sauce::LogicalDevice& logicalDevice,
         vk::raii::PhysicalDevice& physicalDevice,
         vk::raii::CommandPool& commandPool,
-        vk::raii::Queue& queue
+        vk::raii::Queue& queue,
+        const vk::raii::DescriptorPool& descriptorPool,
+        const vk::raii::ImageView& defaultView,
+        const vk::raii::Sampler& defaultSampler
     );
-    MaterialDescriptorInfo getDescriptorInfo() const;
 
 private:
     std::string name;
@@ -97,6 +98,8 @@ private:
     std::unordered_map<std::string, PropertyValue> metadata;
 
     // Vulkan resources
+    static std::unique_ptr<vk::raii::DescriptorSetLayout> descriptorSetLayout;
+    std::unique_ptr<vk::raii::DescriptorSet> descriptorSet;
     std::unique_ptr<vk::raii::Buffer> uniformBuffer;
     std::unique_ptr<vk::raii::DeviceMemory> uniformBufferMemory;
 

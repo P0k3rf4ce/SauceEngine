@@ -110,12 +110,14 @@ static bool drawVec3Control(const std::string& label, glm::vec3& values, float r
 
   ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 0));
 
+  const ImGuiInputTextFlags inputFlags = ImGuiInputTextFlags_AutoSelectAll;
+
   // X
   ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.35f, 0.15f, 0.15f, 1.0f));
   ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.45f, 0.20f, 0.20f, 1.0f));
   ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.55f, 0.25f, 0.25f, 1.0f));
   ImGui::SetNextItemWidth(fieldWidth);
-  if (ImGui::DragFloat("##X", &values.x, speed, 0.0f, 0.0f, "%.2f")) modified = true;
+  if (ImGui::InputFloat("##X", &values.x, 0.0f, 0.0f, "%.2f", inputFlags)) modified = true;
   ImGui::PopStyleColor(3);
 
   ImGui::SameLine();
@@ -125,7 +127,7 @@ static bool drawVec3Control(const std::string& label, glm::vec3& values, float r
   ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.20f, 0.45f, 0.20f, 1.0f));
   ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.25f, 0.55f, 0.25f, 1.0f));
   ImGui::SetNextItemWidth(fieldWidth);
-  if (ImGui::DragFloat("##Y", &values.y, speed, 0.0f, 0.0f, "%.2f")) modified = true;
+  if (ImGui::InputFloat("##Y", &values.y, 0.0f, 0.0f, "%.2f", inputFlags)) modified = true;
   ImGui::PopStyleColor(3);
 
   ImGui::SameLine();
@@ -135,10 +137,16 @@ static bool drawVec3Control(const std::string& label, glm::vec3& values, float r
   ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.20f, 0.20f, 0.45f, 1.0f));
   ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.25f, 0.25f, 0.55f, 1.0f));
   ImGui::SetNextItemWidth(fieldWidth);
-  if (ImGui::DragFloat("##Z", &values.z, speed, 0.0f, 0.0f, "%.2f")) modified = true;
+  if (ImGui::InputFloat("##Z", &values.z, 0.0f, 0.0f, "%.2f", inputFlags)) modified = true;
   ImGui::PopStyleColor(3);
 
   ImGui::PopStyleVar();
+
+  // Normalize negative zero to positive zero
+  if (values.x == 0.0f) values.x = 0.0f;
+  if (values.y == 0.0f) values.y = 0.0f;
+  if (values.z == 0.0f) values.z = 0.0f;
+
   ImGui::PopID();
 
   return modified;
