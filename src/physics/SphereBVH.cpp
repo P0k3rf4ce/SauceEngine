@@ -134,16 +134,6 @@ namespace {
     }
 }
 
-// SphereBVHNode
-bool SphereBVHNode::checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const {
-    if (!this->sphere.checkCollision(collider, info)) {
-        return false;
-    }
-
-    return this->left->sphere.checkCollision(collider, info) 
-        || this->right->sphere.checkCollision(collider, info);
-}
-
 static constexpr size_t MAX_MANIFOLD_CONTACTS = 4;
 
 // ── helpers ──────────────────────────────────────────────────────────
@@ -151,6 +141,24 @@ static constexpr size_t MAX_MANIFOLD_CONTACTS = 4;
 static bool spheresOverlap(const SphereCollider& a, const SphereCollider& b) {
     float radiusSum = a.radius + b.radius;
     return glm::length2(b.center - a.center) < radiusSum * radiusSum;
+}
+
+// SphereBVHNode
+bool SphereBVHNode::checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const {
+    const auto* otherSphere = dynamic_cast<const SphereCollider*>(&collider);
+    if (!otherSphere) return false;
+
+    if (!spheresOverlap(sphere, *otherSphere)) {
+        return false;
+    }
+
+    if (isLeaf()) {
+        return sphere.checkCollision(*otherSphere, info);
+    }
+
+    bool hitLeft  = left  ? left->checkCollision(collider, info)  : false;
+    bool hitRight = right ? right->checkCollision(collider, info) : false;
+    return hitLeft || hitRight;
 }
 
 // Reduces a set of contacts down to at most MAX_MANIFOLD_CONTACTS that
@@ -247,23 +255,6 @@ bool SphereBVHNode::isLeaf() const {
     return left == nullptr && right == nullptr;
 }
 
-bool SphereBVHNode::checkCollision(const Collider& collider, std::vector<ContactInfo>& info) {
-    const auto* otherSphere = dynamic_cast<const SphereCollider*>(&collider);
-    if (!otherSphere) return false;
-
-    if (!spheresOverlap(sphere, *otherSphere)) {
-        return false;
-    }
-
-    if (isLeaf()) {
-        return sphere.checkCollision(*otherSphere, info);
-    }
-
-    bool hitLeft  = left  ? left->checkCollision(collider, info)  : false;
-    bool hitRight = right ? right->checkCollision(collider, info) : false;
-    return hitLeft || hitRight;
-}
-
 std::unique_ptr<SphereBVHNode> SphereBVHNode::fromMesh(sauce::modeling::Mesh& mesh) {
     const auto &vertices = mesh.getVertices();
     const auto &indices = mesh.getIndices();
@@ -292,12 +283,6 @@ std::unique_ptr<SphereBVHNode> SphereBVHNode::fromMesh(sauce::modeling::Mesh& me
 
     return buildNode(triangles, 0, triangles.size());
 }
-
-bool SphereBVHNode::isLeaf() const {
-    return left == nullptr && right == nullptr;
-}
-
-
 
 // SphereBVH
 SphereBVH SphereBVH::fromScene(const sauce::Scene& scene) {
@@ -337,22 +322,3 @@ const SphereBVHNode *SphereBVH::getRoot() const {
 
 };
 
-    glm::vec3 extent = centroidMax - centroidMin;
-    int axis = 0; 
-    if (extent.y > extent.x) axis = 1;
-    if (extent.z > extent[axis]) axis = 2;
-
-    size_t mid = start + count / 2;
-    std::nth_element(triangles.begin() + start,
-                     triangles.begin() + mid,
-                     triangles.begin() + end,
-                     [axis](const TriangleInfo &a, const TriangleInfo &b) {
-                         return a.centroid[axis] < b.centroid[axis];
-                     });
-
-    node->left = buildRecursive(triangles, start, mid);
-    node->right = buildRecursive(triangles, mid, end);
-
-    return node;
-}
-};
