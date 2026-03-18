@@ -1,5 +1,6 @@
 #pragma once
 
+#include <app/Entity.hpp>
 #include <app/components/MeshRendererComponent.hpp>
 #include <app/components/RigidBodyComponent.hpp>
 

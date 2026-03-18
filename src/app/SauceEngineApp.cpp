@@ -8,6 +8,8 @@
 #include <functional>
 #include <cstring>
 
+#include <physics/XPBD.hpp>
+
 namespace sauce {
 
 SauceEngineApp::SauceEngineApp() {
@@ -69,6 +71,8 @@ void SauceEngineApp::initVulkan() {
     };
 
     pRenderer = std::make_unique<sauce::Renderer>(rendererCreateInfo);
+
+    pSolver = std::make_unique<physics::XPBDSolver>();
 
     // Initialize ImGui
     sauce::ImGuiRendererCreateInfo imguiCreateInfo{
@@ -163,15 +167,34 @@ void SauceEngineApp::mouseCallback(GLFWwindow* window, double xposIn, double ypo
 void SauceEngineApp::mainLoop() {
     while (!glfwWindowShouldClose(window)) {
       auto currentFrameTime = std::chrono::steady_clock::now();
-      deltaTime = std::chrono::duration<float>(currentFrameTime - lastFrameTime).count();
+      deltaFrame = std::chrono::duration<float>(currentFrameTime - lastFrameTime).count();
       lastFrameTime = currentFrameTime;
+      deltaUpdate += deltaFrame;
 
       glfwPollEvents();
-      processInput(deltaTime);
+      processInput(deltaFrame);
       syncRigidBodiesToTransforms();
 
       pImGuiRenderer->newFrame();
       buildExampleUI();
+
+      // Run XPBD only if 1/TICKRATE seconds passed since last physics run 
+
+      auto rigidBodies = std::vector<RigidBodyComponent>();
+      auto constraints = std::vector<std::unique_ptr<physics::Constraint>>();
+
+      for (auto& entity: pScene->getEntities()) {
+        auto rigidBody = entity.getComponent<RigidBodyComponent>();
+        if (rigidBody) rigidBodies.push_back(*rigidBody);
+      }
+
+      if (deltaUpdate > 1) {
+        deltaUpdate = 1.0/128.0;
+      }
+      while (deltaUpdate >= 1/128.0) {
+        pSolver->solvePositions(rigidBodies, constraints, 1.0/128.0);
+        deltaUpdate -= 1/128.0;
+      }
 
       pRenderer->drawFrame(logicalDevice, *pScene, pImGuiRenderer.get());
     }
@@ -234,6 +257,10 @@ void SauceEngineApp::setupSceneRenderer() {
       recordSceneCommandBuffer(cmd, imageIndex);
     }
   );
+}
+
+void SauceEngineApp::setupXPBDSolver() {
+  
 }
 
 void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t imageIndex) {
