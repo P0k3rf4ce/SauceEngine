@@ -73,7 +73,7 @@ struct XPBDSolver {
     }
   }
 
-  std::vector<Constraint> generateCollisionConstraints(std::vector<sauce::RigidBodyComponent>& rigidBodies);
+  std::vector<std::unique_ptr<Constraint>> generateCollisionConstraints(std::vector<sauce::RigidBodyComponent>& rigidBodies);
 };
 
 }
