@@ -17,8 +17,6 @@ struct LogicalDevice {
   LogicalDevice(const sauce::PhysicalDevice& physicalDevice, const sauce::RenderSurface& surface) {
     std::vector<vk::QueueFamilyProperties> queueFamilyProps = (*physicalDevice).getQueueFamilyProperties();
 
-    uint32_t graphicsAndPresentIndex;
-
     auto graphicsQueueFamilyProp = std::ranges::find_if(queueFamilyProps, [&](const vk::QueueFamilyProperties& prop){
         return (prop.queueFlags & vk::QueueFlagBits::eGraphics) != static_cast<vk::QueueFlags>(0);
     });
