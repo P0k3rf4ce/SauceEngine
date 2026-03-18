@@ -1,20 +1,18 @@
 #pragma once
 
+#include <app/ui/ImGuiComponent.hpp>
 #include <string>
 #include <vector>
-#include <app/ui/ImGuiComponent.hpp>
 
-namespace sauce::ui
-{
-	class PlotLines : public ImGuiComponent
-	{
-	public:
-		explicit PlotLines(const std::string& name, std::vector<float> values);
-		~PlotLines() override;
+namespace sauce::ui {
+    class PlotLines : public ImGuiComponent {
+      public:
+        explicit PlotLines(const std::string& name, std::vector<float> values);
+        ~PlotLines() override;
 
-		void render() override;
+        void render() override;
 
-	private:
-		std::vector<float> values;
-	};
-}
+      private:
+        std::vector<float> values;
+    };
+} // namespace sauce::ui

@@ -5,9 +5,9 @@
 
 // Program options imports
 #include <boost/program_options/options_description.hpp>
-#include <boost/program_options/variables_map.hpp>
-#include <boost/program_options/positional_options.hpp>
 #include <boost/program_options/parsers.hpp>
+#include <boost/program_options/positional_options.hpp>
+#include <boost/program_options/variables_map.hpp>
 
 struct AppOptions {
     static constexpr unsigned int DEFAULT_SCR_WIDTH = 800;
@@ -19,12 +19,15 @@ struct AppOptions {
     std::string scene_file;
     bool help;
 
-    AppOptions(int argc, const char *argv[]);
-    AppOptions(): scr_width(DEFAULT_SCR_WIDTH), scr_height(DEFAULT_SCR_HEIGHT), tickrate(DEFAULT_TICKRATE), scene_file(), help(false) {}
+    AppOptions(int argc, const char* argv[]);
+    AppOptions()
+        : scr_width(DEFAULT_SCR_WIDTH), scr_height(DEFAULT_SCR_HEIGHT), tickrate(DEFAULT_TICKRATE),
+          scene_file(), help(false) {
+    }
 
     boost::program_options::options_description getHelpMessage() const;
 
-private:
+  private:
     boost::program_options::options_description desc;
 };
 

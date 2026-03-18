@@ -15,20 +15,20 @@
 
 #include <app/BufferUtils.hpp>
 #include <app/GraphicsPipeline.hpp>
-#include <app/Scene.hpp>
-#include <app/Instance.hpp>
-#include <app/PhysicalDevice.hpp>
-#include <app/LogicalDevice.hpp>
-#include <app/Renderer.hpp>
-#include <app/RenderSurface.hpp>
-#include <app/SwapChain.hpp>
 #include <app/ImGuiRenderer.hpp>
+#include <app/Instance.hpp>
+#include <app/LogicalDevice.hpp>
+#include <app/PhysicalDevice.hpp>
+#include <app/RenderSurface.hpp>
+#include <app/Renderer.hpp>
+#include <app/Scene.hpp>
+#include <app/SwapChain.hpp>
 #include <app/ui/ImGuiComponentManager.hpp>
-#include <app/ui/components/HelloWorldWindow.hpp>
-#include <app/ui/components/DebugStatsWindow.hpp>
 #include <app/ui/components/BulletText.hpp>
 #include <app/ui/components/Button.hpp>
 #include <app/ui/components/Checkbox.hpp>
+#include <app/ui/components/DebugStatsWindow.hpp>
+#include <app/ui/components/HelloWorldWindow.hpp>
 #include <app/ui/components/Image.hpp>
 #include <app/ui/components/ImageButton.hpp>
 #include <app/ui/components/LabelText.hpp>
@@ -48,62 +48,65 @@ constexpr uint32_t HEIGHT = 720;
 
 namespace sauce {
 
-class SauceEngineApp {
-public:
-  SauceEngineApp(); // Constructor to initialize pImGuiComponentManager
-  void run();
+    class SauceEngineApp {
+      public:
+        SauceEngineApp(); // Constructor to initialize pImGuiComponentManager
+        void run();
 
-  ~SauceEngineApp();
+        ~SauceEngineApp();
 
-private:
-  GLFWwindow *window;
+      private:
+        GLFWwindow* window;
 
-  std::chrono::steady_clock::time_point lastFrameTime = std::chrono::steady_clock::now();
-  float deltaTime = 0.0f;
+        std::chrono::steady_clock::time_point lastFrameTime = std::chrono::steady_clock::now();
+        float deltaTime = 0.0f;
 
-  float lastX = 0.0f;
-  float lastY = 0.0f;
-  bool firstMouse = true;
-  bool cursorCaptured = true;
-  bool gravePressedLastFrame = false;
+        float lastX = 0.0f;
+        float lastY = 0.0f;
+        bool firstMouse = true;
+        bool cursorCaptured = true;
+        bool gravePressedLastFrame = false;
 
-  std::unique_ptr<sauce::Instance> pInstance;
+        std::unique_ptr<sauce::Instance> pInstance;
 
-  std::unique_ptr<sauce::RenderSurface> pRenderSurface;
+        std::unique_ptr<sauce::RenderSurface> pRenderSurface;
 
-  sauce::PhysicalDevice physicalDevice = nullptr;
-  sauce::LogicalDevice logicalDevice = nullptr;
+        sauce::PhysicalDevice physicalDevice = nullptr;
+        sauce::LogicalDevice logicalDevice = nullptr;
 
-  std::unique_ptr<sauce::Renderer> pRenderer;
+        std::unique_ptr<sauce::Renderer> pRenderer;
 
-  std::unique_ptr<sauce::Scene> pScene;
+        std::unique_ptr<sauce::Scene> pScene;
 
-  std::unique_ptr<sauce::ImGuiRenderer> pImGuiRenderer;
+        std::unique_ptr<sauce::ImGuiRenderer> pImGuiRenderer;
 
-  std::unique_ptr<sauce::ui::ImGuiComponentManager> pImGuiComponentManager;
-  std::function<void(sauce::ui::ImGuiComponentManager&)> pCustomUIBuilder;
+        std::unique_ptr<sauce::ui::ImGuiComponentManager> pImGuiComponentManager;
+        std::function<void(sauce::ui::ImGuiComponentManager&)> pCustomUIBuilder;
 
-  void initVulkan();
-  void initWindow();
-  void mainLoop();
-  void processInput(float deltaTime);
-  static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn);
+        void initVulkan();
+        void initWindow();
+        void mainLoop();
+        void processInput(float deltaTime);
+        static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn);
 
-  void buildExampleUI();
+        void buildExampleUI();
 
-  void uploadMeshGPUResources();
-  void setupSceneRenderer();
-  void syncRigidBodiesToTransforms();
-  void recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t imageIndex);
+        void uploadMeshGPUResources();
+        void setupSceneRenderer();
+        void syncRigidBodiesToTransforms();
+        void recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t imageIndex);
 
-public:
-  sauce::ui::ImGuiComponentManager& getImGuiManager() { return *pImGuiComponentManager; }
-  void setCustomUIBuilder(std::function<void(sauce::ui::ImGuiComponentManager&)> builder);
-  void setSceneFile(const std::string& path) { sceneFile = path; }
+      public:
+        sauce::ui::ImGuiComponentManager& getImGuiManager() {
+            return *pImGuiComponentManager;
+        }
+        void setCustomUIBuilder(std::function<void(sauce::ui::ImGuiComponentManager&)> builder);
+        void setSceneFile(const std::string& path) {
+            sceneFile = path;
+        }
 
-private:
-  std::string sceneFile;
-};
+      private:
+        std::string sceneFile;
+    };
 
-}
-
+} // namespace sauce

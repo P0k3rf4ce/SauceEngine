@@ -1,0 +1,21 @@
+BasedOnStyle: Microsoft
+Language: Cpp
+
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+ColumnLimit: 100
+PointerAlignment: Left
+
+SortIncludes: true
+IncludeBlocks: Preserve
+
+NamespaceIndentation: All
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+
+ReflowComments: false
+BreakBeforeBraces: Attach
+

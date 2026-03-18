@@ -1,33 +1,44 @@
-#include "app/modeling/GLTFLoader.hpp"
 #include "app/modeling/Model.hpp"
-#include "app/modeling/ModelNode.hpp"
-#include "app/modeling/Mesh.hpp"
+#include "app/modeling/GLTFLoader.hpp"
 #include "app/modeling/Material.hpp"
+#include "app/modeling/Mesh.hpp"
+#include "app/modeling/ModelNode.hpp"
 #include "app/modeling/Texture.hpp"
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #include <memory>
 
 using namespace sauce::modeling;
 
 std::string textureTypeToString(TextureType type) {
     switch (type) {
-        case TextureType::BaseColor: return "BaseColor";
-        case TextureType::Normal: return "Normal";
-        case TextureType::MetallicRoughness: return "MetallicRoughness";
-        case TextureType::Occlusion: return "Occlusion";
-        case TextureType::Emissive: return "Emissive";
-        case TextureType::Unknown: return "Unknown";
-        default: return "Invalid";
+    case TextureType::BaseColor:
+        return "BaseColor";
+    case TextureType::Normal:
+        return "Normal";
+    case TextureType::MetallicRoughness:
+        return "MetallicRoughness";
+    case TextureType::Occlusion:
+        return "Occlusion";
+    case TextureType::Emissive:
+        return "Emissive";
+    case TextureType::Unknown:
+        return "Unknown";
+    default:
+        return "Invalid";
     }
 }
 
 std::string alphaModeToString(MaterialProperties::AlphaMode mode) {
     switch (mode) {
-        case MaterialProperties::AlphaMode::Opaque: return "Opaque";
-        case MaterialProperties::AlphaMode::Mask: return "Mask";
-        case MaterialProperties::AlphaMode::Blend: return "Blend";
-        default: return "Unknown";
+    case MaterialProperties::AlphaMode::Opaque:
+        return "Opaque";
+    case MaterialProperties::AlphaMode::Mask:
+        return "Mask";
+    case MaterialProperties::AlphaMode::Blend:
+        return "Blend";
+    default:
+        return "Unknown";
     }
 }
 
@@ -41,10 +52,8 @@ void printMeshInfo(const std::shared_ptr<Mesh>& mesh, int index) {
 
     if (mesh->getVertexCount() > 0) {
         const auto& vertices = mesh->getVertices();
-        std::cout << "    First vertex position: ("
-                  << vertices[0].position.x << ", "
-                  << vertices[0].position.y << ", "
-                  << vertices[0].position.z << ")\n";
+        std::cout << "    First vertex position: (" << vertices[0].position.x << ", "
+                  << vertices[0].position.y << ", " << vertices[0].position.z << ")\n";
     }
 }
 
@@ -53,17 +62,12 @@ void printMaterialInfo(const std::shared_ptr<Material>& material, int index) {
     std::cout << "    Name: " << material->getName() << "\n";
 
     const auto& props = material->getProperties();
-    std::cout << "    Base Color: ("
-              << props.baseColorFactor.r << ", "
-              << props.baseColorFactor.g << ", "
-              << props.baseColorFactor.b << ", "
-              << props.baseColorFactor.a << ")\n";
+    std::cout << "    Base Color: (" << props.baseColorFactor.r << ", " << props.baseColorFactor.g
+              << ", " << props.baseColorFactor.b << ", " << props.baseColorFactor.a << ")\n";
     std::cout << "    Metallic: " << props.metallicFactor << "\n";
     std::cout << "    Roughness: " << props.roughnessFactor << "\n";
-    std::cout << "    Emissive: ("
-              << props.emissiveFactor.r << ", "
-              << props.emissiveFactor.g << ", "
-              << props.emissiveFactor.b << ")\n";
+    std::cout << "    Emissive: (" << props.emissiveFactor.r << ", " << props.emissiveFactor.g
+              << ", " << props.emissiveFactor.b << ")\n";
     std::cout << "    Alpha Mode: " << alphaModeToString(props.alphaMode) << "\n";
     std::cout << "    Double Sided: " << (props.doubleSided ? "Yes" : "No") << "\n";
 
@@ -90,14 +94,10 @@ void printNodeHierarchy(const std::shared_ptr<ModelNode>& node, int depth = 0) {
     std::cout << indent << "Node: " << node->getName() << "\n";
 
     const auto& transform = node->getTransform();
-    std::cout << indent << "  Translation: ("
-              << transform.getTranslation().x << ", "
-              << transform.getTranslation().y << ", "
-              << transform.getTranslation().z << ")\n";
-    std::cout << indent << "  Scale: ("
-              << transform.getScale().x << ", "
-              << transform.getScale().y << ", "
-              << transform.getScale().z << ")\n";
+    std::cout << indent << "  Translation: (" << transform.getTranslation().x << ", "
+              << transform.getTranslation().y << ", " << transform.getTranslation().z << ")\n";
+    std::cout << indent << "  Scale: (" << transform.getScale().x << ", " << transform.getScale().y
+              << ", " << transform.getScale().z << ")\n";
 
     const auto& pairs = node->getMeshMaterialPairs();
     if (!pairs.empty()) {

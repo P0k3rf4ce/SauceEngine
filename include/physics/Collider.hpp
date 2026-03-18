@@ -6,14 +6,10 @@
 
 namespace physics {
 
-struct Collider {
+    struct Collider {
+        // Stores contact info if sphere intersects collider. If no intersection, info is not modified
+        virtual bool checkCollision(const Collider& collider,
+                                    std::vector<ContactInfo>& info) const = 0;
+    };
 
-  // Stores contact info if sphere intersects collider. If no intersection, info is not modified
-  virtual bool checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const = 0;
-
-};
-
-
-
-}
-
+} // namespace physics

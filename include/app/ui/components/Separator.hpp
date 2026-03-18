@@ -6,15 +6,15 @@
 
 namespace sauce::ui {
 
-/**
+    /**
  * Separator - Wraps ImGui::Separator()
  * Creates a horizontal line separator
  */
-class Separator : public ImGuiComponent {
-public:
-    explicit Separator(const std::string& name);
+    class Separator : public ImGuiComponent {
+      public:
+        explicit Separator(const std::string& name);
 
-    void render() override;
-};
+        void render() override;
+    };
 
-}
+} // namespace sauce::ui

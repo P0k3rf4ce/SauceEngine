@@ -2,13 +2,15 @@
 
 namespace sauce::ui {
 
-SameLine::SameLine(const std::string& name, float offsetFromStartX, float spacing)
-    : ImGuiComponent(name), offsetFromStartX(offsetFromStartX), spacing(spacing) {}
+    SameLine::SameLine(const std::string& name, float offsetFromStartX, float spacing)
+        : ImGuiComponent(name), offsetFromStartX(offsetFromStartX), spacing(spacing) {
+    }
 
-void SameLine::render() {
-    if (!enabled) return;
-    
-    ImGui::SameLine(offsetFromStartX, spacing);
-}
+    void SameLine::render() {
+        if (!enabled)
+            return;
 
-}
+        ImGui::SameLine(offsetFromStartX, spacing);
+    }
+
+} // namespace sauce::ui
