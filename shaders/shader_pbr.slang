@@ -144,6 +144,7 @@ ConstantBuffer<MaterialData> material;
 // ============================================================================
 [[vk::push_constant]]
 cbuffer PushConstants {
+    float4x4 model;
     uint lightCount;
 };
 
@@ -167,7 +168,7 @@ VSOutput vertMain(VSInput input) {
     VSOutput output;
 
     // World-space position
-    float4 worldPos4 = mul(ubo.model, float4(input.inPosition, 1.0));
+    float4 worldPos4 = mul(model, float4(input.inPosition, 1.0));
     output.worldPos = worldPos4.xyz;
 
     // Clip-space position
@@ -176,7 +177,7 @@ VSOutput vertMain(VSInput input) {
     // Transform normal to world space
     // NOTE: Assumes uniform scale. For non-uniform scale the CPU should pass
     //       transpose(inverse(model)) as a separate normal matrix.
-    float3x3 normalMatrix = (float3x3)ubo.model;
+    float3x3 normalMatrix = (float3x3)model;
     output.normal = normalize(mul(normalMatrix, input.inNormal));
 
     // Transform tangent to world space (same matrix; valid for uniform scale)
@@ -380,9 +381,23 @@ float4 fragMain(VSOutput vertIn) : SV_TARGET {
         Lo += (kD * albedo / PI + specular) * radiance * NdotL;
     }
 
-    // ---- Ambient (constant placeholder — no IBL) ----
-    // TODO: Replace with IBL irradiance (task 10)
-    float3 ambient = float3(0.03, 0.03, 0.03) * albedo * ao;
+    // ---- Ambient (IBL) ----
+    float3 F = fresnelSchlick(max(dot(N, V), 0.0), F0);
+    float3 kS = F;
+    float3 kD = (1.0 - kS) * (1.0 - metallic);
+
+    // Diffuse IBL
+    float3 irradiance = irradianceMap.Sample(N).rgb;
+    float3 diffuseIBL = irradiance * albedo;
+
+    // Specular IBL (Split-sum approximation)
+    float3 R = reflect(-V, N);
+    const float MAX_REFLECTION_LOD = 4.0; // matches mip levels in prefilter map
+    float3 prefilteredColor = prefilterMap.SampleLevel(R, roughness * MAX_REFLECTION_LOD).rgb;
+    float2 brdf = brdfLUT.Sample(float2(max(dot(N, V), 0.0), roughness)).rg;
+    float3 specularIBL = prefilteredColor * (F * brdf.x + brdf.y);
+
+    float3 ambient = (kD * diffuseIBL + specularIBL) * ao;
 
     // ---- Final colour ----
     float3 color = ambient + Lo + emissive;

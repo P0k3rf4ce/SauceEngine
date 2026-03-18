@@ -31,6 +31,11 @@ void SauceEngineApp::run() {
     }
   }
 
+  // Load IBL if specified
+  if (!iblFile.empty() && pRenderer) {
+    pRenderer->loadIBL(iblFile);
+  }
+
 
   // Call custom UI builder after ImGui is initialized
   if (pCustomUIBuilder) {
@@ -236,18 +241,32 @@ void SauceEngineApp::setupSceneRenderer() {
   );
 }
 
+struct ScenePushConstants {
+  glm::mat4 model;
+  uint32_t lightCount;
+};
+
 void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t imageIndex) {
   // Write camera matrices to UBO (host side, before GPU execution)
-  sauce::UniformBufferObject ubo {
+  sauce::UniformBufferObject uboData {
     .model = glm::mat4(1.0f),
     .view = pScene->getCameraRO().getViewMatrix(),
     .proj = pScene->getCameraRO().getProjectionMatrix(),
     .cameraPos = pScene->getCameraRO().getPos(),
   };
-  ubo.proj[1][1] *= -1; // Vulkan Y-flip
-  std::memcpy(pRenderer->getCurrentUniformBufferMapped(), &ubo, sizeof(ubo));
+  uboData.proj[1][1] *= -1; // Vulkan Y-flip
+  std::memcpy(pRenderer->getCurrentUniformBufferMapped(), &uboData, sizeof(uboData));
 
-  const auto& gpuLights = pScene->collectGPULights();
+  auto gpuLights = pScene->collectGPULights();
+  if (gpuLights.empty()) {
+    GPULight defaultLight{};
+    defaultLight.type = 0; // Directional
+    defaultLight.direction = glm::normalize(glm::vec3(1.0f, -1.0f, -1.0f));
+    defaultLight.color = glm::vec3(1.0f, 1.0f, 1.0f);
+    defaultLight.intensity = 1.0f;
+    gpuLights.push_back(defaultLight);
+  }
+
   uint32_t lightCount = pRenderer->updateLightSSBO(
       gpuLights.data(), static_cast<uint32_t>(gpuLights.size()));
 
@@ -300,27 +319,6 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
       modelMatrix = tc->getLocalMatrix();
     }
 
-    // Update model matrix in UBO via vkCmdUpdateBuffer (GPU-side, outside render pass)
-    cmd.updateBuffer<glm::mat4>(*pRenderer->getCurrentUniformBuffer(), 0, modelMatrix);
-
-    // Barrier: transfer write -> vertex shader uniform read
-    vk::BufferMemoryBarrier2 bufBarrier {
-      .srcStageMask = vk::PipelineStageFlagBits2::eTransfer,
-      .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
-      .dstStageMask = vk::PipelineStageFlagBits2::eVertexShader,
-      .dstAccessMask = vk::AccessFlagBits2::eUniformRead,
-      .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-      .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-      .buffer = *pRenderer->getCurrentUniformBuffer(),
-      .offset = 0,
-      .size = sizeof(glm::mat4),
-    };
-    vk::DependencyInfo depInfo {
-      .bufferMemoryBarrierCount = 1,
-      .pBufferMemoryBarriers = &bufBarrier,
-    };
-    cmd.pipelineBarrier2(depInfo);
-
     // Begin rendering (clear on first, load on subsequent)
     vk::RenderingAttachmentInfo colorAttachment {
       .imageView = swapChain.getImageViews()[imageIndex],
@@ -359,10 +357,15 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
       pRenderer->getPipeline().getLayout(), 1, { pRenderer->getEnvironmentDescriptorSet() }, nullptr);
 
-    cmd.pushConstants<uint32_t>(
+    // Push constants: model matrix + lightCount
+    ScenePushConstants pushData {
+      .model = modelMatrix,
+      .lightCount = lightCount
+    };
+    cmd.pushConstants<ScenePushConstants>(
       *pRenderer->getPipeline().getLayout(),
-      vk::ShaderStageFlagBits::eFragment,
-      0u, { lightCount }
+      vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+      0u, pushData
     );
 
     for (auto* mrc : mrcs) {

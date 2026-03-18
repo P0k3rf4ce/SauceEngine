@@ -100,9 +100,11 @@ public:
   sauce::ui::ImGuiComponentManager& getImGuiManager() { return *pImGuiComponentManager; }
   void setCustomUIBuilder(std::function<void(sauce::ui::ImGuiComponentManager&)> builder);
   void setSceneFile(const std::string& path) { sceneFile = path; }
+  void setIBLFile(const std::string& path) { iblFile = path; }
 
 private:
   std::string sceneFile;
+  std::string iblFile;
 };
 
 }

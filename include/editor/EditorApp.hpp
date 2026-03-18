@@ -40,7 +40,9 @@
 #include <memory>
 #include <chrono>
 #include <filesystem>
+#ifndef _WIN32
 #include <sys/types.h>
+#endif
 
 namespace sauce {
 class MeshRendererComponent;
@@ -210,7 +212,11 @@ private:
 
   // Play mode state
   bool playModeActive = false;
+#ifndef _WIN32
   pid_t playProcessPid = -1;
+#else
+  int playProcessPid = -1;
+#endif
   std::string playModeTempFile;
 
   sauce::SettingsManager settingsManager;

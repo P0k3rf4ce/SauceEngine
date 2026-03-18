@@ -12,7 +12,7 @@ struct ImGuiContext;
 
 namespace sauce {
 
-class SwapChain;
+struct SwapChain;
 
 struct ImGuiRendererCreateInfo {
   const vk::raii::Instance& instance;
