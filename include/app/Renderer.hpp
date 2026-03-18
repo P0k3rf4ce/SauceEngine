@@ -72,12 +72,12 @@ const std::vector<uint16_t> indices {
 
 struct MaterialData {
   glm::vec4 baseColorFactor{1.0f, 1.0f, 1.0f, 1.0f}; // offset  0
-  float     metallicFactor{1.0f};                      // offset 16
-  float     roughnessFactor{1.0f};                     // offset 20
-  float     normalScale{1.0f};                         // offset 24
-  float     occlusionStrength{1.0f};                   // offset 28
-  alignas(16) glm::vec3 emissiveFactor{0.0f};          // offset 32
-  float     _pad0{0.0f};                               // offset 44
+  float     metallicFactor{0.0f};                     // offset 16 (dielectric)
+  float     roughnessFactor{0.3f};                    // offset 20 (glossy)
+  float     normalScale{1.0f};                        // offset 24
+  float     occlusionStrength{1.0f};                  // offset 28
+  alignas(16) glm::vec3 emissiveFactor{0.0f};         // offset 32
+  float     _pad0{0.0f};                              // offset 44
 };
 
 struct RendererCreateInfo {
