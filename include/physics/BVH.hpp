@@ -2,13 +2,12 @@
 
 namespace physics {
 
-struct BVH : public Collider {
- 
-  virtual bool checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const override;
+    struct BVH : public Collider {
+        virtual bool checkCollision(const Collider& collider,
+                                    std::vector<ContactInfo>& info) const override;
 
-private:
-  std::shared_ptr<Collider> left, right;
+      private:
+        std::shared_ptr<Collider> left, right;
+    };
 
-};
-
-}
+} // namespace physics

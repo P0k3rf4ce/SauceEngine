@@ -2,12 +2,11 @@
 
 namespace sauce {
 
-TransformComponent::TransformComponent()
-    : transform() {
-}
+    TransformComponent::TransformComponent() : transform() {
+    }
 
-TransformComponent::TransformComponent(const modeling::Transform& transform)
-    : transform(transform) {
-}
+    TransformComponent::TransformComponent(const modeling::Transform& transform)
+        : transform(transform) {
+    }
 
 } // namespace sauce

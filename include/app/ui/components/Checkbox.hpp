@@ -1,23 +1,24 @@
 #pragma once
 
 #include <app/ui/ImGuiComponent.hpp>
-#include <imgui.h>
 #include <functional>
+#include <imgui.h>
 #include <string>
 
 namespace sauce::ui {
-class Checkbox : public ImGuiComponent {
-public:
-    using Callback = std::function<void(bool)>;
+    class Checkbox : public ImGuiComponent {
+      public:
+        using Callback = std::function<void(bool)>;
 
-    Checkbox(const std::string& name, const std::string& label, bool* checked, Callback onChanged = nullptr);
+        Checkbox(const std::string& name, const std::string& label, bool* checked,
+                 Callback onChanged = nullptr);
 
-    void render() override;
+        void render() override;
 
-private:
-    std::string label; 
-    bool* checked;
-    Callback onChanged;
-};
+      private:
+        std::string label;
+        bool* checked;
+        Callback onChanged;
+    };
 
-}
+} // namespace sauce::ui

@@ -193,3 +193,19 @@ if(APPLE)
     target_link_options(${EXEC_NAME} PRIVATE "LINKER:-no_warn_duplicate_libraries")
 endif()
 
+# ----------------------------------------------------------------------
+# clang-format helper: cmake --build build --target format
+# ----------------------------------------------------------------------
+find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format)
+
+if(CLANG_FORMAT_EXECUTABLE)
+  add_custom_target(format
+    COMMAND git ls-files | grep -E "\\.(h|hpp|c|cpp)$" | xargs ${CLANG_FORMAT_EXECUTABLE} -i
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Running clang-format on tracked C/C++ files"
+    VERBATIM
+  )
+else()
+  message(STATUS "clang-format not found; 'format' target will not be available.")
+endif()
+

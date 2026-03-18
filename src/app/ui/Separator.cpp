@@ -2,13 +2,14 @@
 
 namespace sauce::ui {
 
-Separator::Separator(const std::string& name)
-    : ImGuiComponent(name) {}
+    Separator::Separator(const std::string& name) : ImGuiComponent(name) {
+    }
 
-void Separator::render() {
-    if (!enabled) return;
-    
-    ImGui::Separator();
-}
+    void Separator::render() {
+        if (!enabled)
+            return;
 
-}
+        ImGui::Separator();
+    }
+
+} // namespace sauce::ui
