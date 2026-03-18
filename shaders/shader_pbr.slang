@@ -88,11 +88,10 @@ struct Light {
     float  range;                   // Point/spot: max range (0 = infinite)
     float  innerConeAngle;          // Spot: inner cone half-angle (radians)
     float  outerConeAngle;          // Spot: outer cone half-angle (radians)
-    float2 _padding;
 };
 
 [[vk::binding(1, 0)]]
-StructuredBuffer<Light> lights;
+StructuredBuffer<Light, Std430DataLayout> lights;
 
 // ============================================================================
 // IBL Maps (Set 1)
