@@ -44,7 +44,15 @@ target_include_directories(SauceEngine PRIVATE
 
 file(GLOB_RECURSE UI_COMPONENT_SOURCES
   "${PROJECT_SOURCE_DIR}/src/app/ui/*.cpp" 
-) 
+)
+
+file(GLOB_RECURSE PHYSICS_SOURCES
+  "${PROJECT_SOURCE_DIR}/src/physics/*.cpp"
+)
+file(GLOB_RECURSE PHYSICS_SOURCES
+  "${PROJECT_SOURCE_DIR}/src/physics/*.cpp"
+)
+
 
 target_sources(${EXEC_NAME} PRIVATE
   src/app/modeling/Transform.cpp
@@ -67,6 +75,7 @@ target_sources(${EXEC_NAME} PRIVATE
   src/app/IBLGenerator.cpp
   src/app/ui/ImGuiComponentManager.cpp
   ${UI_COMPONENT_SOURCES}
+  ${PHYSICS_SOURCES}
 )
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/shaders)
