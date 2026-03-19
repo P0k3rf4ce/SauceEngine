@@ -1,4 +1,4 @@
-#include "app/physics/constraints/BendConstraint.hpp"
+#include <physics/constraints/BendConstraint.hpp>
 
 namespace{
     constexpr float EPS = 1e-8f;
