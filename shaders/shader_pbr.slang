@@ -406,9 +406,5 @@ float4 fragMain(VSOutput vertIn) : SV_TARGET {
     // TODO(tasks 11-12): Remove once post-process pass (postprocess.slang) is wired into the renderer
     color = color / (color + 1.0);
 
-    // ---- Gamma correction ----
-    // TODO(tasks 11-12): Remove once rendering to sRGB framebuffer or post-process handles this
-    color = pow(color, float3(1.0 / 2.2, 1.0 / 2.2, 1.0 / 2.2));
-
     return float4(color, alpha);
 }

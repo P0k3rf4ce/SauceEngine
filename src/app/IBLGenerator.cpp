@@ -79,9 +79,10 @@ std::unique_ptr<IBLMaps> IBLGenerator::generateIBLMaps(
     );
 
     // Create a descriptor pool for the generation process
-    std::array<vk::DescriptorPoolSize, 2> poolSizes = {{
+    std::array<vk::DescriptorPoolSize, 3> poolSizes = {{
         { vk::DescriptorType::eCombinedImageSampler, 10 },
-        { vk::DescriptorType::eStorageImage, 10 }
+        { vk::DescriptorType::eStorageImage, 10 },
+        { vk::DescriptorType::eSampler, 10 }
     }};
     vk::DescriptorPoolCreateInfo poolInfo {
         .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,

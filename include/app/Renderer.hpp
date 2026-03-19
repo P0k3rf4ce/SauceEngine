@@ -329,16 +329,7 @@ public:
 
     vk::DescriptorBufferInfo lightSSBOInfo { .buffer = *lightSSBO, .offset = 0, .range = lightSSBOSize };
     
-    // Fallback for IBL maps
-    vk::DescriptorImageInfo irrInfo { .sampler = *defaultSampler, .imageView = *defaultCubeImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
-    vk::DescriptorImageInfo prefInfo { .sampler = *defaultSampler, .imageView = *defaultCubeImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
-    vk::DescriptorImageInfo brdfInfo { .sampler = *defaultSampler, .imageView = *defaultImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
-
-    if (pIBLMaps) {
-        irrInfo = { .sampler = *pIBLMaps->sampler, .imageView = *pIBLMaps->irradianceMapView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
-        prefInfo = { .sampler = *pIBLMaps->sampler, .imageView = *pIBLMaps->prefilterMapView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
-        brdfInfo = { .sampler = *pIBLMaps->sampler, .imageView = *pIBLMaps->brdfLUTView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
-    }
+    updateEnvironmentDescriptorSets();
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
       vk::DescriptorBufferInfo uboInfo { .buffer = uniformBuffers[i], .offset = 0, .range = sizeof(UniformBufferObject) };
@@ -350,12 +341,6 @@ public:
       logicalDevice->updateDescriptorSets(writes, {});
     }
 
-    std::array<vk::WriteDescriptorSet, 3> envWrites;
-    envWrites[0] = { .dstSet = environmentDescriptorSets[0], .dstBinding = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &irrInfo };
-    envWrites[1] = { .dstSet = environmentDescriptorSets[0], .dstBinding = 1, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &prefInfo };
-    envWrites[2] = { .dstSet = environmentDescriptorSets[0], .dstBinding = 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &brdfInfo };
-    logicalDevice->updateDescriptorSets(envWrites, {});
-
     vk::DescriptorBufferInfo matUboInfo { .buffer = *materialBuffer, .offset = 0, .range = sizeof(MaterialData) };
     vk::DescriptorImageInfo defaultImageInfo { .sampler = *defaultSampler, .imageView = *defaultImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
 
@@ -365,6 +350,24 @@ public:
     }
     matWrites[5] = { .dstSet = defaultMaterialDescriptorSets[0], .dstBinding = 5, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eUniformBuffer, .pBufferInfo = &matUboInfo };
     logicalDevice->updateDescriptorSets(matWrites, {});
+  }
+
+  void updateEnvironmentDescriptorSets() {
+    // Fallback for IBL maps
+    vk::DescriptorImageInfo irrInfo { .sampler = *defaultSampler, .imageView = *defaultCubeImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    vk::DescriptorImageInfo prefInfo { .sampler = *defaultSampler, .imageView = *defaultCubeImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    vk::DescriptorImageInfo brdfInfo { .sampler = *defaultSampler, .imageView = *defaultImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+
+    if (pIBLMaps) {
+        irrInfo = { .sampler = *pIBLMaps->sampler, .imageView = *pIBLMaps->irradianceMapView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+        prefInfo = { .sampler = *pIBLMaps->sampler, .imageView = *pIBLMaps->prefilterMapView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+        brdfInfo = { .sampler = *pIBLMaps->sampler, .imageView = *pIBLMaps->brdfLUTView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    }
+    std::array<vk::WriteDescriptorSet, 3> envWrites;
+    envWrites[0] = { .dstSet = environmentDescriptorSets[0], .dstBinding = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &irrInfo };
+    envWrites[1] = { .dstSet = environmentDescriptorSets[0], .dstBinding = 1, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &prefInfo };
+    envWrites[2] = { .dstSet = environmentDescriptorSets[0], .dstBinding = 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &brdfInfo };
+    (*this->pLogicalDevice)->updateDescriptorSets(envWrites, {});
   }
 
   void createPostProcessDescriptorSets(const sauce::LogicalDevice& logicalDevice) {
@@ -963,7 +966,7 @@ public:
     IBLGenerator generator(*pPhysicalDevice, *pLogicalDevice);
     pIBLMaps = generator.generateIBLMaps(hdrPath, commandPool, *pQueue);
     // Re-create descriptor sets to bind the new IBL maps
-    createDescriptorSets(*pLogicalDevice);
+    updateEnvironmentDescriptorSets();
   }
 
 private:
