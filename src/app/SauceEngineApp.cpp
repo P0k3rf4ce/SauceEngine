@@ -19,7 +19,9 @@ SauceEngineApp::~SauceEngineApp() {
     glfwTerminate();
 }
 
-void SauceEngineApp::run() {
+void SauceEngineApp::run(const uint32_t width, const uint32_t height) {
+  this->width = width;
+  this->height = height;
   initWindow();
   initVulkan();
 
@@ -60,8 +62,8 @@ void SauceEngineApp::initVulkan() {
     logicalDevice = { physicalDevice, *pRenderSurface };
 
     sauce::CameraCreateInfo cameraCreateInfo {
-      .scrWidth = WIDTH,
-      .scrHeight = HEIGHT,
+      .scrWidth = static_cast<float>(width),
+      .scrHeight = static_cast<float>(height),
     };
 
     pScene = std::make_unique<sauce::Scene>( cameraCreateInfo );
@@ -103,7 +105,7 @@ void SauceEngineApp::initWindow() {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-    window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan Playground", nullptr, nullptr);
+    window = glfwCreateWindow(width, height, "Vulkan Playground", nullptr, nullptr);
 
     glfwSetWindowUserPointer(window, this);
     glfwSetCursorPosCallback(window, mouseCallback);

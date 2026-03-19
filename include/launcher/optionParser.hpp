@@ -10,8 +10,8 @@
 #include <boost/program_options/parsers.hpp>
 
 struct AppOptions {
-    static constexpr unsigned int DEFAULT_SCR_WIDTH = 800;
-    static constexpr unsigned int DEFAULT_SCR_HEIGHT = 600;
+    static constexpr unsigned int DEFAULT_SCR_WIDTH = 1280;
+    static constexpr unsigned int DEFAULT_SCR_HEIGHT = 720;
     static constexpr double DEFAULT_TICKRATE = 128.0;
 
     unsigned int scr_width, scr_height;
