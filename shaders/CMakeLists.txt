@@ -74,6 +74,8 @@ if(GLSLC)
   add_glsl_shader_target(editorLitFrag editor_lit.frag editor_lit.frag.spv)
 endif()
 
+add_slang_compute_target(iblEquirectToCubeTarget SOURCES ibl_equirect_to_cube.slang OUTPUT ibl_equirect_to_cube.spv)
+
 add_custom_target(shaders DEPENDS
   shaderTarget
   shaderLightsTarget
@@ -82,6 +84,7 @@ add_custom_target(shaders DEPENDS
   iblBrdfLutTarget
   iblIrradianceTarget
   iblPrefilterTarget
+  iblEquirectToCubeTarget
   $<$<BOOL:${GLSLC}>:editorGridVert>
   $<$<BOOL:${GLSLC}>:editorGridFrag>
   $<$<BOOL:${GLSLC}>:editorUnlitVert>

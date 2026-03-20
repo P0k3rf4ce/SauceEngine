@@ -17,7 +17,8 @@ AppOptions::AppOptions(int argc, char const **argv): desc("Allowed options") {
     ("width,w", po::value<unsigned int>(&(this->scr_width))->default_value(DEFAULT_SCR_WIDTH), "screen width")
     ("height,h", po::value<unsigned int>(&(this->scr_height))->default_value(DEFAULT_SCR_HEIGHT), "screen height")
     ("tickrate,t", po::value<double>(&(this->tickrate))->default_value(DEFAULT_TICKRATE), "animation tickrate")
-    ("input-file,f", po::value<std::string>(&(this->scene_file))->default_value(""), "scene file to load");
+    ("input-file,f", po::value<std::string>(&(this->scene_file))->default_value(""), "scene file to load")
+    ("ibl,i", po::value<std::string>(&(this->ibl_file))->default_value(""), "HDR IBL map to load");
 
     po::positional_options_description p;
     p.add("input-file", 1);

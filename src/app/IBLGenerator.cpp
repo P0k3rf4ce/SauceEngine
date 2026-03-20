@@ -4,7 +4,9 @@
 #include <app/Vertex.hpp>
 
 #include <glm/gtc/matrix_transform.hpp>
+
 #include <stb_image.h>
+
 #include <fstream>
 #include <iostream>
 #include <array>
@@ -12,7 +14,7 @@
 namespace sauce {
 
 struct IBLPushConstants {
-    glm::mat4 mvp;
+    uint32_t faceSize;
     float roughness;
 };
 
@@ -27,7 +29,7 @@ std::unique_ptr<IBLMaps> IBLGenerator::generateIBLMaps(
 ) {
     auto maps = std::make_unique<IBLMaps>();
 
-    // loading HDR image
+    // Load HDR image
     int width, height, channels;
     float* pixels = stbi_loadf(hdrPath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
     if (!pixels) {
@@ -76,7 +78,21 @@ std::unique_ptr<IBLMaps> IBLGenerator::generateIBLMaps(
         logicalDevice, hdrImage, vk::Format::eR32G32B32A32Sfloat, vk::ImageAspectFlagBits::eColor
     );
 
-    // map sampler
+    // Create a descriptor pool for the generation process
+    std::array<vk::DescriptorPoolSize, 3> poolSizes = {{
+        { vk::DescriptorType::eCombinedImageSampler, 10 },
+        { vk::DescriptorType::eStorageImage, 10 },
+        { vk::DescriptorType::eSampler, 10 }
+    }};
+    vk::DescriptorPoolCreateInfo poolInfo {
+        .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+        .maxSets = 20,
+        .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+        .pPoolSizes = poolSizes.data()
+    };
+    descriptorPool = vk::raii::DescriptorPool(*logicalDevice, poolInfo);
+
+    // IBL Sampler
     vk::SamplerCreateInfo samplerInfo {
         .magFilter = vk::Filter::eLinear,
         .minFilter = vk::Filter::eLinear,
@@ -89,57 +105,12 @@ std::unique_ptr<IBLMaps> IBLGenerator::generateIBLMaps(
     };
     maps->sampler = vk::raii::Sampler(*logicalDevice, samplerInfo);
 
-    createCubeMesh(commandPool, queue);
-
     convertEquirectangularToCubemap(hdrView, *maps, commandPool, queue);
     generateIrradianceMap(*maps, commandPool, queue);
     generatePrefilterMap(*maps, commandPool, queue);
     generateBRDFLUT(*maps, commandPool, queue);
 
     return maps;
-}
-
-void IBLGenerator::createCubeMesh(const vk::raii::CommandPool& commandPool, const vk::raii::Queue& queue) {
-    std::vector<Vertex> cubeVertices = {
-        {{-1.0f,  1.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},
-        {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},
-        {{ 1.0f, -1.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},
-        {{ 1.0f,  1.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},
-        {{-1.0f,  1.0f,  1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},
-        {{-1.0f, -1.0f,  1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},
-        {{ 1.0f, -1.0f,  1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},
-        {{ 1.0f,  1.0f,  1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},
-    };
-
-    std::vector<uint16_t> cubeIndices = {
-        0, 1, 2, 2, 3, 0,
-        4, 5, 6, 6, 7, 4,
-        0, 1, 5, 5, 4, 0,
-        2, 3, 7, 7, 6, 2,
-        0, 3, 7, 7, 4, 0,
-        1, 2, 6, 6, 5, 1,
-    };
-    indexCount = static_cast<uint32_t>(cubeIndices.size());
-
-    vk::DeviceSize vertexBufferSize = cubeVertices.size() * sizeof(Vertex);
-    vk::raii::Buffer vertexStagingBuffer = nullptr;
-    vk::raii::DeviceMemory vertexStagingMemory = nullptr;
-    sauce::BufferUtils::createBuffer(physicalDevice, logicalDevice, vertexBufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, vertexStagingBuffer, vertexStagingMemory);
-    void* vertexData = vertexStagingMemory.mapMemory(0, vertexBufferSize);
-    memcpy(vertexData, cubeVertices.data(), vertexBufferSize);
-    vertexStagingMemory.unmapMemory();
-    sauce::BufferUtils::createBuffer(physicalDevice, logicalDevice, vertexBufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer, vertexBufferMemory);
-    sauce::BufferUtils::copyBuffer(logicalDevice, commandPool, queue, vertexStagingBuffer, vertexBuffer, vertexBufferSize);
-
-    vk::DeviceSize indexBufferSize = cubeIndices.size() * sizeof(uint16_t);
-    vk::raii::Buffer indexStagingBuffer = nullptr;
-    vk::raii::DeviceMemory indexStagingMemory = nullptr;
-    sauce::BufferUtils::createBuffer(physicalDevice, logicalDevice, indexBufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, indexStagingBuffer, indexStagingMemory);
-    void* indexData = indexStagingMemory.mapMemory(0, indexBufferSize);
-    memcpy(indexData, cubeIndices.data(), indexBufferSize);
-    indexStagingMemory.unmapMemory();
-    sauce::BufferUtils::createBuffer(physicalDevice, logicalDevice, indexBufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, indexBuffer, indexBufferMemory);
-    sauce::BufferUtils::copyBuffer(logicalDevice, commandPool, queue, indexStagingBuffer, indexBuffer, indexBufferSize);
 }
 
 vk::raii::ShaderModule IBLGenerator::createShaderModule(const std::string& filename) {
@@ -154,51 +125,227 @@ vk::raii::ShaderModule IBLGenerator::createShaderModule(const std::string& filen
     return vk::raii::ShaderModule(*logicalDevice, createInfo);
 }
 
+IBLGenerator::ComputePipeline IBLGenerator::createComputePipeline(
+    const std::string& shaderPath, 
+    const std::vector<vk::DescriptorSetLayoutBinding>& bindings,
+    uint32_t pushConstantSize
+) {
+    ComputePipeline cp;
+    
+    vk::DescriptorSetLayoutCreateInfo layoutInfo {
+        .bindingCount = static_cast<uint32_t>(bindings.size()),
+        .pBindings = bindings.data()
+    };
+    cp.layout = vk::raii::DescriptorSetLayout(*logicalDevice, layoutInfo);
+
+    vk::PushConstantRange pushRange {
+        .stageFlags = vk::ShaderStageFlagBits::eCompute,
+        .offset = 0,
+        .size = pushConstantSize
+    };
+
+    vk::PipelineLayoutCreateInfo pipelineLayoutInfo {
+        .setLayoutCount = 1,
+        .pSetLayouts = &*cp.layout,
+        .pushConstantRangeCount = pushConstantSize > 0 ? 1u : 0u,
+        .pPushConstantRanges = pushConstantSize > 0 ? &pushRange : nullptr
+    };
+    cp.pipelineLayout = vk::raii::PipelineLayout(*logicalDevice, pipelineLayoutInfo);
+
+    vk::raii::ShaderModule shaderModule = createShaderModule(shaderPath);
+    vk::PipelineShaderStageCreateInfo stageInfo {
+        .stage = vk::ShaderStageFlagBits::eCompute,
+        .module = *shaderModule,
+        .pName = "computeMain"
+    };
+
+    vk::ComputePipelineCreateInfo pipelineInfo {
+        .stage = stageInfo,
+        .layout = *cp.pipelineLayout
+    };
+    cp.pipeline = vk::raii::Pipeline(*logicalDevice, nullptr, pipelineInfo);
+
+    return cp;
+}
+
 void IBLGenerator::convertEquirectangularToCubemap(const vk::raii::ImageView& hdrView, IBLMaps& maps, const vk::raii::CommandPool& commandPool, const vk::raii::Queue& queue) {
     uint32_t resolution = 512;
     vk::Format format = vk::Format::eR16G16B16A16Sfloat;
-    sauce::ImageUtils::createImage(physicalDevice, logicalDevice, resolution, resolution, format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal, maps.envCubemap, maps.envCubemapMemory, 1, 6, vk::ImageCreateFlagBits::eCubeCompatible);
+    sauce::ImageUtils::createImage(physicalDevice, logicalDevice, resolution, resolution, format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eStorage, vk::MemoryPropertyFlagBits::eDeviceLocal, maps.envCubemap, maps.envCubemapMemory, 1, 6, vk::ImageCreateFlagBits::eCubeCompatible);
     maps.envCubemapView = sauce::ImageUtils::createImageView(logicalDevice, maps.envCubemap, format, vk::ImageAspectFlagBits::eColor, vk::ImageViewType::eCube, 1, 6);
 
-    // TODO: rendering logic for 6 faces would go here i think, using dynamic rendering
+    vk::raii::ImageView storageView = sauce::ImageUtils::createImageView(logicalDevice, maps.envCubemap, format, vk::ImageAspectFlagBits::eColor, vk::ImageViewType::e2DArray, 1, 6);
 
-    // transition to ShaderReadOnlyOptimal for subsequent passes
-    sauce::ImageUtils::transitionImageLayout(logicalDevice, commandPool, queue, maps.envCubemap, vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal, {}, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eNone, vk::PipelineStageFlagBits2::eFragmentShader, 1, 6);
+    std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+        { 0, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eCompute },
+        { 1, vk::DescriptorType::eSampler, 1, vk::ShaderStageFlagBits::eCompute },
+        { 2, vk::DescriptorType::eStorageImage, 1, vk::ShaderStageFlagBits::eCompute }
+    };
+    ComputePipeline cp = createComputePipeline("shaders/ibl_equirect_to_cube.spv", bindings, sizeof(uint32_t));
+
+    vk::DescriptorSetAllocateInfo allocInfo { .descriptorPool = descriptorPool, .descriptorSetCount = 1, .pSetLayouts = &*cp.layout };
+    vk::raii::DescriptorSet ds = std::move(logicalDevice->allocateDescriptorSets(allocInfo)[0]);
+
+    vk::DescriptorImageInfo hdrInfo { .sampler = *maps.sampler, .imageView = *hdrView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    vk::DescriptorImageInfo samplerInfo { .sampler = *maps.sampler };
+    vk::DescriptorImageInfo storageInfo { .imageView = *storageView, .imageLayout = vk::ImageLayout::eGeneral };
+
+    std::array<vk::WriteDescriptorSet, 3> writes;
+    writes[0] = { .dstSet = *ds, .dstBinding = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &hdrInfo };
+    writes[1] = { .dstSet = *ds, .dstBinding = 1, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampler, .pImageInfo = &samplerInfo };
+    writes[2] = { .dstSet = *ds, .dstBinding = 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eStorageImage, .pImageInfo = &storageInfo };
+    logicalDevice->updateDescriptorSets(writes, {});
+
+    sauce::ImageUtils::transitionImageLayout(logicalDevice, commandPool, queue, maps.envCubemap, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits2::eShaderStorageWrite, vk::PipelineStageFlagBits2::eNone, vk::PipelineStageFlagBits2::eComputeShader, 1, 6);
+
+    vk::raii::CommandBuffer cmd = std::move(vk::raii::CommandBuffers(*logicalDevice, { .commandPool = commandPool, .level = vk::CommandBufferLevel::ePrimary, .commandBufferCount = 1 })[0]);
+    cmd.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+    cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *cp.pipeline);
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *cp.pipelineLayout, 0, *ds, nullptr);
+    cmd.pushConstants<uint32_t>(*cp.pipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, resolution);
+    cmd.dispatch((resolution + 7) / 8, (resolution + 7) / 8, 6);
+    cmd.end();
+
+    vk::SubmitInfo submitInfo { .commandBufferCount = 1, .pCommandBuffers = &*cmd };
+    queue.submit(submitInfo, nullptr);
+    queue.waitIdle();
+
+    sauce::ImageUtils::transitionImageLayout(logicalDevice, commandPool, queue, maps.envCubemap, vk::ImageLayout::eGeneral, vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits2::eShaderStorageWrite, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader, vk::PipelineStageFlagBits2::eFragmentShader, 1, 6);
 }
 
 void IBLGenerator::generateIrradianceMap(IBLMaps& maps, const vk::raii::CommandPool& commandPool, const vk::raii::Queue& queue) {
     uint32_t resolution = 32;
     vk::Format format = vk::Format::eR16G16B16A16Sfloat;
-    sauce::ImageUtils::createImage(physicalDevice, logicalDevice, resolution, resolution, format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled, vk::MemoryPropertyFlagBits::eDeviceLocal, maps.irradianceMap, maps.irradianceMapMemory, 1, 6, vk::ImageCreateFlagBits::eCubeCompatible);
+    sauce::ImageUtils::createImage(physicalDevice, logicalDevice, resolution, resolution, format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage, vk::MemoryPropertyFlagBits::eDeviceLocal, maps.irradianceMap, maps.irradianceMapMemory, 1, 6, vk::ImageCreateFlagBits::eCubeCompatible);
     maps.irradianceMapView = sauce::ImageUtils::createImageView(logicalDevice, maps.irradianceMap, format, vk::ImageAspectFlagBits::eColor, vk::ImageViewType::eCube, 1, 6);
 
-    sauce::ImageUtils::transitionImageLayout(logicalDevice, commandPool, queue, maps.irradianceMap, vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal, {}, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eNone, vk::PipelineStageFlagBits2::eFragmentShader, 1, 6);
+    vk::raii::ImageView storageView = sauce::ImageUtils::createImageView(logicalDevice, maps.irradianceMap, format, vk::ImageAspectFlagBits::eColor, vk::ImageViewType::e2DArray, 1, 6);
+
+    std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+        { 0, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eCompute },
+        { 1, vk::DescriptorType::eSampler, 1, vk::ShaderStageFlagBits::eCompute },
+        { 2, vk::DescriptorType::eStorageImage, 1, vk::ShaderStageFlagBits::eCompute }
+    };
+    ComputePipeline cp = createComputePipeline("shaders/ibl_irradiance.spv", bindings, sizeof(uint32_t));
+
+    vk::DescriptorSetAllocateInfo allocInfo { .descriptorPool = descriptorPool, .descriptorSetCount = 1, .pSetLayouts = &*cp.layout };
+    vk::raii::DescriptorSet ds = std::move(logicalDevice->allocateDescriptorSets(allocInfo)[0]);
+
+    vk::DescriptorImageInfo envInfo { .sampler = *maps.sampler, .imageView = *maps.envCubemapView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    vk::DescriptorImageInfo samplerInfo { .sampler = *maps.sampler };
+    vk::DescriptorImageInfo storageInfo { .imageView = *storageView, .imageLayout = vk::ImageLayout::eGeneral };
+
+    std::array<vk::WriteDescriptorSet, 3> writes;
+    writes[0] = { .dstSet = *ds, .dstBinding = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &envInfo };
+    writes[1] = { .dstSet = *ds, .dstBinding = 1, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampler, .pImageInfo = &samplerInfo };
+    writes[2] = { .dstSet = *ds, .dstBinding = 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eStorageImage, .pImageInfo = &storageInfo };
+    logicalDevice->updateDescriptorSets(writes, {});
+
+    sauce::ImageUtils::transitionImageLayout(logicalDevice, commandPool, queue, maps.irradianceMap, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits2::eShaderStorageWrite, vk::PipelineStageFlagBits2::eNone, vk::PipelineStageFlagBits2::eComputeShader, 1, 6);
+
+    vk::raii::CommandBuffer cmd = std::move(vk::raii::CommandBuffers(*logicalDevice, { .commandPool = commandPool, .level = vk::CommandBufferLevel::ePrimary, .commandBufferCount = 1 })[0]);
+    cmd.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+    cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *cp.pipeline);
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *cp.pipelineLayout, 0, *ds, nullptr);
+    cmd.pushConstants<uint32_t>(*cp.pipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, resolution);
+    cmd.dispatch((resolution + 7) / 8, (resolution + 7) / 8, 6);
+    cmd.end();
+
+    vk::SubmitInfo submitInfo { .commandBufferCount = 1, .pCommandBuffers = &*cmd };
+    queue.submit(submitInfo, nullptr);
+    queue.waitIdle();
+
+    sauce::ImageUtils::transitionImageLayout(logicalDevice, commandPool, queue, maps.irradianceMap, vk::ImageLayout::eGeneral, vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits2::eShaderStorageWrite, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader, vk::PipelineStageFlagBits2::eFragmentShader, 1, 6);
 }
 
 void IBLGenerator::generatePrefilterMap(IBLMaps& maps, const vk::raii::CommandPool& commandPool, const vk::raii::Queue& queue) {
     uint32_t resolution = 128;
     uint32_t mipLevels = 5;
     vk::Format format = vk::Format::eR16G16B16A16Sfloat;
-    sauce::ImageUtils::createImage(physicalDevice, logicalDevice, resolution, resolution, format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled, vk::MemoryPropertyFlagBits::eDeviceLocal, maps.prefilterMap, maps.prefilterMapMemory, mipLevels, 6, vk::ImageCreateFlagBits::eCubeCompatible);
+    sauce::ImageUtils::createImage(physicalDevice, logicalDevice, resolution, resolution, format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage, vk::MemoryPropertyFlagBits::eDeviceLocal, maps.prefilterMap, maps.prefilterMapMemory, mipLevels, 6, vk::ImageCreateFlagBits::eCubeCompatible);
     maps.prefilterMapView = sauce::ImageUtils::createImageView(logicalDevice, maps.prefilterMap, format, vk::ImageAspectFlagBits::eColor, vk::ImageViewType::eCube, mipLevels, 6);
 
-    for (uint32_t mip = 0; mip < mipLevels; ++mip) {
-        float roughness = (float)mip / (float)(mipLevels - 1);
-        for (uint32_t face = 0; face < 6; ++face) {
-            // TODO: rendering each face for each mip level with specific roughness
-        }
-    }
+    std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+        { 0, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eCompute },
+        { 1, vk::DescriptorType::eSampler, 1, vk::ShaderStageFlagBits::eCompute },
+        { 2, vk::DescriptorType::eStorageImage, 1, vk::ShaderStageFlagBits::eCompute }
+    };
+    ComputePipeline cp = createComputePipeline("shaders/ibl_prefilter.spv", bindings, sizeof(IBLPushConstants));
 
-    sauce::ImageUtils::transitionImageLayout(logicalDevice, commandPool, queue, maps.prefilterMap, vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal, {}, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eNone, vk::PipelineStageFlagBits2::eFragmentShader, mipLevels, 6);
+    vk::DescriptorImageInfo envInfo { .sampler = *maps.sampler, .imageView = *maps.envCubemapView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    vk::DescriptorImageInfo samplerInfo { .sampler = *maps.sampler };
+
+    for (uint32_t mip = 0; mip < mipLevels; ++mip) {
+        uint32_t mipRes = resolution >> mip;
+        float roughness = (float)mip / (float)(mipLevels - 1);
+
+        vk::raii::ImageView storageView = sauce::ImageUtils::createImageView(logicalDevice, maps.prefilterMap, format, vk::ImageAspectFlagBits::eColor, vk::ImageViewType::e2DArray, 1, 6, mip);
+
+        vk::DescriptorSetAllocateInfo allocInfo { .descriptorPool = descriptorPool, .descriptorSetCount = 1, .pSetLayouts = &*cp.layout };
+        vk::raii::DescriptorSet ds = std::move(logicalDevice->allocateDescriptorSets(allocInfo)[0]);
+
+        vk::DescriptorImageInfo storageInfo { .imageView = *storageView, .imageLayout = vk::ImageLayout::eGeneral };
+
+        std::array<vk::WriteDescriptorSet, 3> writes;
+        writes[0] = { .dstSet = *ds, .dstBinding = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &envInfo };
+        writes[1] = { .dstSet = *ds, .dstBinding = 1, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eSampler, .pImageInfo = &samplerInfo };
+        writes[2] = { .dstSet = *ds, .dstBinding = 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eStorageImage, .pImageInfo = &storageInfo };
+        logicalDevice->updateDescriptorSets(writes, {});
+
+        sauce::ImageUtils::transitionImageLayout(logicalDevice, commandPool, queue, maps.prefilterMap, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits2::eShaderStorageWrite, vk::PipelineStageFlagBits2::eNone, vk::PipelineStageFlagBits2::eComputeShader, 1, 6, mip);
+
+        vk::raii::CommandBuffer cmd = std::move(vk::raii::CommandBuffers(*logicalDevice, { .commandPool = commandPool, .level = vk::CommandBufferLevel::ePrimary, .commandBufferCount = 1 })[0]);
+        cmd.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+        cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *cp.pipeline);
+        cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *cp.pipelineLayout, 0, *ds, nullptr);
+        IBLPushConstants pc { .faceSize = mipRes, .roughness = roughness };
+        cmd.pushConstants<IBLPushConstants>(*cp.pipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, pc);
+        cmd.dispatch((mipRes + 7) / 8, (mipRes + 7) / 8, 6);
+        cmd.end();
+
+        vk::SubmitInfo submitInfo { .commandBufferCount = 1, .pCommandBuffers = &*cmd };
+        queue.submit(submitInfo, nullptr);
+        queue.waitIdle();
+
+        sauce::ImageUtils::transitionImageLayout(logicalDevice, commandPool, queue, maps.prefilterMap, vk::ImageLayout::eGeneral, vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits2::eShaderStorageWrite, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader, vk::PipelineStageFlagBits2::eFragmentShader, 1, 6, mip);
+    }
 }
 
 void IBLGenerator::generateBRDFLUT(IBLMaps& maps, const vk::raii::CommandPool& commandPool, const vk::raii::Queue& queue) {
     uint32_t resolution = 512;
     vk::Format format = vk::Format::eR16G16Sfloat;
-    sauce::ImageUtils::createImage(physicalDevice, logicalDevice, resolution, resolution, format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled, vk::MemoryPropertyFlagBits::eDeviceLocal, maps.brdfLUT, maps.brdfLUTMemory);
+    sauce::ImageUtils::createImage(physicalDevice, logicalDevice, resolution, resolution, format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage, vk::MemoryPropertyFlagBits::eDeviceLocal, maps.brdfLUT, maps.brdfLUTMemory);
     maps.brdfLUTView = sauce::ImageUtils::createImageView(logicalDevice, maps.brdfLUT, format, vk::ImageAspectFlagBits::eColor);
 
-    sauce::ImageUtils::transitionImageLayout(logicalDevice, commandPool, queue, maps.brdfLUT, vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal, {}, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eNone, vk::PipelineStageFlagBits2::eFragmentShader);
+    std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+        { 0, vk::DescriptorType::eStorageImage, 1, vk::ShaderStageFlagBits::eCompute }
+    };
+    ComputePipeline cp = createComputePipeline("shaders/ibl_brdf_lut.spv", bindings, sizeof(uint32_t) * 2);
+
+    vk::DescriptorSetAllocateInfo allocInfo { .descriptorPool = descriptorPool, .descriptorSetCount = 1, .pSetLayouts = &*cp.layout };
+    vk::raii::DescriptorSet ds = std::move(logicalDevice->allocateDescriptorSets(allocInfo)[0]);
+
+    vk::DescriptorImageInfo storageInfo { .imageView = *maps.brdfLUTView, .imageLayout = vk::ImageLayout::eGeneral };
+
+    vk::WriteDescriptorSet write { .dstSet = *ds, .dstBinding = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eStorageImage, .pImageInfo = &storageInfo };
+    logicalDevice->updateDescriptorSets(write, {});
+
+    sauce::ImageUtils::transitionImageLayout(logicalDevice, commandPool, queue, maps.brdfLUT, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits2::eShaderStorageWrite, vk::PipelineStageFlagBits2::eNone, vk::PipelineStageFlagBits2::eComputeShader);
+
+    vk::raii::CommandBuffer cmd = std::move(vk::raii::CommandBuffers(*logicalDevice, { .commandPool = commandPool, .level = vk::CommandBufferLevel::ePrimary, .commandBufferCount = 1 })[0]);
+    cmd.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+    cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *cp.pipeline);
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *cp.pipelineLayout, 0, *ds, nullptr);
+    uint32_t pc[2] = { resolution, resolution };
+    cmd.pushConstants<uint32_t>(*cp.pipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, pc);
+    cmd.dispatch((resolution + 15) / 16, (resolution + 15) / 16, 1);
+    cmd.end();
+
+    vk::SubmitInfo submitInfo { .commandBufferCount = 1, .pCommandBuffers = &*cmd };
+    queue.submit(submitInfo, nullptr);
+    queue.waitIdle();
+
+    sauce::ImageUtils::transitionImageLayout(logicalDevice, commandPool, queue, maps.brdfLUT, vk::ImageLayout::eGeneral, vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits2::eShaderStorageWrite, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader, vk::PipelineStageFlagBits2::eFragmentShader);
 }
 
 } // namespace sauce
