@@ -260,14 +260,6 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
   std::memcpy(pRenderer->getCurrentUniformBufferMapped(), &uboData, sizeof(uboData));
 
   auto gpuLights = pScene->collectGPULights();
-  if (gpuLights.empty()) {
-    GPULight defaultLight{};
-    defaultLight.type = 0; // Directional
-    defaultLight.direction = glm::normalize(glm::vec3(1.0f, -1.0f, -1.0f));
-    defaultLight.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    defaultLight.intensity = 1.0f;
-    gpuLights.push_back(defaultLight);
-  }
 
   uint32_t lightCount = pRenderer->updateLightSSBO(
       gpuLights.data(), static_cast<uint32_t>(gpuLights.size()));
