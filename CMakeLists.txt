@@ -134,6 +134,7 @@ add_executable(sauceeditor ${EDITOR_SOURCES})
 
 target_sources(sauceeditor PRIVATE
     ${APP_SOURCES}
+    ${PHYSICS_SOURCES}
     src/app/Log.cpp
     src/app/Settings.cpp
 )

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <physics/Collider.hpp>
 
 #include <glm/glm.hpp>
