@@ -25,6 +25,7 @@ public:
 private:
   void drawTransformSection(sauce::Entity& entity);
   void drawMeshRendererSection(sauce::Entity& entity);
+  void drawClothSection(sauce::Entity& entity);
   void drawMetadataSection(const std::string& label,
                            const std::unordered_map<std::string, sauce::modeling::PropertyValue>& metadata);
 };
