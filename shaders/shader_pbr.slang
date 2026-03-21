@@ -1,15 +1,15 @@
 // ============================================================================
-// PBR Shader — Cook-Torrance BRDF (GGX/Smith/Fresnel-Schlick)
-// Uses SSBO for dynamic light array. Supports IBL.
+// PBR Shader — Cook-Torrance BRDF (GGX/Smith/Fresnel-Schlick) + IBL
+// Uses SSBO for dynamic light array and IBL maps for ambient lighting.
 //
 // Descriptor Layout (Set 0): Global
 //   Binding  0: ConstantBuffer<UniformBuffer>   (Vertex + Fragment) — MVP + camera
 //   Binding  1: StructuredBuffer<Light>         (Fragment)          — SSBO light array
 //
-// Descriptor Layout (Set 1): Environment
-//   Binding  0: SamplerCube irradianceMap       (Fragment)
-//   Binding  1: SamplerCube prefilterMap        (Fragment)
-//   Binding  2: Sampler2D   brdfLUT             (Fragment)
+// Descriptor Layout (Set 1): Environment (IBL)
+//   Binding  0: SamplerCube irradianceMap       (Fragment)          — IBL diffuse irradiance cubemap
+//   Binding  1: SamplerCube prefilterMap        (Fragment)          — IBL specular prefilter cubemap
+//   Binding  2: Sampler2D   brdfLUT             (Fragment)          — IBL BRDF integration LUT
 //
 // Descriptor Layout (Set 2): Material
 //   Binding  0: Sampler2D   baseColorMap        (Fragment)          — Albedo
@@ -23,6 +23,9 @@
 //   uint lightCount — number of active lights in the SSBO
 //
 // Notes:
+//   - IBL provides indirect ambient lighting via split-sum approximation.
+//   - Outputs linear HDR. Tonemapping and gamma correction are handled
+//     by the post-processing pass (postprocess.slang).
 //   - Normal transform assumes uniform scale. For non-uniform scale,
 //     pass transpose(inverse(model)) as a normal matrix from CPU.
 //   - glTF metallic-roughness packing: G=roughness, B=metallic.
@@ -252,6 +255,13 @@ float3 fresnelSchlick(float cosTheta, float3 F0) {
     return F0 + (1.0 - F0) * pow(saturate(1.0 - cosTheta), 5.0);
 }
 
+// Fresnel-Schlick with roughness term — used for IBL ambient specular
+// to prevent rough surfaces from appearing overly reflective.
+float3 fresnelSchlickRoughness(float cosTheta, float3 F0, float roughness) {
+    return F0 + (max(float3(1.0 - roughness, 1.0 - roughness, 1.0 - roughness), F0) - F0)
+             * pow(saturate(1.0 - cosTheta), 5.0);
+}
+
 // ---- Per-light radiance computation ----
 
 struct LightContribution {
@@ -380,9 +390,28 @@ float4 fragMain(VSOutput vertIn) : SV_TARGET {
         Lo += (kD * albedo / PI + specular) * radiance * NdotL;
     }
 
-    // ---- Ambient (constant placeholder — no IBL) ----
-    // TODO: Replace with IBL irradiance (task 10)
-    float3 ambient = float3(0.03, 0.03, 0.03) * albedo * ao;
+    // ---- Indirect Lighting (IBL) ----
+    // Fresnel with roughness for ambient term
+    float NdotV_ibl = max(dot(N, V), 0.0);
+    float3 F_ibl = fresnelSchlickRoughness(NdotV_ibl, F0, roughness);
+
+    float3 kS_ibl = F_ibl;
+    float3 kD_ibl = (1.0 - kS_ibl) * (1.0 - metallic);
+
+    // Indirect diffuse: sample irradiance cubemap with surface normal
+    float3 irradiance = irradianceMap.Sample(N).rgb;
+    float3 indirectDiffuse = irradiance * (albedo / PI);
+
+    // Indirect specular: sample prefilter cubemap at reflection direction
+    // using roughness to select mip level, combined with BRDF LUT
+    float3 R = reflect(-V, N);
+    const float MAX_REFLECTION_LOD = 4.0; // prefilter map mip levels - 1
+    float3 prefilteredColor = prefilterMap.SampleLevel(R, roughness * MAX_REFLECTION_LOD).rgb;
+    float2 brdf = brdfLUT.Sample(float2(NdotV_ibl, roughness)).rg;
+    float3 indirectSpecular = prefilteredColor * (F_ibl * brdf.x + brdf.y);
+
+    // Combine indirect diffuse and specular, modulated by AO
+    float3 ambient = (kD_ibl * indirectDiffuse + indirectSpecular) * ao;
 
     // ---- Final colour ----
     float3 color = ambient + Lo + emissive;
