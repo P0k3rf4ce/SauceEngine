@@ -7,6 +7,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(SauceEngine)
 
+enable_testing()
+
 if(WIN32)
   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
@@ -123,6 +125,29 @@ add_custom_command(TARGET modelviewer POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${PROJECT_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:modelviewer>/shaders
 )
+
+# ── xpbd_cloth_harness ───────────────────────────────────────────────
+
+add_executable(xpbd_cloth_harness
+    src/xpbd_cloth_harness.cpp
+    src/app/components/MeshRendererComponent.cpp
+    src/physics/Cloth.cpp
+    src/physics/SphereCollider.cpp
+    src/physics/XPBD.cpp
+)
+
+target_include_directories(xpbd_cloth_harness PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${TINYGLTF_INCLUDE_DIRS}
+)
+
+target_link_libraries(xpbd_cloth_harness PUBLIC Vulkan::Vulkan)
+
+if(NOT WIN32)
+    target_compile_options(xpbd_cloth_harness PUBLIC ${SAUCE_WARNINGS})
+endif()
+
+add_test(NAME xpbd_cloth_harness COMMAND xpbd_cloth_harness)
 
 # ── SauceEditor ──────────────────────────────────────────────────────
 
