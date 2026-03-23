@@ -184,16 +184,16 @@ private:
     };
 
     vk::PushConstantRange pushConstantRange {
-      .stageFlags = vk::ShaderStageFlagBits::eFragment,
+      .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
       .offset = 0,
-      .size = sizeof(uint32_t),
+      .size = config.pushConstantSize,
     };
 
     vk::PipelineLayoutCreateInfo pipelineLayoutInfo {
       .setLayoutCount = static_cast<uint32_t>(config.descriptorSetLayouts.size()),
       .pSetLayouts = config.descriptorSetLayouts.data(),
-      .pushConstantRangeCount = 1,
-      .pPushConstantRanges = &pushConstantRange,
+      .pushConstantRangeCount = config.hasPushConstants ? 1u : 0u,
+      .pPushConstantRanges = config.hasPushConstants ? &pushConstantRange : nullptr,
     };
 
     layout = vk::raii::PipelineLayout { *config.logicalDevice, pipelineLayoutInfo };

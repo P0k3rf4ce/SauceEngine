@@ -23,7 +23,7 @@ struct XPBDSolver {
   // XPBD substeps for cloth (prediction + constraint projection each substep)
   int clothSubsteps = 4;
 
-  void solvePositions(std::vector<sauce::RigidBodyComponent>& rigidBodies,
+  void solvePositions(std::vector<sauce::RigidBodyComponent*>& rigidBodies,
                       std::vector<std::unique_ptr<Constraint>>& constraints,
                       float deltatime);
 
@@ -38,7 +38,7 @@ struct XPBDSolver {
       float deltatime);
 
   std::vector<std::unique_ptr<Constraint>> generateCollisionConstraints(
-      std::vector<sauce::RigidBodyComponent>& rigidBodies);
+      std::vector<sauce::RigidBodyComponent*>& rigidBodies);
 };
 
 } // namespace physics

@@ -20,6 +20,7 @@
 //   Binding  5: ConstantBuffer<MaterialData>    (Fragment)          — PBR material properties
 //
 // Push Constants:
+//   float4x4 model
 //   uint lightCount — number of active lights in the SSBO
 //
 // Notes:
@@ -144,6 +145,7 @@ ConstantBuffer<MaterialData> material;
 // ============================================================================
 [[vk::push_constant]]
 cbuffer PushConstants {
+    float4x4 model;
     uint lightCount;
 };
 
@@ -167,7 +169,7 @@ VSOutput vertMain(VSInput input) {
     VSOutput output;
 
     // World-space position
-    float4 worldPos4 = mul(ubo.model, float4(input.inPosition, 1.0));
+    float4 worldPos4 = mul(model, float4(input.inPosition, 1.0));
     output.worldPos = worldPos4.xyz;
 
     // Clip-space position
@@ -176,7 +178,7 @@ VSOutput vertMain(VSInput input) {
     // Transform normal to world space
     // NOTE: Assumes uniform scale. For non-uniform scale the CPU should pass
     //       transpose(inverse(model)) as a separate normal matrix.
-    float3x3 normalMatrix = (float3x3)ubo.model;
+    float3x3 normalMatrix = (float3x3)model;
     output.normal = normalize(mul(normalMatrix, input.inNormal));
 
     // Transform tangent to world space (same matrix; valid for uniform scale)

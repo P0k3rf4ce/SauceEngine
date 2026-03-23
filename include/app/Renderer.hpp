@@ -123,6 +123,8 @@ public:
       .descriptorSetLayouts = { *descriptorSetLayout0, *descriptorSetLayout1, *modeling::Material::getDescriptorSetLayout() },
       .colorFormat = pSwapChain->getSurfaceFormat().format,
       .shaderPath = "shaders/shader_pbr.spv",
+      .hasPushConstants = true,
+      .pushConstantSize = sizeof(ScenePushConstants),
     };
     pPipeline = std::make_unique<sauce::GraphicsPipeline>(mainPipelineConfig);
 
@@ -644,11 +646,12 @@ public:
         static_cast<float>(pSwapChain->getExtent().height), 0.0f, 1.0f));
     commandBuffers[frameIndex].setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), pSwapChain->getExtent()));
 
-    const uint32_t lightCount = 0;
-    commandBuffers[frameIndex].pushConstants<uint32_t>(
+    ScenePushConstants pushData {};
+    pushData.lightCount = 0;
+    commandBuffers[frameIndex].pushConstants<ScenePushConstants>(
         *pPipeline->getLayout(),
-        vk::ShaderStageFlagBits::eFragment,
-        0u, { lightCount }
+        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+        0u, pushData
     );
 
     commandBuffers[frameIndex].drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);

@@ -121,7 +121,7 @@ void projectBend(std::vector<ClothParticle>& particles, BendConstraint& c, float
 } // namespace
 
 void XPBDSolver::solvePositions(
-    std::vector<sauce::RigidBodyComponent>& rigidBodies,
+    std::vector<sauce::RigidBodyComponent*>& rigidBodies,
     std::vector<std::unique_ptr<Constraint>>& constraints,
     float deltatime) {
   /*
@@ -132,21 +132,25 @@ void XPBDSolver::solvePositions(
   std::vector<physics::Vertex> centers;
 
   centers.reserve(rigidBodies.size());
-  for (auto& rigidBody : rigidBodies) {
-    auto* owner = rigidBody.getOwner();
+  for (auto* rigidBody : rigidBodies) {
+    if (!rigidBody) {
+      continue;
+    }
+
+    auto* owner = rigidBody->getOwner();
     auto* meshRenderer = owner ? owner->getComponent<sauce::MeshRendererComponent>() : nullptr;
     if (!meshRenderer || !meshRenderer->getMesh()) {
       continue;
     }
 
-    w = rigidBody.getInvMass();
-    velocity = rigidBody.getVelocity() + deltatime * (w * rigidBody.getExternalForces());
-    rigidBody.setPosition(rigidBody.getPosition() + velocity * deltatime);
+    w = rigidBody->getInvMass();
+    velocity = rigidBody->getVelocity() + deltatime * (w * rigidBody->getExternalForces());
+    rigidBody->setPosition(rigidBody->getPosition() + velocity * deltatime);
 
     centers.push_back({
-        rigidBody.getCenterOfMass(),
+        rigidBody->getCenterOfMass(),
         glm::vec3(0.0f),
-        rigidBody.getInvMass(),
+        rigidBody->getInvMass(),
     });
   }
 
@@ -176,7 +180,7 @@ void XPBDSolver::projectConstraints(
 }
 
 std::vector<std::unique_ptr<Constraint>> XPBDSolver::generateCollisionConstraints(
-    std::vector<sauce::RigidBodyComponent>& rigidBodies
+    std::vector<sauce::RigidBodyComponent*>& rigidBodies
 ) {
     std::vector<std::unique_ptr<Constraint>> constraints;
 
@@ -190,9 +194,10 @@ std::vector<std::unique_ptr<Constraint>> XPBDSolver::generateCollisionConstraint
     bodies.reserve(rigidBodies.size());
 
     for (uint32_t i = 0; i < static_cast<uint32_t>(rigidBodies.size()); ++i) {
-        auto& rb = rigidBodies[i];
+        auto* rb = rigidBodies[i];
+        if (!rb) continue;
 
-        auto* owner = rb.getOwner();
+        auto* owner = rb->getOwner();
         if (!owner) continue;
 
         auto* meshComp = owner->getComponent<sauce::MeshRendererComponent>();
@@ -201,7 +206,7 @@ std::vector<std::unique_ptr<Constraint>> XPBDSolver::generateCollisionConstraint
         const auto& verts = meshComp->getMesh()->getVertices();
         if (verts.empty()) continue;
 
-        glm::vec3 center = rb.getPosition();
+        glm::vec3 center = rb->getPosition();
 
         float maxRadiusSq = 0.0f;
         for (const auto& v : verts) {

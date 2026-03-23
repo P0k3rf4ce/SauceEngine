@@ -99,7 +99,6 @@ private:
 
   // Helper functions for GLTF loading
   void loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
-                             Entity* parentEntity,
                              std::unordered_map<modeling::ModelNode*, Entity*>& nodeToEntityMap,
                              const std::string& filePath);
   void loadGLTFFlattened(std::shared_ptr<modeling::Model> model, const std::string& filePath);

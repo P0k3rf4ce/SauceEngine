@@ -182,12 +182,12 @@ void SauceEngineApp::mainLoop() {
 
       // Run XPBD only if 1/TICKRATE seconds passed since last physics run 
 
-      auto rigidBodies = std::vector<RigidBodyComponent>();
+      auto rigidBodies = std::vector<RigidBodyComponent*>();
       auto constraints = std::vector<std::unique_ptr<physics::Constraint>>();
 
-      for (auto& entity: pScene->getEntities()) {
+      for (auto& entity: pScene->getEntitiesMut()) {
         auto rigidBody = entity.getComponent<RigidBodyComponent>();
-        if (rigidBody) rigidBodies.push_back(*rigidBody);
+        if (rigidBody) rigidBodies.push_back(rigidBody);
       }
 
       constexpr float kPhysicsDt = 1.0f / 128.0f;
@@ -196,6 +196,7 @@ void SauceEngineApp::mainLoop() {
       }
       while (deltaUpdate >= kPhysicsDt) {
         pSolver->solvePositions(rigidBodies, constraints, kPhysicsDt);
+        syncRigidBodiesToTransforms();
         for (auto& entity : pScene->getEntitiesMut()) {
           if (!entity.getActive()) {
             continue;
@@ -346,27 +347,6 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
       modelMatrix = tc->getLocalMatrix();
     }
 
-    // Update model matrix in UBO via vkCmdUpdateBuffer (GPU-side, outside render pass)
-    cmd.updateBuffer<glm::mat4>(*pRenderer->getCurrentUniformBuffer(), 0, modelMatrix);
-
-    // Barrier: transfer write -> vertex shader uniform read
-    vk::BufferMemoryBarrier2 bufBarrier {
-      .srcStageMask = vk::PipelineStageFlagBits2::eTransfer,
-      .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
-      .dstStageMask = vk::PipelineStageFlagBits2::eVertexShader,
-      .dstAccessMask = vk::AccessFlagBits2::eUniformRead,
-      .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-      .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-      .buffer = *pRenderer->getCurrentUniformBuffer(),
-      .offset = 0,
-      .size = sizeof(glm::mat4),
-    };
-    vk::DependencyInfo depInfo {
-      .bufferMemoryBarrierCount = 1,
-      .pBufferMemoryBarriers = &bufBarrier,
-    };
-    cmd.pipelineBarrier2(depInfo);
-
     // Begin rendering (clear on first, load on subsequent)
     vk::RenderingAttachmentInfo colorAttachment {
       .imageView = swapChain.getImageViews()[imageIndex],
@@ -405,10 +385,13 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
       pRenderer->getPipeline().getLayout(), 1, { pRenderer->getEnvironmentDescriptorSet() }, nullptr);
 
-    cmd.pushConstants<uint32_t>(
+    ScenePushConstants pushData {};
+    pushData.model = modelMatrix;
+    pushData.lightCount = lightCount;
+    cmd.pushConstants<ScenePushConstants>(
       *pRenderer->getPipeline().getLayout(),
-      vk::ShaderStageFlagBits::eFragment,
-      0u, { lightCount }
+      vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+      0u, pushData
     );
 
     for (auto* mrc : mrcs) {
