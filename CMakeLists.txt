@@ -83,10 +83,10 @@ endif()
 
 # add_executable(modeltest src/modeltest.cpp)
 
-target_sources(modeltest PRIVATE
-    src/app/components/MeshRendererComponent.cpp
-    ${MODELING_SOURCES}
-)
+# target_sources(modeltest PRIVATE
+#     src/app/components/MeshRendererComponent.cpp
+#     ${MODELING_SOURCES}
+# )
 
 # target_include_directories(modeltest PRIVATE
 #     ${PROJECT_SOURCE_DIR}/include
@@ -109,13 +109,13 @@ target_sources(modeltest PRIVATE
 #     src/app/components/RigidBodyComponent.cpp
 #     ${MODELING_SOURCES}
 # )
-target_sources(modelviewer PRIVATE
-    src/app/ModelViewerRenderer.cpp
-    src/app/ImGuiRenderer.cpp
-    src/app/components/MeshRendererComponent.cpp
-    src/app/components/RigidBodyComponent.cpp
-    ${MODELING_SOURCES}
-)
+# target_sources(modelviewer PRIVATE
+#     src/app/ModelViewerRenderer.cpp
+#     src/app/ImGuiRenderer.cpp
+#     src/app/components/MeshRendererComponent.cpp
+#     src/app/components/RigidBodyComponent.cpp
+#     ${MODELING_SOURCES}
+# )
 
 # target_include_directories(modelviewer PRIVATE
 #     ${PROJECT_SOURCE_DIR}/include
