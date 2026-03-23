@@ -40,7 +40,7 @@
 #include <memory>
 #include <chrono>
 #include <filesystem>
-#if defined(_WIN32) || !defined(_WIN32)
+#if defined(_WIN32)
   #ifndef NOMINMAX
   #define NOMINMAX
   #endif
@@ -217,7 +217,7 @@ private:
 
   // Play mode state
   bool playModeActive = false;
-  #if defined(_WIN32) || !defined(_WIN32)
+  #if defined(_WIN32)
       HANDLE playProcessPid = nullptr;
   #else
       pid_t playProcessPid = -1;
