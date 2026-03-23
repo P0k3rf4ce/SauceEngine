@@ -2,6 +2,14 @@
 
 #include "app/components/LightComponent.hpp"
 #include <glm/glm.hpp>
+#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
+#include <vulkan/vulkan_raii.hpp>
+#include <memory>
+
+namespace sauce {
+    struct LogicalDevice;
+    struct PhysicalDevice;
+}
 
 namespace sauce {
 
@@ -56,6 +64,23 @@ public:
     GPUPointLight toGPUPointLight(const glm::vec3& worldPosition) const;
     GPULight toGPULight(const glm::vec3& worldPosition) const override;
 
+    // Depth mapping resources
+    static void initDescriptorSetLayout(const sauce::LogicalDevice& logicalDevice);
+    static const vk::raii::DescriptorSetLayout& getDescriptorSetLayout();
+    static void cleanup();
+
+    bool hasDepthMappingResources() const { return (bool)depthDescriptorSet; }
+    const vk::raii::DescriptorSet& getDepthDescriptorSet() const { return *depthDescriptorSet; }
+
+    void initDepthMappingResources(
+        const sauce::LogicalDevice& logicalDevice,
+        const sauce::PhysicalDevice& physicalDevice,
+        const vk::raii::CommandPool& commandPool,
+        const vk::raii::Queue& queue,
+        const vk::raii::DescriptorPool& descriptorPool,
+        const vk::raii::DescriptorSetLayout& layout
+    );
+
 private:
     float range{0.0f};
 
@@ -65,6 +90,14 @@ private:
     float constant{1.0f};
     float linear{0.09f};
     float quadratic{0.032f};
+
+    static std::unique_ptr<vk::raii::DescriptorSetLayout> descriptorSetLayout;
+
+    std::unique_ptr<vk::raii::Image> depthImage;
+    std::unique_ptr<vk::raii::DeviceMemory> depthImageMemory;
+    std::unique_ptr<vk::raii::ImageView> depthImageView;
+    std::unique_ptr<vk::raii::Sampler> depthSampler;
+    std::unique_ptr<vk::raii::DescriptorSet> depthDescriptorSet;
 };
 
 } // namespace sauce

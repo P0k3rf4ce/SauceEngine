@@ -5,6 +5,9 @@
 #include <app/components/RigidBodyComponent.hpp>
 #include <app/components/MeshRendererComponent.hpp>
 #include <app/components/LightComponent.hpp>
+#include <app/components/DirectionalLightComponent.hpp>
+#include <app/components/PointLightComponent.hpp>
+#include <app/components/SpotLightComponent.hpp>
 #include <functional>
 #include <cstring>
 
@@ -27,6 +30,7 @@ void SauceEngineApp::run() {
   if (!sceneFile.empty() && pScene) {
     if (pScene->loadFromFile(sceneFile) && !pScene->getEntities().empty()) {
       uploadMeshGPUResources();
+      uploadLightGPUResources();
       setupSceneRenderer();
     }
   }
@@ -223,6 +227,41 @@ void SauceEngineApp::uploadMeshGPUResources() {
           pRenderer->getDefaultImageView(),
           pRenderer->getDefaultSampler()
         );
+      }
+    }
+  }
+}
+
+void SauceEngineApp::uploadLightGPUResources() {
+  if (!pScene) return;
+
+  auto& physDev = const_cast<vk::raii::PhysicalDevice&>(*physicalDevice);
+  auto& cmdPool = const_cast<vk::raii::CommandPool&>(pRenderer->getCommandPool());
+  auto& queue = const_cast<vk::raii::Queue&>(pRenderer->getQueue());
+  auto& logicalDev = logicalDevice;
+  auto& descriptorPool = pRenderer->getDescriptorPool();
+
+  DirectionalLightComponent::initDescriptorSetLayout(logicalDev);
+  PointLightComponent::initDescriptorSetLayout(logicalDev);
+  SpotLightComponent::initDescriptorSetLayout(logicalDev);
+
+  for (auto& entity : pScene->getEntitiesMut()) {
+    auto dirLights = entity.getComponents<DirectionalLightComponent>();
+    for (auto* dl : dirLights) {
+      if (!dl->hasDepthMappingResources()) {
+        dl->initDepthMappingResources(logicalDev, physDev, cmdPool, queue, descriptorPool, DirectionalLightComponent::getDescriptorSetLayout());
+      }
+    }
+    auto ptLights = entity.getComponents<PointLightComponent>();
+    for (auto* pl : ptLights) {
+      if (!pl->hasDepthMappingResources()) {
+        pl->initDepthMappingResources(logicalDev, physDev, cmdPool, queue, descriptorPool, PointLightComponent::getDescriptorSetLayout());
+      }
+    }
+    auto spLights = entity.getComponents<SpotLightComponent>();
+    for (auto* sl : spLights) {
+      if (!sl->hasDepthMappingResources()) {
+        sl->initDepthMappingResources(logicalDev, physDev, cmdPool, queue, descriptorPool, SpotLightComponent::getDescriptorSetLayout());
       }
     }
   }
