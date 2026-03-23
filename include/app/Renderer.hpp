@@ -24,6 +24,7 @@
 #include <app/SwapChain.hpp>
 
 #include <app/IBLGenerator.hpp>
+#include <app/modeling/Material.hpp>
 #include <cstring>
 
 namespace sauce {

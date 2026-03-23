@@ -4,11 +4,13 @@
 #include <app/components/TransformComponent.hpp>
 #include <app/components/RigidBodyComponent.hpp>
 #include <app/components/MeshRendererComponent.hpp>
+#include <app/components/ClothComponent.hpp>
 #include <app/components/LightComponent.hpp>
 #include <functional>
 #include <cstring>
 
 #include <physics/XPBD.hpp>
+#include <physics/constraints/Constraint.hpp>
 
 namespace sauce {
 
@@ -188,12 +190,29 @@ void SauceEngineApp::mainLoop() {
         if (rigidBody) rigidBodies.push_back(*rigidBody);
       }
 
-      if (deltaUpdate > 1) {
-        deltaUpdate = 1.0/128.0;
+      constexpr float kPhysicsDt = 1.0f / 128.0f;
+      if (deltaUpdate > 1.0) {
+        deltaUpdate = kPhysicsDt;
       }
-      while (deltaUpdate >= 1/128.0) {
-        pSolver->solvePositions(rigidBodies, constraints, 1.0/128.0);
-        deltaUpdate -= 1/128.0;
+      while (deltaUpdate >= kPhysicsDt) {
+        pSolver->solvePositions(rigidBodies, constraints, kPhysicsDt);
+        for (auto& entity : pScene->getEntitiesMut()) {
+          if (!entity.getActive()) {
+            continue;
+          }
+
+          for (auto* clothComp : entity.getComponents<ClothComponent>()) {
+            if (!clothComp->hasClothData()) {
+              continue;
+            }
+
+            physics::ClothData* cloth = clothComp->getClothData();
+            if (cloth && !cloth->empty()) {
+              pSolver->solveCloth(*cloth, kPhysicsDt);
+            }
+          }
+        }
+        deltaUpdate -= kPhysicsDt;
       }
 
       pRenderer->drawFrame(logicalDevice, *pScene, pImGuiRenderer.get());

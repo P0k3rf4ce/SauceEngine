@@ -2,6 +2,7 @@
 #include <editor/EditorApp.hpp>
 #include <app/Scene.hpp>
 #include <app/Entity.hpp>
+#include <app/components/ClothComponent.hpp>
 #include <app/components/TransformComponent.hpp>
 #include <app/components/MeshRendererComponent.hpp>
 #include <app/modeling/Mesh.hpp>
@@ -16,10 +17,31 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <variant>
+#include <algorithm>
 #include <cstring>
 #include <filesystem>
 
 namespace sauce::editor {
+
+namespace {
+
+ClothComponent* findClothComponentForMesh(
+    sauce::Entity& entity,
+    const std::shared_ptr<sauce::modeling::Mesh>& mesh) {
+  if (!mesh) {
+    return nullptr;
+  }
+
+  for (auto* cloth : entity.getComponents<ClothComponent>()) {
+    if (cloth->getSourceMesh() == mesh) {
+      return cloth;
+    }
+  }
+
+  return nullptr;
+}
+
+} // namespace
 
 
 InspectorPanel::InspectorPanel(EditorApp& app)
@@ -66,6 +88,7 @@ void InspectorPanel::render() {
 
   drawTransformSection(*entity);
   drawMeshRendererSection(*entity);
+  drawClothSection(*entity);
 
   ImGui::Spacing();
   ImGui::Spacing();
@@ -88,6 +111,21 @@ void InspectorPanel::render() {
     if (ImGui::MenuItem("Mesh Renderer")) {
       entity->addComponent<MeshRendererComponent>();
       app.setStatusMessage("Added MeshRendererComponent");
+    }
+    if (ImGui::MenuItem("Cloth")) {
+      auto* meshRenderer = entity->getComponent<MeshRendererComponent>();
+      if (meshRenderer && meshRenderer->getMesh()) {
+        entity->addComponent<ClothComponent>(meshRenderer->getMesh());
+        auto* cloth = entity->getComponent<ClothComponent>();
+        if (cloth && cloth->hasClothData()) {
+          app.setStatusMessage("Added ClothComponent from mesh");
+        } else if (cloth) {
+          app.setStatusMessage(cloth->getLastBuildError());
+        }
+      } else {
+        entity->addComponent<ClothComponent>();
+        app.setStatusMessage("Added ClothComponent");
+      }
     }
     ImGui::EndPopup();
   }
@@ -239,6 +277,25 @@ void InspectorPanel::drawMeshRendererSection(sauce::Entity& entity) {
         ImGui::Text("Vertices: %zu", mesh->getVertexCount());
         ImGui::SameLine(0, 20);
         ImGui::Text("Indices: %zu", mesh->getIndexCount());
+
+        ClothComponent* cloth = findClothComponentForMesh(entity, mesh);
+        const char* clothActionLabel =
+            cloth ? "Rebuild Cloth Data" : "Create Cloth Data";
+        if (ImGui::Button(clothActionLabel, ImVec2(-1.0f, 0.0f))) {
+          if (!cloth) {
+            entity.addComponent<ClothComponent>(mesh);
+            cloth = entity.getComponent<ClothComponent>();
+          } else {
+            cloth->rebuildFromMesh(mesh);
+          }
+
+          if (cloth && cloth->hasClothData()) {
+            app.setStatusMessage("Built cloth data from mesh");
+          } else if (cloth) {
+            app.setStatusMessage(cloth->getLastBuildError());
+          }
+        }
+
         const auto& meshMeta = mesh->getMetadata();
         if (!meshMeta.empty())
           drawMetadataSection("Mesh Metadata", meshMeta);
@@ -288,6 +345,143 @@ void InspectorPanel::drawMeshRendererSection(sauce::Entity& entity) {
     if (removeRequested) {
       entity.removeComponentByPointer(mrc);
       app.setStatusMessage("Removed MeshRendererComponent");
+      ImGui::PopID();
+      break;
+    }
+
+    ImGui::PopID();
+  }
+}
+
+void InspectorPanel::drawClothSection(sauce::Entity& entity) {
+  auto clothComponents = entity.getComponents<ClothComponent>();
+  if (clothComponents.empty()) return;
+
+  for (size_t i = 0; i < clothComponents.size(); ++i) {
+    auto* cloth = clothComponents[i];
+    ImGui::PushID(static_cast<int>(i));
+
+    const std::string headerLabel = (clothComponents.size() == 1)
+        ? "Cloth"
+        : "Cloth " + std::to_string(i);
+
+    bool removeRequested = false;
+    if (ImGui::CollapsingHeader(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+      auto sourceMesh = cloth->getSourceMesh();
+      if (sourceMesh) {
+        ImGui::Text("Source Mesh: %zu vertices / %zu indices",
+                    sourceMesh->getVertexCount(),
+                    sourceMesh->getIndexCount());
+      } else {
+        ImGui::TextDisabled("No source mesh assigned");
+      }
+
+      if (sourceMesh) {
+        if (ImGui::Button("Build From Source Mesh", ImVec2(-1.0f, 0.0f))) {
+          if (cloth->rebuildFromSourceMesh()) {
+            app.setStatusMessage("Rebuilt cloth data from source mesh");
+          } else {
+            app.setStatusMessage(cloth->getLastBuildError());
+          }
+        }
+      }
+
+      if (cloth->hasClothData()) {
+        const auto* clothData = cloth->getClothData();
+        ImGui::Text("Particles: %zu", cloth->getParticleCount());
+        ImGui::SameLine(0, 20);
+        ImGui::Text("Triangles: %zu", cloth->getTriangleCount());
+        ImGui::Text("Edges: %zu", cloth->getEdgeCount());
+        ImGui::SameLine(0, 20);
+        ImGui::Text("Stretches: %zu", cloth->getStretchConstraintCount());
+        ImGui::Text("Bends: %zu", cloth->getBendConstraintCount());
+        ImGui::SameLine(0, 20);
+        ImGui::Text("Pinned: %zu", clothData->pinnedParticleCount());
+        ImGui::SameLine(0, 20);
+        ImGui::Text("Static: %zu", clothData->staticParticleCount());
+
+        if (ImGui::TreeNode("Particle Preview")) {
+          const size_t previewCount = std::min<size_t>(clothData->particles.size(), 4);
+          for (size_t particleIndex = 0; particleIndex < previewCount; ++particleIndex) {
+            const auto& particle = clothData->particles[particleIndex];
+            ImGui::BulletText(
+                "#%zu pos=(%.2f, %.2f, %.2f) pred=(%.2f, %.2f, %.2f) invMass=%.2f pinned=%s",
+                particleIndex,
+                particle.position.x, particle.position.y, particle.position.z,
+                particle.predictedPosition.x, particle.predictedPosition.y, particle.predictedPosition.z,
+                particle.invMass,
+                particle.pinned ? "true" : "false");
+          }
+          ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNode("Edge Preview")) {
+          const size_t previewCount = std::min<size_t>(clothData->topology.edges.size(), 4);
+          for (size_t edgeIndex = 0; edgeIndex < previewCount; ++edgeIndex) {
+            const auto& edge = clothData->topology.edges[edgeIndex];
+            ImGui::BulletText(
+                "#%zu [%u, %u] triangles=(%u, %u)",
+                edgeIndex,
+                edge.particleIndices[0],
+                edge.particleIndices[1],
+                edge.adjacentTriangleIndices[0],
+                edge.adjacentTriangleIndices[1]);
+          }
+          ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNode("Stretch Preview")) {
+          const size_t previewCount = std::min<size_t>(clothData->stretchConstraints.size(), 4);
+          for (size_t stretchIndex = 0; stretchIndex < previewCount; ++stretchIndex) {
+            const auto& stretch = clothData->stretchConstraints[stretchIndex];
+            ImGui::BulletText(
+                "#%zu [%u, %u] restLength=%.4f",
+                stretchIndex,
+                stretch.particleIndices[0],
+                stretch.particleIndices[1],
+                stretch.restLength);
+          }
+          ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNode("Bend Preview")) {
+          const size_t previewCount = std::min<size_t>(clothData->bendConstraints.size(), 4);
+          for (size_t bendIndex = 0; bendIndex < previewCount; ++bendIndex) {
+            const auto& bend = clothData->bendConstraints[bendIndex];
+            ImGui::BulletText(
+                "#%zu edge=[%u, %u] opp=[%u, %u] restAngle=%.4f",
+                bendIndex,
+                bend.sharedEdgeParticleIndices[0],
+                bend.sharedEdgeParticleIndices[1],
+                bend.oppositeParticleIndices[0],
+                bend.oppositeParticleIndices[1],
+                bend.restAngle);
+          }
+          ImGui::TreePop();
+        }
+      } else if (!cloth->getLastBuildError().empty()) {
+        ImGui::TextColored(
+            ImVec4(0.9f, 0.4f, 0.4f, 1.0f),
+            "%s",
+            cloth->getLastBuildError().c_str());
+      } else {
+        ImGui::TextDisabled("No cloth data generated");
+      }
+
+      ImGui::Spacing();
+      float removeWidth = ImGui::GetContentRegionAvail().x;
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.15f, 0.15f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.8f, 0.25f, 0.25f, 1.0f));
+      if (ImGui::Button("Remove Component", ImVec2(removeWidth, 0))) {
+        removeRequested = true;
+      }
+      ImGui::PopStyleColor(3);
+    }
+
+    if (removeRequested) {
+      entity.removeComponentByPointer(cloth);
+      app.setStatusMessage("Removed ClothComponent");
       ImGui::PopID();
       break;
     }

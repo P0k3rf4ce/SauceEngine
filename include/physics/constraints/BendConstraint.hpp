@@ -1,79 +1,48 @@
 #pragma once
 
-#include <physics/constraints/Constraint.hpp>
-#include <glm/glm.hpp>
-#include <cmath>
+#include <array>
+#include <cstdint>
+#include <limits>
 
 namespace physics {
 
-struct BendConstraint : public Constraint {
-
+struct BendConstraint {
   BendConstraint() = default;
 
-  BendConstraint(uint32_t i0, uint32_t i1, uint32_t i2, uint32_t i3,
-                 float rest, float comp = 0.0f)
-      : Constraint(comp),
-        i0(i0), i1(i1), i2(i2), i3(i3),
-        restAngle(rest) {}
+  BendConstraint(uint32_t sharedEdgeIndex,
+                 uint32_t sharedEdgeParticleA,
+                 uint32_t sharedEdgeParticleB,
+                 uint32_t oppositeParticleA,
+                 uint32_t oppositeParticleB,
+                 float restAngle,
+                 uint32_t triangleA = std::numeric_limits<uint32_t>::max(),
+                 uint32_t triangleB = std::numeric_limits<uint32_t>::max(),
+                 float compliance = 0.0f,
+                 float lambda = 0.0f)
+      : sharedEdgeIndex(sharedEdgeIndex),
+        sharedEdgeParticleIndices { sharedEdgeParticleA, sharedEdgeParticleB },
+        oppositeParticleIndices { oppositeParticleA, oppositeParticleB },
+        triangleIndices { triangleA, triangleB },
+        restAngle(restAngle),
+        compliance(compliance),
+        lambda_(lambda) {}
 
-  void solve(std::vector<physics::Vertex>& vertices, float dt) override {
+  void resetLambda() { lambda_ = 0.0f; }
+  float getLambda() const { return lambda_; }
+  void setLambda(float lambda) { lambda_ = lambda; }
 
-    if (i0 >= vertices.size() || i1 >= vertices.size() ||
-        i2 >= vertices.size() || i3 >= vertices.size()) return;
-
-    auto& v0 = vertices[i0];
-    auto& v1 = vertices[i1];
-    auto& v2 = vertices[i2];
-    auto& v3 = vertices[i3];
-
-    float w0 = v0.invMass;
-    float w1 = v1.invMass;
-    float w2 = v2.invMass;
-    float w3 = v3.invMass;
-
-    if (w0 + w1 + w2 + w3 <= 0.0f) return;
-
-    glm::vec3 e = v3.position - v2.position;
-
-    glm::vec3 n1 = glm::normalize(glm::cross(v2.position - v0.position,
-                                             v3.position - v0.position));
-    glm::vec3 n2 = glm::normalize(glm::cross(v3.position - v1.position,
-                                             v2.position - v1.position));
-
-    float dot = glm::clamp(glm::dot(n1, n2), -1.0f, 1.0f);
-
-    float phi = std::acos(dot);
-
-    float C = phi - restAngle;
-
-    float alphaTilde = compliance / (dt * dt);
-
-    glm::vec3 q0 = (glm::cross(e, n1) / glm::length(glm::cross(e, n1)));
-    glm::vec3 q1 = (glm::cross(e, n2) / glm::length(glm::cross(e, n2)));
-    glm::vec3 q2 = -q0;
-    glm::vec3 q3 = -q1;
-
-    float denom =
-        w0 * glm::dot(q0, q0) +
-        w1 * glm::dot(q1, q1) +
-        w2 * glm::dot(q2, q2) +
-        w3 * glm::dot(q3, q3) +
-        alphaTilde;
-
-    if (denom <= 0.0f) return;
-
-    float deltaLambda = (-C - alphaTilde * lambda) / denom;
-
-    v0.position += (w0 * deltaLambda) * q0;
-    v1.position += (w1 * deltaLambda) * q1;
-    v2.position += (w2 * deltaLambda) * q2;
-    v3.position += (w3 * deltaLambda) * q3;
-
-    lambda += deltaLambda;
-  }
-
-  uint32_t i0, i1, i2, i3;
+  uint32_t sharedEdgeIndex = std::numeric_limits<uint32_t>::max();
+  std::array<uint32_t, 2> sharedEdgeParticleIndices { 0, 0 };
+  std::array<uint32_t, 2> oppositeParticleIndices { 0, 0 };
+  std::array<uint32_t, 2> triangleIndices {
+      std::numeric_limits<uint32_t>::max(),
+      std::numeric_limits<uint32_t>::max(),
+  };
   float restAngle = 0.0f;
+  float compliance = 0.0f;
+
+private:
+  float lambda_ = 0.0f;
 };
 
-}
+} // namespace physics
