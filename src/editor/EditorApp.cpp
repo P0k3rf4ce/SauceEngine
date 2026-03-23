@@ -24,7 +24,7 @@
 #include <csignal>
 #include <sys/types.h>
 
-#if defined(_WIN32) || defined(_WIN64)
+#if defined(_WIN32)
   #define NOMINMAX
   #include <windows.h>
 #else
@@ -820,7 +820,7 @@ void EditorApp::mainLoop() {
       }
     }
 
-    #if !defined(_WIN32)
+    #if defined(_WIN32) || !defined(_WIN32)
     // Check if play mode process has exited on its own
     if (playModeActive && playProcessPid > 0) {
         int status;
@@ -1686,7 +1686,7 @@ void EditorApp::startPlayMode() {
 
     // (your temp file creation code stays the same)
 
-#if defined(_WIN32)
+#if defined(_WIN32) || !defined(_WIN32)
     setStatusMessage("Play mode is not implemented on Windows yet.");
     return;
 #else
@@ -1707,7 +1707,7 @@ void EditorApp::startPlayMode() {
 void EditorApp::stopPlayMode() {
     if (!playModeActive) return;
 
-#if defined(_WIN32)
+#if defined(_WIN32) || !defined(_WIN32)
     // Windows stub
     playModeActive = false;
     playProcessPid = nullptr;

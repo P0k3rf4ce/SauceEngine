@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.30)
-
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -13,6 +12,9 @@ if(WIN32)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 endif()
+
+
+
 
 # ── Common sources (shared across multiple targets) ──────────────────
 
@@ -77,52 +79,52 @@ endif()
 
 # ── modeltest ────────────────────────────────────────────────────────
 
-add_executable(modeltest src/modeltest.cpp)
+# add_executable(modeltest src/modeltest.cpp)
 
-target_sources(modeltest PRIVATE ${MODELING_SOURCES})
+# target_sources(modeltest PRIVATE ${MODELING_SOURCES})
 
-target_include_directories(modeltest PRIVATE
-    ${PROJECT_SOURCE_DIR}/include
-    ${TINYGLTF_INCLUDE_DIRS}
-)
+# target_include_directories(modeltest PRIVATE
+#     ${PROJECT_SOURCE_DIR}/include
+#     ${TINYGLTF_INCLUDE_DIRS}
+# )
 
-target_link_libraries(modeltest PUBLIC Vulkan::Vulkan)
+# target_link_libraries(modeltest PUBLIC Vulkan::Vulkan)
 
-if(NOT WIN32)
-    target_compile_options(modeltest PUBLIC ${SAUCE_WARNINGS})
-endif()
+# if(NOT WIN32)
+#     target_compile_options(modeltest PUBLIC ${SAUCE_WARNINGS})
+# endif()
 
 # ── modelviewer ──────────────────────────────────────────────────────
 
-add_executable(modelviewer src/modelviewer.cpp)
+# add_executable(modelviewer src/modelviewer.cpp)
 
-target_sources(modelviewer PRIVATE
-    src/app/ModelViewerRenderer.cpp
-    src/app/ImGuiRenderer.cpp
-    src/app/components/RigidBodyComponent.cpp
-    ${MODELING_SOURCES}
-)
+# target_sources(modelviewer PRIVATE
+#     src/app/ModelViewerRenderer.cpp
+#     src/app/ImGuiRenderer.cpp
+#     src/app/components/RigidBodyComponent.cpp
+#     ${MODELING_SOURCES}
+# )
 
-target_include_directories(modelviewer PRIVATE
-    ${PROJECT_SOURCE_DIR}/include
-    ${TINYGLTF_INCLUDE_DIRS}
-)
+# target_include_directories(modelviewer PRIVATE
+#     ${PROJECT_SOURCE_DIR}/include
+#     ${TINYGLTF_INCLUDE_DIRS}
+# )
 
-target_link_libraries(modelviewer
-    PUBLIC  Vulkan::Vulkan
-    PRIVATE glfw imgui::imgui
-)
+# target_link_libraries(modelviewer
+#     PUBLIC  Vulkan::Vulkan
+#     PRIVATE glfw imgui::imgui
+# )
 
-if(NOT WIN32)
-    target_compile_options(modelviewer PUBLIC ${SAUCE_WARNINGS})
-endif()
+# if(NOT WIN32)
+#     target_compile_options(modelviewer PUBLIC ${SAUCE_WARNINGS})
+# endif()
 
-add_dependencies(modelviewer shaders)
+# add_dependencies(modelviewer shaders)
 
-add_custom_command(TARGET modelviewer POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${PROJECT_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:modelviewer>/shaders
-)
+# add_custom_command(TARGET modelviewer POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E copy_directory
+#     ${PROJECT_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:modelviewer>/shaders
+# )
 
 # ── SauceEditor ──────────────────────────────────────────────────────
 
