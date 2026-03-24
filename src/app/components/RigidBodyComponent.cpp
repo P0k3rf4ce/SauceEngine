@@ -1,6 +1,31 @@
 #include "app/components/RigidBodyComponent.hpp"
 
+#include <limits>
+
 namespace sauce {
+
+namespace {
+
+glm::quat integrateOrientation(const glm::quat& orientation,
+                               const glm::vec3& angularVelocity,
+                               float deltaTime) {
+	if (glm::dot(angularVelocity, angularVelocity) <= 1e-10f) {
+		return orientation;
+	}
+
+	const glm::quat spin(0.0f, angularVelocity.x, angularVelocity.y, angularVelocity.z);
+	return glm::normalize(orientation + 0.5f * spin * orientation * deltaTime);
+}
+
+glm::vec3 scalePoint(const glm::vec3& point, const glm::vec3& scale) {
+	return point * scale;
+}
+
+float scaleVolumeFactor(const glm::vec3& scale) {
+	return std::abs(scale.x * scale.y * scale.z);
+}
+
+} // namespace
 
 glm::vec3 RigidBodyComponent::meshCenterOfMass(std::shared_ptr<modeling::Mesh> m) {
 	auto ret=glm::vec3(0.f,0.f,0.f);
@@ -54,7 +79,70 @@ float RigidBodyComponent::meshInvMass(std::shared_ptr<modeling::Mesh> m) {
 	}
 	if (volume<0.f)
 		volume*=-1.f;
-	return volume;
+	if (volume <= 1e-6f)
+		return 0.0f;
+	return 1.0f / volume;
+}
+
+float RigidBodyComponent::scaledMeshInvMass(std::shared_ptr<modeling::Mesh> m, const glm::vec3& scale) {
+	const float invMass = meshInvMass(std::move(m));
+	const float volumeScale = scaleVolumeFactor(scale);
+	if (invMass <= 1e-8f || volumeScale <= 1e-8f) {
+		return 0.0f;
+	}
+
+	return invMass / volumeScale;
+}
+
+glm::mat3 RigidBodyComponent::meshInvInertiaTensor(
+	std::shared_ptr<modeling::Mesh> m,
+	const glm::vec3& centerOfMass,
+	float invMass) {
+	return meshInvInertiaTensor(std::move(m), centerOfMass, invMass, glm::vec3(1.0f));
+}
+
+glm::mat3 RigidBodyComponent::meshInvInertiaTensor(
+	std::shared_ptr<modeling::Mesh> m,
+	const glm::vec3& centerOfMass,
+	float invMass,
+	const glm::vec3& scale) {
+	if (!m || invMass <= 1e-8f) {
+		return glm::mat3(0.0f);
+	}
+
+	glm::vec3 minExt(std::numeric_limits<float>::infinity());
+	glm::vec3 maxExt(-std::numeric_limits<float>::infinity());
+	for (const auto& v : m->getVertices()) {
+		const glm::vec3 local = scalePoint(v.position - centerOfMass, scale);
+		minExt = glm::min(minExt, local);
+		maxExt = glm::max(maxExt, local);
+	}
+
+	const glm::vec3 size = glm::max(maxExt - minExt, glm::vec3(1e-3f));
+	const float mass = 1.0f / invMass;
+	const float ixx = (mass / 12.0f) * (size.y * size.y + size.z * size.z);
+	const float iyy = (mass / 12.0f) * (size.x * size.x + size.z * size.z);
+	const float izz = (mass / 12.0f) * (size.x * size.x + size.y * size.y);
+
+	glm::mat3 invInertia(0.0f);
+	if (ixx > 1e-8f) invInertia[0][0] = 1.0f / ixx;
+	if (iyy > 1e-8f) invInertia[1][1] = 1.0f / iyy;
+	if (izz > 1e-8f) invInertia[2][2] = 1.0f / izz;
+	return invInertia;
+}
+
+void RigidBodyComponent::update(float deltatime) {
+	if (deltatime <= 0.0f) {
+		return;
+	}
+
+	glm::vec3 centerPosition = getWorldCenterOfMass();
+	const glm::vec3 acceleration = invMass * accumulatedForce;
+	velocity += acceleration * deltatime;
+	centerPosition += velocity * deltatime;
+	orientation = integrateOrientation(orientation, angularVelocity, deltatime);
+
+	setWorldCenterOfMass(centerPosition);
 }
 
 } // namespace sauce
