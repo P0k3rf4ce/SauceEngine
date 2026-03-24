@@ -8,11 +8,27 @@
 #include <app/components/LightComponent.hpp>
 #include <functional>
 #include <cstring>
+#include <limits>
 
 #include <physics/XPBD.hpp>
 #include <physics/constraints/Constraint.hpp>
 
 namespace sauce {
+
+namespace {
+
+bool isStaticTableMesh(const MeshRendererComponent* meshRenderer) {
+  return meshRenderer && meshRenderer->getMesh() && meshRenderer->getMesh()->getVertexCount() == 4;
+}
+
+glm::quat integrateAngularVelocity(const glm::quat& orientation,
+                                   const glm::vec3& angularVelocity,
+                                   float deltaTime) {
+  const glm::quat spin(0.0f, angularVelocity.x, angularVelocity.y, angularVelocity.z);
+  return glm::normalize(orientation + 0.5f * spin * orientation * deltaTime);
+}
+
+} // namespace
 
 SauceEngineApp::SauceEngineApp() {
   pImGuiComponentManager = std::make_unique<sauce::ui::ImGuiComponentManager>();
@@ -27,9 +43,14 @@ void SauceEngineApp::run() {
   initWindow();
   initVulkan();
 
-  // Load scene file if specified
-  if (!sceneFile.empty() && pScene) {
+  defaultSceneSpinEnabled = sceneFile.empty();
+  if (sceneFile.empty()) {
+    sceneFile = "assets/models/Cube.gltf";
+  }
+
+  if (pScene) {
     if (pScene->loadFromFile(sceneFile) && !pScene->getEntities().empty()) {
+      setupDefaultSceneSpin();
       uploadMeshGPUResources();
       setupSceneRenderer();
     }
@@ -122,6 +143,12 @@ void SauceEngineApp::processInput(float deltaTime) {
     }
     gravePressedLastFrame = glfwGetKey(window, GLFW_KEY_GRAVE_ACCENT) == GLFW_PRESS;
 
+    const bool demoTriggerPressed = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
+    if (demoTriggerPressed && !demoTriggerPressedLastFrame && pScene) {
+      startDropDemo();
+    }
+    demoTriggerPressedLastFrame = demoTriggerPressed;
+
     if (!cursorCaptured || !pScene) {
       return;
     }
@@ -137,6 +164,196 @@ void SauceEngineApp::processInput(float deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
       camera.processDirection(Camera::Movement::RIGHT, deltaTime);
   }
+
+void SauceEngineApp::updateDefaultSceneSpin(float deltaTime) {
+    if (!defaultSceneSpinEnabled || !pScene || deltaTime <= 0.0f || isPhysicsDemoScene()) {
+      return;
+    }
+
+    if (!defaultSceneSpinActive || defaultSceneSpinEntityName.empty()) {
+      Entity* candidate = findDefaultSceneSpinEntity();
+      if (!candidate) {
+        defaultSceneSpinActive = false;
+        defaultSceneSpinEntityName.clear();
+        return;
+      }
+      defaultSceneSpinActive = true;
+      defaultSceneSpinEntityName = candidate->get_name();
+    }
+
+    for (auto& entity : pScene->getEntitiesMut()) {
+      if (entity.get_name() != defaultSceneSpinEntityName) {
+        continue;
+      }
+
+      auto* transform = entity.getComponent<TransformComponent>();
+      if (!transform) {
+        return;
+      }
+
+      const glm::quat currentOrientation = transform->getRotation();
+      const glm::quat nextOrientation = integrateAngularVelocity(
+        currentOrientation,
+        defaultSceneSpinAngularVelocity,
+        deltaTime
+      );
+
+      transform->setRotation(nextOrientation);
+      return;
+    }
+}
+
+bool SauceEngineApp::isPhysicsDemoScene() const {
+    return sceneFile.find("testScene") != std::string::npos;
+}
+
+Entity* SauceEngineApp::findDefaultSceneSpinEntity() {
+    if (!pScene) {
+      return nullptr;
+    }
+
+    Entity* candidate = nullptr;
+    size_t meshEntityCount = 0;
+    for (auto& entity : pScene->getEntitiesMut()) {
+      if (!entity.getActive()) {
+        continue;
+      }
+
+      auto* meshRenderer = entity.getComponent<MeshRendererComponent>();
+      auto* transform = entity.getComponent<TransformComponent>();
+      if (!meshRenderer || !meshRenderer->getMesh() || !transform) {
+        continue;
+      }
+
+      ++meshEntityCount;
+      if (entity.get_name() == "Cube") {
+        return &entity;
+      }
+
+      if (!candidate) {
+        candidate = &entity;
+      }
+    }
+
+    return meshEntityCount == 1 ? candidate : nullptr;
+}
+
+RigidBodyComponent* SauceEngineApp::ensureEntityRigidBody(Entity& entity) {
+    auto* meshRenderer = entity.getComponent<MeshRendererComponent>();
+    auto* transform = entity.getComponent<TransformComponent>();
+    if (!meshRenderer || !meshRenderer->getMesh() || !transform) {
+      return nullptr;
+    }
+
+    auto* rigidBody = entity.getComponent<RigidBodyComponent>();
+    if (!rigidBody) {
+      entity.addComponent<RigidBodyComponent>(
+        transform->getTranslation(),
+        glm::vec3(0.0f),
+        transform->getRotation(),
+        glm::vec3(0.0f)
+      );
+      rigidBody = entity.getComponent<RigidBodyComponent>();
+    }
+
+    if (!rigidBody) {
+      return nullptr;
+    }
+
+    configureRigidBodyFromEntity(entity, *rigidBody);
+    return rigidBody;
+}
+
+void SauceEngineApp::configureRigidBodyFromEntity(Entity& entity, RigidBodyComponent& rigidBody) {
+    auto* meshRenderer = entity.getComponent<MeshRendererComponent>();
+    auto* transform = entity.getComponent<TransformComponent>();
+    if (!meshRenderer || !meshRenderer->getMesh() || !transform) {
+      return;
+    }
+
+    rigidBody.setPosition(transform->getTranslation());
+    rigidBody.setOrientation(transform->getRotation());
+    rigidBody.setScale(transform->getScale());
+    const glm::vec3 centerOfMass = RigidBodyComponent::meshCenterOfMass(meshRenderer->getMesh());
+    rigidBody.setCenterOfMass(centerOfMass);
+
+    float invMass = 0.0f;
+    if (!isStaticTableMesh(meshRenderer)) {
+      invMass = RigidBodyComponent::scaledMeshInvMass(meshRenderer->getMesh(), transform->getScale());
+      if (invMass <= std::numeric_limits<float>::epsilon()) {
+        invMass = 1.0f;
+      }
+    }
+    rigidBody.setInvMass(invMass);
+    rigidBody.setInvInertiaTensor(
+      RigidBodyComponent::meshInvInertiaTensor(
+        meshRenderer->getMesh(),
+        centerOfMass,
+        invMass,
+        transform->getScale())
+    );
+}
+
+void SauceEngineApp::startDropDemo() {
+    if (!pScene) {
+      return;
+    }
+
+    dropDemoActive = false;
+
+    for (auto& entity : pScene->getEntitiesMut()) {
+      if (!entity.getActive()) {
+        continue;
+      }
+
+      auto* rigidBody = ensureEntityRigidBody(entity);
+      auto* meshRenderer = entity.getComponent<MeshRendererComponent>();
+      auto* transform = entity.getComponent<TransformComponent>();
+      if (!rigidBody || !meshRenderer || !meshRenderer->getMesh()) {
+        continue;
+      }
+
+      if (transform) {
+        rigidBody->setPosition(transform->getTranslation());
+        rigidBody->setOrientation(transform->getRotation());
+      }
+      rigidBody->setVelocity(glm::vec3(0.0f));
+      rigidBody->setAngularVelocity(glm::vec3(0.0f));
+      rigidBody->clearAccumulatedForce();
+      rigidBody->setCollisionEnabled(true);
+
+      if (isStaticTableMesh(meshRenderer)) {
+        rigidBody->setInvMass(0.0f);
+        rigidBody->setInvInertiaTensor(glm::mat3(0.0f));
+        continue;
+      }
+    }
+
+    dropDemoActive = true;
+}
+
+void SauceEngineApp::updateDropDemoForces() {
+    if (!dropDemoActive || !pScene) {
+      return;
+    }
+    constexpr glm::vec3 kGravityAcceleration(0.0f, 0.0f, -9.81f);
+    constexpr float kLinearDamping = 0.25f;
+
+    for (auto& entity : pScene->getEntitiesMut()) {
+      auto* rigidBody = entity.getComponent<RigidBodyComponent>();
+      if (!rigidBody || !entity.getActive()) {
+        continue;
+      }
+
+      if (!rigidBody->isDynamic()) {
+        rigidBody->clearAccumulatedForce();
+        continue;
+      }
+
+      const glm::vec3 acceleration = kGravityAcceleration - rigidBody->getVelocity() * kLinearDamping;
+      rigidBody->setAccumulatedForce(acceleration / rigidBody->getInvMass());
+    }
+}
 
 void SauceEngineApp::mouseCallback(GLFWwindow* window, double xposIn, double yposIn) {
     auto* app = static_cast<SauceEngineApp*>(glfwGetWindowUserPointer(window));
@@ -175,6 +392,7 @@ void SauceEngineApp::mainLoop() {
 
       glfwPollEvents();
       processInput(deltaFrame);
+      updateDefaultSceneSpin(static_cast<float>(deltaFrame));
       syncRigidBodiesToTransforms();
 
       pImGuiRenderer->newFrame();
@@ -182,19 +400,15 @@ void SauceEngineApp::mainLoop() {
 
       // Run XPBD only if 1/TICKRATE seconds passed since last physics run 
 
-      auto rigidBodies = std::vector<RigidBodyComponent*>();
       auto constraints = std::vector<std::unique_ptr<physics::Constraint>>();
-
-      for (auto& entity: pScene->getEntitiesMut()) {
-        auto rigidBody = entity.getComponent<RigidBodyComponent>();
-        if (rigidBody) rigidBodies.push_back(rigidBody);
-      }
+      auto rigidBodies = collectRigidBodies();
 
       constexpr float kPhysicsDt = 1.0f / 128.0f;
       if (deltaUpdate > 1.0) {
         deltaUpdate = kPhysicsDt;
       }
       while (deltaUpdate >= kPhysicsDt) {
+        updateDropDemoForces();
         pSolver->solvePositions(rigidBodies, constraints, kPhysicsDt);
         syncRigidBodiesToTransforms();
         for (auto& entity : pScene->getEntitiesMut()) {
@@ -243,6 +457,23 @@ void SauceEngineApp::syncRigidBodiesToTransforms() {
     }
   }
 
+std::vector<RigidBodyComponent*> SauceEngineApp::collectRigidBodies() {
+  std::vector<RigidBodyComponent*> rigidBodies;
+  if (!pScene) {
+    return rigidBodies;
+  }
+
+  auto& entities = pScene->getEntitiesMut();
+  rigidBodies.reserve(entities.size());
+  for (auto& entity : entities) {
+    if (auto* rigidBody = entity.getComponent<RigidBodyComponent>()) {
+      rigidBodies.push_back(rigidBody);
+    }
+  }
+
+  return rigidBodies;
+}
+
 void SauceEngineApp::uploadMeshGPUResources() {
   for (auto& entity : pScene->getEntitiesMut()) {
     auto mrcs = entity.getComponents<MeshRendererComponent>();
@@ -281,6 +512,11 @@ void SauceEngineApp::setupSceneRenderer() {
 
 void SauceEngineApp::setupXPBDSolver() {
   
+}
+
+void SauceEngineApp::setupDefaultSceneSpin() {
+  defaultSceneSpinActive = false;
+  defaultSceneSpinEntityName.clear();
 }
 
 void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t imageIndex) {

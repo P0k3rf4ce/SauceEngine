@@ -144,8 +144,11 @@ add_executable(xpbd_cloth_harness
     src/xpbd_cloth_harness.cpp
     src/app/components/MeshRendererComponent.cpp
     src/physics/Cloth.cpp
+    src/physics/SphereBVH.cpp
     src/physics/SphereCollider.cpp
     src/physics/XPBD.cpp
+    src/physics/XPBDContacts.cpp
+    src/physics/XPBDRigidSolve.cpp
 )
 
 target_include_directories(xpbd_cloth_harness PRIVATE
