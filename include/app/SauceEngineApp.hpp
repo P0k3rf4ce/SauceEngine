@@ -70,11 +70,13 @@ private:
   bool cursorCaptured = true;
   bool gravePressedLastFrame = false;
   bool demoTriggerPressedLastFrame = false;
+  bool cameraCollisionEnabled = false;
   bool dropDemoActive = false;
   bool defaultSceneSpinEnabled = false;
   bool defaultSceneSpinActive = false;
   std::string defaultSceneSpinEntityName;
   glm::vec3 defaultSceneSpinAngularVelocity = glm::vec3(1.35f, 1.9f, 0.65f);
+  float cameraCollisionRadius = 0.35f;
 
   std::unique_ptr<sauce::Instance> pInstance;
 
@@ -110,6 +112,7 @@ private:
   Entity* findDefaultSceneSpinEntity();
   RigidBodyComponent* ensureEntityRigidBody(Entity& entity);
   void configureRigidBodyFromEntity(Entity& entity, RigidBodyComponent& rigidBody);
+  void applyCameraCollisionPush(const glm::vec3& previousCameraPosition, float deltaTime);
   void startDropDemo();
   void updateDropDemoForces();
   void syncRigidBodiesToTransforms();
@@ -120,6 +123,7 @@ public:
   sauce::ui::ImGuiComponentManager& getImGuiManager() { return *pImGuiComponentManager; }
   void setCustomUIBuilder(std::function<void(sauce::ui::ImGuiComponentManager&)> builder);
   void setSceneFile(const std::string& path) { sceneFile = path; }
+  void setCameraCollisionEnabled(bool enabled) { cameraCollisionEnabled = enabled; }
 
 private:
   std::string sceneFile;

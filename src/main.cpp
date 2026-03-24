@@ -26,6 +26,7 @@ int main(int argc, const char *argv[]) {
     if (!ops.scene_file.empty()) {
       mainApp.setSceneFile(ops.scene_file);
     }
+    mainApp.setCameraCollisionEnabled(ops.camera_collide);
     mainApp.run();
   } catch (std::exception& e) {
     std::cerr << e.what() << std::endl;

@@ -13,6 +13,9 @@
 #include <physics/XPBD.hpp>
 #include <physics/constraints/Constraint.hpp>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/norm.hpp>
+
 namespace sauce {
 
 namespace {
@@ -26,6 +29,18 @@ glm::quat integrateAngularVelocity(const glm::quat& orientation,
                                    float deltaTime) {
   const glm::quat spin(0.0f, angularVelocity.x, angularVelocity.y, angularVelocity.z);
   return glm::normalize(orientation + 0.5f * spin * orientation * deltaTime);
+}
+
+float computeScaledMeshRadius(const modeling::Mesh& mesh,
+                              const glm::vec3& centerOfMass,
+                              const glm::vec3& scale) {
+  float maxRadiusSq = 0.0f;
+  for (const auto& vertex : mesh.getVertices()) {
+    const glm::vec3 localOffset = (vertex.position - centerOfMass) * scale;
+    maxRadiusSq = std::max(maxRadiusSq, glm::length2(localOffset));
+  }
+
+  return std::sqrt(maxRadiusSq);
 }
 
 } // namespace
@@ -149,11 +164,19 @@ void SauceEngineApp::processInput(float deltaTime) {
     }
     demoTriggerPressedLastFrame = demoTriggerPressed;
 
-    if (!cursorCaptured || !pScene) {
+    if (!pScene) {
       return;
     }
 
     auto& camera = pScene->getCameraRW();
+    const glm::vec3 previousCameraPosition = camera.getPos();
+
+    if (!cursorCaptured) {
+      if (cameraCollisionEnabled) {
+        applyCameraCollisionPush(previousCameraPosition, deltaTime);
+      }
+      return;
+    }
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
       camera.processDirection(Camera::Movement::FORWARD, deltaTime);
@@ -163,6 +186,10 @@ void SauceEngineApp::processInput(float deltaTime) {
       camera.processDirection(Camera::Movement::LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
       camera.processDirection(Camera::Movement::RIGHT, deltaTime);
+
+    if (cameraCollisionEnabled) {
+      applyCameraCollisionPush(previousCameraPosition, deltaTime);
+    }
   }
 
 void SauceEngineApp::updateDefaultSceneSpin(float deltaTime) {
@@ -292,6 +319,96 @@ void SauceEngineApp::configureRigidBodyFromEntity(Entity& entity, RigidBodyCompo
         invMass,
         transform->getScale())
     );
+}
+
+void SauceEngineApp::applyCameraCollisionPush(const glm::vec3& previousCameraPosition, float deltaTime) {
+    if (!cameraCollisionEnabled || !pScene) {
+      return;
+    }
+
+    auto& camera = pScene->getCameraRW();
+    const glm::vec3 cameraPosition = camera.getPos();
+    const glm::vec3 cameraDisplacement = cameraPosition - previousCameraPosition;
+    const float displacementLengthSq = glm::length2(cameraDisplacement);
+    const float displacementLength = displacementLengthSq > 1e-10f
+        ? std::sqrt(displacementLengthSq)
+        : 0.0f;
+    const glm::vec3 cameraMoveDirection = displacementLength > 1e-5f
+        ? cameraDisplacement / displacementLength
+        : glm::vec3(0.0f);
+    const float cameraSpeed = deltaTime > 1e-6f ? displacementLength / deltaTime : 0.0f;
+
+    for (auto& entity : pScene->getEntitiesMut()) {
+      if (!entity.getActive()) {
+        continue;
+      }
+
+      auto* meshRenderer = entity.getComponent<MeshRendererComponent>();
+      auto* transform = entity.getComponent<TransformComponent>();
+      if (!meshRenderer || !meshRenderer->getMesh() || !transform) {
+        continue;
+      }
+
+      auto* rigidBody = entity.getComponent<RigidBodyComponent>();
+      const glm::vec3 centerOfMass = rigidBody
+          ? rigidBody->getCenterOfMass()
+          : RigidBodyComponent::meshCenterOfMass(meshRenderer->getMesh());
+      const glm::vec3 bodyScale = rigidBody ? rigidBody->getScale() : transform->getScale();
+      const float bodyRadius = computeScaledMeshRadius(
+          *meshRenderer->getMesh(),
+          centerOfMass,
+          bodyScale);
+      if (bodyRadius <= 1e-5f) {
+        continue;
+      }
+
+      const glm::vec3 bodyCenter = rigidBody
+          ? rigidBody->getWorldCenterOfMass()
+          : transform->getTranslation() + transform->getRotation() * (centerOfMass * bodyScale);
+      const glm::vec3 delta = bodyCenter - cameraPosition;
+      const float distanceSq = glm::length2(delta);
+      const float combinedRadius = cameraCollisionRadius + bodyRadius;
+      if (distanceSq >= combinedRadius * combinedRadius) {
+        continue;
+      }
+
+      if (!rigidBody) {
+        rigidBody = ensureEntityRigidBody(entity);
+      }
+
+      if (!rigidBody || !rigidBody->isDynamic() || !rigidBody->isCollisionEnabled()) {
+        continue;
+      }
+
+      const float distance = distanceSq > 1e-10f ? std::sqrt(distanceSq) : 0.0f;
+      glm::vec3 contactNormal = distance > 1e-5f ? (delta / distance) : glm::vec3(1.0f, 0.0f, 0.0f);
+      if (distance <= 1e-5f && displacementLength > 1e-5f) {
+        contactNormal = cameraMoveDirection;
+      }
+
+      const float penetration = combinedRadius - distance;
+      rigidBody->setWorldCenterOfMass(bodyCenter + contactNormal * penetration);
+
+      glm::vec3 velocity = rigidBody->getVelocity();
+      const float inwardSpeed = glm::dot(velocity, -contactNormal);
+      if (inwardSpeed > 0.0f) {
+        velocity += inwardSpeed * contactNormal;
+      }
+
+      if (cameraSpeed > 0.0f) {
+        const float alignedPushSpeed = std::max(glm::dot(cameraMoveDirection, contactNormal), 0.0f) * cameraSpeed;
+        velocity += cameraMoveDirection * alignedPushSpeed;
+      }
+
+      velocity += contactNormal * (penetration * 8.0f);
+      rigidBody->setVelocity(velocity);
+
+      if (cameraSpeed > 0.0f) {
+        rigidBody->setAngularVelocity(
+            rigidBody->getAngularVelocity() +
+            glm::cross(cameraMoveDirection, contactNormal) * (cameraSpeed * 0.35f));
+      }
+    }
 }
 
 void SauceEngineApp::startDropDemo() {
