@@ -1,0 +1,245 @@
+{
+  "asset": {
+    "generator": "Codex scene assembly",
+    "version": "2.0"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "MonkeyBallScene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "MonkeyBall",
+      "children": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "SuzanneCore",
+      "mesh": 0,
+      "translation": [
+        0.0,
+        -0.05,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.3826834324,
+        0.0,
+        0.9238795325
+      ],
+      "scale": [
+        0.62,
+        0.62,
+        0.62
+      ]
+    },
+    {
+      "name": "SphereShell",
+      "mesh": 1,
+      "scale": [
+        1.08,
+        1.08,
+        1.08
+      ]
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Suzanne",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Ball",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 4,
+            "NORMAL": 6,
+            "TEXCOORD_0": 7
+          },
+          "indices": 5,
+          "material": 1,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "name": "MonkeyFur",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.42,
+          0.26,
+          0.14,
+          1.0
+        ],
+        "metallicFactor": 0.02,
+        "roughnessFactor": 0.92
+      }
+    },
+    {
+      "name": "BallGlass",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.84,
+          0.93,
+          1.0,
+          0.12
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.08
+      },
+      "emissiveFactor": [
+        0.02,
+        0.05,
+        0.08
+      ],
+      "alphaMode": "BLEND",
+      "doubleSided": true
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 1966,
+      "max": [
+        1.3671875,
+        0.984375,
+        0.8515625
+      ],
+      "min": [
+        -1.3671875,
+        -0.984375,
+        -0.8515625
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 1966,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 1966,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 2904,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 4,
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 24895,
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "bufferView": 5,
+      "type": "SCALAR",
+      "componentType": 5125,
+      "count": 146304
+    },
+    {
+      "bufferView": 6,
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 24895
+    },
+    {
+      "bufferView": 7,
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 24895
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 23592,
+      "byteOffset": 0,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 23592,
+      "byteOffset": 23592,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 15728,
+      "byteOffset": 47184,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 5808,
+      "byteOffset": 62912,
+      "target": 34963
+    },
+    {
+      "buffer": 1,
+      "byteLength": 298740
+    },
+    {
+      "buffer": 1,
+      "byteLength": 585216,
+      "byteOffset": 298740
+    },
+    {
+      "buffer": 1,
+      "byteLength": 298740,
+      "byteOffset": 883956
+    },
+    {
+      "buffer": 1,
+      "byteLength": 199160,
+      "byteOffset": 1182696
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 68720,
+      "uri": "monkey.bin"
+    },
+    {
+      "byteLength": 1381856,
+      "uri": "sphere.bin"
+    }
+  ]
+}

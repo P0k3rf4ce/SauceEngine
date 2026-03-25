@@ -68,7 +68,7 @@ if(NOT WIN32)
 endif()
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/shaders)
-# add_dependencies(${EXEC_NAME} shaders)  # Requires slangc; pre-compiled .spv files used instead
+add_dependencies(${EXEC_NAME} shaders)
 
 add_custom_command(TARGET ${EXEC_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -196,6 +196,7 @@ endif()
 if(TARGET editorGridVert)
     add_dependencies(sauceeditor editorGridVert editorGridFrag editorUnlitVert editorUnlitFrag)
 endif()
+add_dependencies(sauceeditor shaders)
 
 # ── Launcher ─────────────────────────────────────────────────────────
 
