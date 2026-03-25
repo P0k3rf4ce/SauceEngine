@@ -22,8 +22,6 @@
 #include <cmath>
 #include <cstring>
 #include <csignal>
-#include <sys/types.h>
-
 #if defined(_WIN32)
   #define NOMINMAX
   #include <windows.h>
@@ -35,8 +33,6 @@
   #include <sys/wait.h>
   #include <unistd.h>
 #endif
-
-
 #include <editor/zip_file.hpp>
 
 namespace sauce::editor {
@@ -266,7 +262,7 @@ void EditorApp::initVulkan() {
     .descriptorSetLayouts = { *pRenderer->getDescriptorSetLayout0() },
     .colorFormat = OffscreenFramebuffer::COLOR_FORMAT,
     .hasVertexInput = true,
-    .enableBlending = false,
+    .enableBlending = true,
     .enableCulling = true,
     .depthWrite = true,
     .hasPushConstants = true,
@@ -1720,74 +1716,97 @@ void EditorApp::applySettings(const sauce::EditorSettings& s) {
 
 
 void EditorApp::startPlayMode() {
-    if (playModeActive) return;
+  if (playModeActive || !pScene) return;
 
-    // (your temp file creation code stays the same)
+  namespace fs = std::filesystem;
+  fs::path tempDir = fs::temp_directory_path() / "sauceengine_play";
+  std::error_code ec;
+  fs::create_directories(tempDir, ec);
+  if (ec) {
+    setStatusMessage("Play: Failed to create temp directory");
+    SAUCE_LOG("Play", "Failed to create temp dir: {}", ec.message());
+    return;
+  }
+
+  playModeTempFile = (tempDir / "play_scene.glb").string();
+
+  const std::string originalPath = pScene->getCurrentFilePath();
+  if (!pScene->saveToFile(playModeTempFile)) {
+    setStatusMessage("Play: Failed to save scene");
+    SAUCE_LOG("Play", "Failed to save scene to temp file");
+    return;
+  }
+  pScene->setCurrentFilePath(originalPath);
 
 #if defined(_WIN32)
-    setStatusMessage("Play mode is not implemented on Windows yet.");
-    return;
+  setStatusMessage("Play mode is not implemented on Windows yet.");
+  return;
 #else
-    const std::filesystem::path engineExe = getEngineExecutablePath();
-    if (engineExe.empty() || !std::filesystem::exists(engineExe)) {
-        setStatusMessage("Play: Could not locate SauceEngine executable");
-        return;
-    }
+  const std::filesystem::path engineExe = getEngineExecutablePath();
+  if (engineExe.empty() || !std::filesystem::exists(engineExe)) {
+    setStatusMessage("Play: Could not locate SauceEngine executable");
+    SAUCE_LOG("Play", "Could not locate SauceEngine executable");
+    return;
+  }
 
-    pid_t pid = fork();
-    if (pid == 0) {
-        execl(engineExe.c_str(), engineExe.c_str(), playModeTempFile.c_str(), nullptr);
-        _exit(1);
-    } else if (pid > 0) {
-        playProcessPid = pid;
-        playModeActive = true;
-        setStatusMessage("Play mode started");
-    } else {
-        setStatusMessage("Play: Failed to launch engine");
-    }
+  SAUCE_LOG("Play", "Starting play mode: {} {}", engineExe.string(), playModeTempFile);
+
+  pid_t pid = fork();
+  if (pid == 0) {
+    execl(engineExe.c_str(), engineExe.c_str(), playModeTempFile.c_str(), nullptr);
+    _exit(1);
+  } else if (pid > 0) {
+    playProcessPid = pid;
+    playModeActive = true;
+    setStatusMessage("Play mode started");
+    SAUCE_LOG("Play", "SauceEngine launched with PID {}", pid);
+  } else {
+    setStatusMessage("Play: Failed to launch engine");
+    SAUCE_LOG("Play", "fork() failed");
+  }
 #endif
 }
 
 void EditorApp::stopPlayMode() {
-    if (!playModeActive) return;
+  if (!playModeActive) return;
 
 #if defined(_WIN32)
-    // Windows stub
-    playModeActive = false;
-    playProcessPid = nullptr;
-    if (!playModeTempFile.empty()) {
-        std::error_code ec2;
-        std::filesystem::remove(playModeTempFile, ec2);
-        playModeTempFile.clear();
-    }
-    setStatusMessage("Play mode stopped");
-    return;
+  playModeActive = false;
+  playProcessPid = nullptr;
+  if (!playModeTempFile.empty()) {
+    std::error_code ec2;
+    std::filesystem::remove(playModeTempFile, ec2);
+    playModeTempFile.clear();
+  }
+  setStatusMessage("Play mode stopped");
+  return;
 #else
-    if (playProcessPid > 0) {
-        kill(playProcessPid, SIGTERM);
+  if (playProcessPid > 0) {
+    SAUCE_LOG("Play", "Stopping SauceEngine (PID {})", playProcessPid);
+    kill(playProcessPid, SIGTERM);
 
-        int tries = 0;
-        pid_t result;
-        do {
-            result = waitpid(playProcessPid, nullptr, WNOHANG);
-            if (result == 0) usleep(100000);
-        } while (result == 0 && ++tries < 50);
+    int tries = 0;
+    pid_t result;
+    do {
+      result = waitpid(playProcessPid, nullptr, WNOHANG);
+      if (result == 0) usleep(100000);
+    } while (result == 0 && ++tries < 50);
 
-        if (result == 0) {
-            kill(playProcessPid, SIGKILL);
-            waitpid(playProcessPid, nullptr, 0);
-        }
-
-        playProcessPid = -1;
+    if (result == 0) {
+      kill(playProcessPid, SIGKILL);
+      waitpid(playProcessPid, nullptr, 0);
     }
 
-    playModeActive = false;
-    if (!playModeTempFile.empty()) {
-        std::error_code ec2;
-        std::filesystem::remove(playModeTempFile, ec2);
-        playModeTempFile.clear();
-    }
-    setStatusMessage("Play mode stopped");
+    playProcessPid = -1;
+  }
+
+  playModeActive = false;
+  if (!playModeTempFile.empty()) {
+    std::error_code ec2;
+    std::filesystem::remove(playModeTempFile, ec2);
+    playModeTempFile.clear();
+  }
+  setStatusMessage("Play mode stopped");
 #endif
 }
 

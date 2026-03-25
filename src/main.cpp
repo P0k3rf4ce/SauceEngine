@@ -27,7 +27,10 @@ int main(int argc, const char *argv[]) {
       mainApp.setSceneFile(ops.scene_file);
     }
     mainApp.setCameraCollisionEnabled(ops.camera_collide);
-    mainApp.run();
+    if (!ops.ibl_file.empty()) {
+      mainApp.setIBLFile(ops.ibl_file);
+    }
+    mainApp.run(ops.scr_width, ops.scr_height);
   } catch (std::exception& e) {
     std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;

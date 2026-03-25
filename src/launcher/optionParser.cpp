@@ -19,7 +19,8 @@ AppOptions::AppOptions(int argc, char const **argv): desc("Allowed options") {
     ("height,h", po::value<unsigned int>(&(this->scr_height))->default_value(DEFAULT_SCR_HEIGHT), "screen height")
     ("tickrate,t", po::value<double>(&(this->tickrate))->default_value(DEFAULT_TICKRATE), "animation tickrate")
     ("input-file,f", po::value<std::string>(&(this->scene_file))->default_value(""), "scene file to load")
-    ("camera_collide", po::bool_switch(&(this->camera_collide)), "enable camera collision/pushing against dynamic objects");
+    ("camera_collide", po::bool_switch(&(this->camera_collide)), "enable camera collision/pushing against dynamic objects")
+    ("ibl,i", po::value<std::string>(&(this->ibl_file))->default_value(""), "HDR IBL map to load");
 
     po::positional_options_description p;
     p.add("input-file", 1);

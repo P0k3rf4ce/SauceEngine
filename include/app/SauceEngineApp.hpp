@@ -43,9 +43,6 @@ constexpr bool enableValidationLayers = false;
 constexpr bool enableValidationLayers = true;
 #endif
 
-constexpr uint32_t WIDTH = 1280;
-constexpr uint32_t HEIGHT = 720;
-
 namespace sauce {
 
 class RigidBodyComponent;
@@ -53,7 +50,7 @@ class RigidBodyComponent;
 class SauceEngineApp {
 public:
   SauceEngineApp(); // Constructor to initialize pImGuiComponentManager
-  void run();
+  void run(const uint32_t width, const uint32_t height);
 
   ~SauceEngineApp();
 
@@ -124,9 +121,13 @@ public:
   void setCustomUIBuilder(std::function<void(sauce::ui::ImGuiComponentManager&)> builder);
   void setSceneFile(const std::string& path) { sceneFile = path; }
   void setCameraCollisionEnabled(bool enabled) { cameraCollisionEnabled = enabled; }
+  void setIBLFile(const std::string& path) { iblFile = path; }
 
 private:
   std::string sceneFile;
+  std::string iblFile;
+  uint32_t width;
+  uint32_t height;
 };
 
 }
