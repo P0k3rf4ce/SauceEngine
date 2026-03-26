@@ -19,7 +19,7 @@ struct Vertex;
 struct XPBDSolver {
   // Gauss-Seidel iterations per rigid-body solve pass
   int solverIterations = 20;
-  int rigidSubsteps = 2;
+  int rigidSubsteps = 4;
 
   // XPBD substeps for cloth (prediction + constraint projection each substep)
   int clothSubsteps = 4;

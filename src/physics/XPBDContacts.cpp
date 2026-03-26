@@ -13,8 +13,10 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
+#include <numeric>
 #include <unordered_map>
 
 namespace physics {
@@ -39,6 +41,7 @@ struct CollisionBody {
   const sauce::modeling::Mesh* mesh = nullptr;
   const SphereBVHNode* bvhRoot = nullptr;
   std::vector<glm::vec3> worldVertices;
+  std::vector<glm::vec3> sampleWorldVertices;
   float contactRadius = 0.0f;
 };
 
@@ -92,13 +95,79 @@ public:
     const float averageEdgeLength = edgeCount > 0
         ? static_cast<float>(edgeSum / static_cast<double>(edgeCount))
         : 0.02f;
-    const float radius = std::clamp(averageEdgeLength * 0.1f, 0.003f, 0.04f);
+    const float radius = std::clamp(averageEdgeLength * 0.16f, 0.006f, 0.06f);
     return contactRadii.emplace(mesh, radius).first->second;
+  }
+
+  const std::vector<uint32_t>& getSampleVertexIndices(const sauce::modeling::Mesh* mesh) {
+    static const std::vector<uint32_t> emptyIndices;
+    if (!mesh) {
+      return emptyIndices;
+    }
+
+    auto it = sampleVertexIndices.find(mesh);
+    if (it != sampleVertexIndices.end()) {
+      return it->second;
+    }
+
+    const auto& vertices = mesh->getVertices();
+    std::vector<uint32_t> indices;
+    indices.reserve(vertices.size());
+
+    constexpr size_t kMaxSampleVertices = 384;
+    if (vertices.size() <= kMaxSampleVertices) {
+      indices.resize(vertices.size());
+      std::iota(indices.begin(), indices.end(), 0u);
+      return sampleVertexIndices.emplace(mesh, std::move(indices)).first->second;
+    }
+
+    std::vector<uint8_t> seen(vertices.size(), 0);
+    auto addSampleIndex = [&](uint32_t index) {
+      if (index >= vertices.size() || seen[index]) {
+        return;
+      }
+      seen[index] = 1;
+      indices.push_back(index);
+    };
+
+    std::array<uint32_t, 6> extrema = {0, 0, 0, 0, 0, 0};
+    for (uint32_t i = 1; i < static_cast<uint32_t>(vertices.size()); ++i) {
+      const auto& position = vertices[i].position;
+      if (position.x < vertices[extrema[0]].position.x) extrema[0] = i;
+      if (position.x > vertices[extrema[1]].position.x) extrema[1] = i;
+      if (position.y < vertices[extrema[2]].position.y) extrema[2] = i;
+      if (position.y > vertices[extrema[3]].position.y) extrema[3] = i;
+      if (position.z < vertices[extrema[4]].position.z) extrema[4] = i;
+      if (position.z > vertices[extrema[5]].position.z) extrema[5] = i;
+    }
+
+    for (uint32_t index : extrema) {
+      addSampleIndex(index);
+    }
+
+    const size_t remainingSlots = kMaxSampleVertices > indices.size()
+        ? (kMaxSampleVertices - indices.size())
+        : 0;
+    const size_t stride = remainingSlots > 0
+        ? std::max<size_t>(1, vertices.size() / remainingSlots)
+        : vertices.size();
+
+    for (size_t i = 0; i < vertices.size() && indices.size() < kMaxSampleVertices; i += stride) {
+      addSampleIndex(static_cast<uint32_t>(i));
+    }
+
+    for (uint32_t i = 0; i < static_cast<uint32_t>(vertices.size()) &&
+                         indices.size() < kMaxSampleVertices; ++i) {
+      addSampleIndex(i);
+    }
+
+    return sampleVertexIndices.emplace(mesh, std::move(indices)).first->second;
   }
 
 private:
   std::unordered_map<const sauce::modeling::Mesh*, std::unique_ptr<SphereBVHNode>> bvhRoots;
   std::unordered_map<const sauce::modeling::Mesh*, float> contactRadii;
+  std::unordered_map<const sauce::modeling::Mesh*, std::vector<uint32_t>> sampleVertexIndices;
 };
 
 glm::vec3 scalePoint(const glm::vec3& point, const glm::vec3& scale) {
@@ -205,8 +274,7 @@ void generateVertexContacts(const CollisionBody& sampleBody,
   const auto& targetIndices = targetBody.mesh->getIndices();
   const glm::vec3 targetCenter = targetBody.rigidBody->getWorldCenterOfMass();
 
-  for (size_t vertexIndex = 0; vertexIndex < sampleBody.worldVertices.size(); ++vertexIndex) {
-    const glm::vec3& worldVertex = sampleBody.worldVertices[vertexIndex];
+  for (const glm::vec3& worldVertex : sampleBody.sampleWorldVertices) {
     SphereCollider query;
     query.center = worldVertex;
     query.radius = sampleBody.contactRadius;
@@ -354,12 +422,25 @@ bool tryBuildCollisionBody(uint32_t index,
         rigidBody->getPosition() + rigidBody->getOrientation() * scalePoint(vertex.position, bodyScale));
   }
 
+  const auto& sampleVertexIndices = MeshCollisionCache::instance().getSampleVertexIndices(mesh.get());
+  std::vector<glm::vec3> sampleWorldVertices;
+  sampleWorldVertices.reserve(sampleVertexIndices.size());
+  for (uint32_t sampleIndex : sampleVertexIndices) {
+    if (sampleIndex < worldVertices.size()) {
+      sampleWorldVertices.push_back(worldVertices[sampleIndex]);
+    }
+  }
+  if (sampleWorldVertices.empty()) {
+    sampleWorldVertices = worldVertices;
+  }
+
   collisionBody = CollisionBody{
     index,
     rigidBody,
     mesh.get(),
     MeshCollisionCache::instance().getBVHRoot(mesh.get()),
     std::move(worldVertices),
+    std::move(sampleWorldVertices),
     MeshCollisionCache::instance().getContactRadius(mesh.get()) * maxScaleComponent(bodyScale),
   };
   return true;

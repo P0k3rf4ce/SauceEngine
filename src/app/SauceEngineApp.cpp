@@ -20,6 +20,12 @@ namespace sauce {
 
 namespace {
 
+struct SceneBounds {
+  glm::vec3 min = glm::vec3(std::numeric_limits<float>::max());
+  glm::vec3 max = glm::vec3(std::numeric_limits<float>::lowest());
+  bool valid = false;
+};
+
 bool isStaticTableMesh(const MeshRendererComponent* meshRenderer) {
   return meshRenderer && meshRenderer->getMesh() && meshRenderer->getMesh()->getVertexCount() == 4;
 }
@@ -41,6 +47,17 @@ float computeScaledMeshRadius(const modeling::Mesh& mesh,
   }
 
   return std::sqrt(maxRadiusSq);
+}
+
+void expandSceneBounds(SceneBounds& bounds,
+                       const modeling::Mesh& mesh,
+                       const glm::mat4& modelMatrix) {
+  for (const auto& vertex : mesh.getVertices()) {
+    const glm::vec3 worldPosition = glm::vec3(modelMatrix * glm::vec4(vertex.position, 1.0f));
+    bounds.min = glm::min(bounds.min, worldPosition);
+    bounds.max = glm::max(bounds.max, worldPosition);
+    bounds.valid = true;
+  }
 }
 
 } // namespace
@@ -67,6 +84,7 @@ void SauceEngineApp::run(const uint32_t width, const uint32_t height) {
 
   if (pScene) {
     if (pScene->loadFromFile(sceneFile) && !pScene->getEntities().empty()) {
+      frameCameraToScene();
       setupDefaultSceneSpin();
       uploadMeshGPUResources();
       setupSceneRenderer();
@@ -235,6 +253,44 @@ void SauceEngineApp::updateDefaultSceneSpin(float deltaTime) {
       transform->setRotation(nextOrientation);
       return;
     }
+}
+
+void SauceEngineApp::frameCameraToScene() {
+    if (!pScene) {
+      return;
+    }
+
+    SceneBounds bounds;
+    for (const auto& entity : pScene->getEntities()) {
+      if (!entity.getActive()) {
+        continue;
+      }
+
+      const auto* meshRenderer = entity.getComponent<MeshRendererComponent>();
+      const auto* transform = entity.getComponent<TransformComponent>();
+      if (!meshRenderer || !meshRenderer->getMesh() || !transform) {
+        continue;
+      }
+
+      expandSceneBounds(bounds, *meshRenderer->getMesh(), transform->getLocalMatrix());
+    }
+
+    if (!bounds.valid) {
+      return;
+    }
+
+    const glm::vec3 center = 0.5f * (bounds.min + bounds.max);
+    const glm::vec3 extents = bounds.max - bounds.min;
+    float radius = 0.5f * glm::length(extents);
+    if (radius < 0.5f) {
+      radius = 0.5f;
+    }
+
+    auto& camera = pScene->getCameraRW();
+    const float halfFovRadians = glm::radians(camera.getFOV() * 0.5f);
+    const float distance = std::max(radius / std::tan(halfFovRadians), radius * 1.2f) * 1.35f;
+    const glm::vec3 viewDirection = glm::normalize(glm::vec3(1.0f, 1.0f, 0.7f));
+    camera.lookAt(center + viewDirection * distance, center, glm::vec3(0.0f, 0.0f, 1.0f));
 }
 
 bool SauceEngineApp::isPhysicsDemoScene() const {

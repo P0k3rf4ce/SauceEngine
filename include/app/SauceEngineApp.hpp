@@ -105,6 +105,7 @@ private:
   void setupXPBDSolver();
   void setupDefaultSceneSpin();
   void updateDefaultSceneSpin(float deltaTime);
+  void frameCameraToScene();
   bool isPhysicsDemoScene() const;
   Entity* findDefaultSceneSpinEntity();
   RigidBodyComponent* ensureEntityRigidBody(Entity& entity);
