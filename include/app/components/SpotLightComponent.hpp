@@ -49,21 +49,11 @@ public:
     GPUSpotLight toGPUSpotLight(const glm::vec3& worldPosition) const;
     GPULight toGPULight(const glm::vec3& worldPosition) const override;
 
-    // Depth mapping resources
-    static void initDescriptorSetLayout(const sauce::LogicalDevice& logicalDevice);
-    static const vk::raii::DescriptorSetLayout& getDescriptorSetLayout();
-    static void cleanup();
-
-    bool hasDepthMappingResources() const { return (bool)depthDescriptorSet; }
-    const vk::raii::DescriptorSet& getDepthDescriptorSet() const { return *depthDescriptorSet; }
-
+    // Use base class implementation for depth mapping resources
     void initDepthMappingResources(
         const sauce::LogicalDevice& logicalDevice,
         const sauce::PhysicalDevice& physicalDevice,
-        const vk::raii::CommandPool& commandPool,
-        const vk::raii::Queue& queue,
-        const vk::raii::DescriptorPool& descriptorPool,
-        const vk::raii::DescriptorSetLayout& layout
+        const vk::raii::DescriptorPool& descriptorPool
     );
 
 private:
@@ -71,14 +61,6 @@ private:
     glm::vec3 direction{0.0f, -1.0f, 0.0f};
     float innerConeAngle{0.0f};
     float outerConeAngle{0.7853981f}; // pi/4
-
-    static std::unique_ptr<vk::raii::DescriptorSetLayout> descriptorSetLayout;
-
-    std::unique_ptr<vk::raii::Image> depthImage;
-    std::unique_ptr<vk::raii::DeviceMemory> depthImageMemory;
-    std::unique_ptr<vk::raii::ImageView> depthImageView;
-    std::unique_ptr<vk::raii::Sampler> depthSampler;
-    std::unique_ptr<vk::raii::DescriptorSet> depthDescriptorSet;
 };
 
 }

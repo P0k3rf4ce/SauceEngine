@@ -29,35 +29,17 @@ public:
 
     GPULight toGPULight(const glm::vec3& worldPosition) const override;
 
-    // Depth mapping resources
-    static void initDescriptorSetLayout(const sauce::LogicalDevice& logicalDevice);
-    static const vk::raii::DescriptorSetLayout& getDescriptorSetLayout();
-    static void cleanup();
-
-    bool hasDepthMappingResources() const { return (bool)depthDescriptorSet; }
-    const vk::raii::DescriptorSet& getDepthDescriptorSet() const { return *depthDescriptorSet; }
-
+    // Use base class implementation for depth mapping resources
     void initDepthMappingResources(
         const sauce::LogicalDevice& logicalDevice,
         const sauce::PhysicalDevice& physicalDevice,
-        const vk::raii::CommandPool& commandPool,
-        const vk::raii::Queue& queue,
-        const vk::raii::DescriptorPool& descriptorPool,
-        const vk::raii::DescriptorSetLayout& layout
+        const vk::raii::DescriptorPool& descriptorPool
     );
 
 private:
     glm::vec3 ambient{0.1f};
     glm::vec3 diffuse{1.0f};
     glm::vec3 specular{1.0f};
-
-    static std::unique_ptr<vk::raii::DescriptorSetLayout> descriptorSetLayout;
-
-    std::unique_ptr<vk::raii::Image> depthImage;
-    std::unique_ptr<vk::raii::DeviceMemory> depthImageMemory;
-    std::unique_ptr<vk::raii::ImageView> depthImageView;
-    std::unique_ptr<vk::raii::Sampler> depthSampler;
-    std::unique_ptr<vk::raii::DescriptorSet> depthDescriptorSet;
 };
 
 } // namespace sauce

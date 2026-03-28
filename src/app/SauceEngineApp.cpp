@@ -241,27 +241,19 @@ void SauceEngineApp::uploadLightGPUResources() {
   auto& logicalDev = logicalDevice;
   auto& descriptorPool = pRenderer->getDescriptorPool();
 
-  DirectionalLightComponent::initDescriptorSetLayout(logicalDev);
-  PointLightComponent::initDescriptorSetLayout(logicalDev);
-  SpotLightComponent::initDescriptorSetLayout(logicalDev);
+  LightComponent::initDescriptorSetLayout(logicalDev);
 
   for (auto& entity : pScene->getEntitiesMut()) {
-    auto dirLights = entity.getComponents<DirectionalLightComponent>();
-    for (auto* dl : dirLights) {
-      if (!dl->hasDepthMappingResources()) {
-        dl->initDepthMappingResources(logicalDev, physDev, cmdPool, queue, descriptorPool, DirectionalLightComponent::getDescriptorSetLayout());
-      }
-    }
-    auto ptLights = entity.getComponents<PointLightComponent>();
-    for (auto* pl : ptLights) {
-      if (!pl->hasDepthMappingResources()) {
-        pl->initDepthMappingResources(logicalDev, physDev, cmdPool, queue, descriptorPool, PointLightComponent::getDescriptorSetLayout());
-      }
-    }
-    auto spLights = entity.getComponents<SpotLightComponent>();
-    for (auto* sl : spLights) {
-      if (!sl->hasDepthMappingResources()) {
-        sl->initDepthMappingResources(logicalDev, physDev, cmdPool, queue, descriptorPool, SpotLightComponent::getDescriptorSetLayout());
+    auto lights = entity.getComponents<LightComponent>();
+    for (auto* light : lights) {
+      if (!light->hasDepthMappingResources()) {
+        if (auto* dl = dynamic_cast<DirectionalLightComponent*>(light)) {
+          dl->initDepthMappingResources(logicalDev, physDev, descriptorPool);
+        } else if (auto* pl = dynamic_cast<PointLightComponent*>(light)) {
+          pl->initDepthMappingResources(logicalDev, physDev, descriptorPool);
+        } else if (auto* sl = dynamic_cast<SpotLightComponent*>(light)) {
+          sl->initDepthMappingResources(logicalDev, physDev, descriptorPool);
+        }
       }
     }
   }
