@@ -3,6 +3,14 @@
 #include "app/Component.hpp"
 #include <glm/glm.hpp>
 #include <cstdint>
+#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
+#include <vulkan/vulkan_raii.hpp>
+#include <memory>
+
+namespace sauce {
+    struct LogicalDevice;
+    struct PhysicalDevice;
+}
 
 namespace sauce {
 
@@ -47,10 +55,34 @@ public:
 
     virtual GPULight toGPULight(const glm::vec3& worldPosition) const = 0;
 
+    bool hasDepthMappingResources() const { return (bool)depthDescriptorSet; }
+    const vk::raii::DescriptorSet& getDepthDescriptorSet() const { return *depthDescriptorSet; }
+
+    static void initDescriptorSetLayout(const sauce::LogicalDevice& logicalDevice);
+    static const vk::raii::DescriptorSetLayout& getDescriptorSetLayout();
+    static void cleanup();
+
 protected:
     LightType lightType;
     glm::vec3 color{1.0f};
     float intensity{1.0f};
+
+    // Shared Vulkan Resources
+    static std::unique_ptr<vk::raii::DescriptorSetLayout> descriptorSetLayout;
+    std::unique_ptr<vk::raii::Image> depthImage;
+    std::unique_ptr<vk::raii::DeviceMemory> depthImageMemory;
+    std::unique_ptr<vk::raii::ImageView> depthImageView;
+    std::unique_ptr<vk::raii::Sampler> depthSampler;
+    std::unique_ptr<vk::raii::DescriptorSet> depthDescriptorSet;
+
+    // A unified helper function for the derived classes to call
+    void allocateDepthMappingResources(
+        const sauce::LogicalDevice& logicalDevice,
+        const sauce::PhysicalDevice& physicalDevice,
+        const vk::raii::DescriptorPool& descriptorPool,
+        uint32_t resolution,
+        bool isCubeMap
+    );
 };
 
 } // namespace sauce

@@ -5,6 +5,9 @@
 #include <app/components/RigidBodyComponent.hpp>
 #include <app/components/MeshRendererComponent.hpp>
 #include <app/components/LightComponent.hpp>
+#include <app/components/DirectionalLightComponent.hpp>
+#include <app/components/PointLightComponent.hpp>
+#include <app/components/SpotLightComponent.hpp>
 #include <functional>
 #include <cstring>
 
@@ -27,6 +30,7 @@ void SauceEngineApp::run() {
   if (!sceneFile.empty() && pScene) {
     if (pScene->loadFromFile(sceneFile) && !pScene->getEntities().empty()) {
       uploadMeshGPUResources();
+      uploadLightGPUResources();
       setupSceneRenderer();
     }
   }
@@ -223,6 +227,33 @@ void SauceEngineApp::uploadMeshGPUResources() {
           pRenderer->getDefaultImageView(),
           pRenderer->getDefaultSampler()
         );
+      }
+    }
+  }
+}
+
+void SauceEngineApp::uploadLightGPUResources() {
+  if (!pScene) return;
+
+  auto& physDev = const_cast<vk::raii::PhysicalDevice&>(*physicalDevice);
+  auto& cmdPool = const_cast<vk::raii::CommandPool&>(pRenderer->getCommandPool());
+  auto& queue = const_cast<vk::raii::Queue&>(pRenderer->getQueue());
+  auto& logicalDev = logicalDevice;
+  auto& descriptorPool = pRenderer->getDescriptorPool();
+
+  LightComponent::initDescriptorSetLayout(logicalDev);
+
+  for (auto& entity : pScene->getEntitiesMut()) {
+    auto lights = entity.getComponents<LightComponent>();
+    for (auto* light : lights) {
+      if (!light->hasDepthMappingResources()) {
+        if (auto* dl = dynamic_cast<DirectionalLightComponent*>(light)) {
+          dl->initDepthMappingResources(logicalDev, physDev, descriptorPool);
+        } else if (auto* pl = dynamic_cast<PointLightComponent*>(light)) {
+          pl->initDepthMappingResources(logicalDev, physDev, descriptorPool);
+        } else if (auto* sl = dynamic_cast<SpotLightComponent*>(light)) {
+          sl->initDepthMappingResources(logicalDev, physDev, descriptorPool);
+        }
       }
     }
   }

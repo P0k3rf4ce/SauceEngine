@@ -1,4 +1,6 @@
 #include "app/components/DirectionalLightComponent.hpp"
+#include "app/components/LightComponent.hpp"
+#include "app/ImageUtils.hpp"
 
 namespace sauce {
 
@@ -23,6 +25,14 @@ GPULight DirectionalLightComponent::toGPULight(const glm::vec3& worldPosition) c
     gpu.innerConeAngle = 0.0f;
     gpu.outerConeAngle = 0.0f;
     return gpu;
+}
+
+void DirectionalLightComponent::initDepthMappingResources(
+    const sauce::LogicalDevice& logicalDevice,
+    const sauce::PhysicalDevice& physicalDevice,
+    const vk::raii::DescriptorPool& descriptorPool)
+{
+    allocateDepthMappingResources(logicalDevice, physicalDevice, descriptorPool, 2048, false);
 }
 
 } // namespace sauce
