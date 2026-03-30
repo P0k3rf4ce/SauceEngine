@@ -26,7 +26,7 @@ public:
 
 private:
   sauce::Entity *owner = nullptr;
-  bool active;
+  bool active = true;
 };
 
 }

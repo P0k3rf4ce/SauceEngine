@@ -11,9 +11,6 @@
 
 namespace sauce {
 
-constexpr uint32_t WIDTH = 1280;
-constexpr uint32_t HEIGHT = 720;
-
 /**
  * Bridge between Vulkan and the window system (GLFW in this case).
  * A surface represents a platform-specific window or display that Vulkan can render to.

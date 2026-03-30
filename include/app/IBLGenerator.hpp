@@ -47,6 +47,8 @@ private:
     const sauce::PhysicalDevice& physicalDevice;
     const sauce::LogicalDevice& logicalDevice;
 
+    vk::raii::DescriptorPool descriptorPool = nullptr;
+
     void convertEquirectangularToCubemap(
         const vk::raii::ImageView& hdrView,
         IBLMaps& maps,
@@ -74,13 +76,14 @@ private:
 
     // Helpers
     vk::raii::ShaderModule createShaderModule(const std::string& filename);
-    void createCubeMesh(const vk::raii::CommandPool& commandPool, const vk::raii::Queue& queue);
+    
+    struct ComputePipeline {
+        vk::raii::DescriptorSetLayout layout = nullptr;
+        vk::raii::PipelineLayout pipelineLayout = nullptr;
+        vk::raii::Pipeline pipeline = nullptr;
+    };
 
-    vk::raii::Buffer vertexBuffer = nullptr;
-    vk::raii::DeviceMemory vertexBufferMemory = nullptr;
-    vk::raii::Buffer indexBuffer = nullptr;
-    vk::raii::DeviceMemory indexBufferMemory = nullptr;
-    uint32_t indexCount = 0;
+    ComputePipeline createComputePipeline(const std::string& shaderPath, const std::vector<vk::DescriptorSetLayoutBinding>& bindings, uint32_t pushConstantSize = 0);
 };
 
 } // namespace sauce
