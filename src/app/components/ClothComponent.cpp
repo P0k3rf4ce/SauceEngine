@@ -13,30 +13,67 @@ ClothComponent::ClothComponent(std::shared_ptr<modeling::Mesh> sourceMesh)
   rebuildFromMesh(std::move(sourceMesh));
 }
 
+ClothComponent::ClothComponent(
+    std::shared_ptr<modeling::Mesh> sourceMesh,
+    const ClothSettings& settings)
+    : Component("ClothComponent") {
+  rebuildFromMesh(std::move(sourceMesh), settings);
+}
+
 bool ClothComponent::rebuildFromMesh(
     std::shared_ptr<modeling::Mesh> mesh,
     float defaultInvMass) {
+  ClothSettings updatedSettings = settings;
+  updatedSettings.defaultInvMass = defaultInvMass;
+  return rebuildFromMesh(std::move(mesh), updatedSettings);
+}
+
+bool ClothComponent::rebuildFromMesh(
+    std::shared_ptr<modeling::Mesh> mesh,
+    const ClothSettings& newSettings) {
   sourceMesh = std::move(mesh);
   clothData.reset();
+  settings = newSettings;
 
   if (!sourceMesh) {
     lastBuildError = "No source mesh assigned.";
     return false;
   }
 
-  auto builtCloth = physics::buildClothDataFromMesh(*sourceMesh, "Mesh", defaultInvMass);
+  auto builtCloth = physics::buildClothDataFromMesh(
+      *sourceMesh,
+      "Mesh",
+      settings.defaultInvMass);
   if (!builtCloth.has_value()) {
     lastBuildError = "Mesh must contain valid triangle indices to build cloth data.";
     return false;
   }
 
   clothData = std::move(builtCloth);
+  for (auto& constraint : clothData->stretchConstraints) {
+    constraint.compliance = settings.stretchCompliance;
+  }
+  for (auto& constraint : clothData->bendConstraints) {
+    constraint.compliance = settings.bendCompliance;
+  }
+  for (uint32_t particleIndex : settings.pinnedParticleIndices) {
+    if (particleIndex < clothData->particles.size()) {
+      clothData->particles[particleIndex].pinned = true;
+    }
+  }
+
   lastBuildError.clear();
   return true;
 }
 
 bool ClothComponent::rebuildFromSourceMesh(float defaultInvMass) {
-  return rebuildFromMesh(sourceMesh, defaultInvMass);
+  ClothSettings updatedSettings = settings;
+  updatedSettings.defaultInvMass = defaultInvMass;
+  return rebuildFromSourceMesh(updatedSettings);
+}
+
+bool ClothComponent::rebuildFromSourceMesh(const ClothSettings& newSettings) {
+  return rebuildFromMesh(sourceMesh, newSettings);
 }
 
 void ClothComponent::clear() {
