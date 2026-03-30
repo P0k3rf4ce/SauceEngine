@@ -38,6 +38,8 @@ add_slang_shader_target(shaderTarget SOURCES shader.slang OUTPUT shader.spv)
 add_slang_shader_target(shaderLightsTarget SOURCES shader_lights.slang OUTPUT shader_lights.spv)
 add_slang_shader_target(postProcessTarget SOURCES postprocess.slang OUTPUT postprocess.spv)
 add_slang_shader_target(shaderPBRTarget SOURCES shader_pbr.slang OUTPUT shader_pbr.spv)
+add_slang_shader_target(shadowMapTarget SOURCES shadow_map.slang OUTPUT shadow_map.spv)
+add_slang_shader_target(shadowMapOmniTarget SOURCES shadow_map_omni.slang OUTPUT shadow_map_omni.spv)
 
 add_slang_compute_target(iblBrdfLutTarget SOURCES ibl_brdf_lut.slang OUTPUT ibl_brdf_lut.spv)
 add_slang_compute_target(iblIrradianceTarget SOURCES ibl_irradiance.slang OUTPUT ibl_irradiance.spv)
@@ -81,6 +83,8 @@ add_custom_target(shaders DEPENDS
   shaderLightsTarget
   postProcessTarget
   shaderPBRTarget
+  shadowMapTarget
+  shadowMapOmniTarget
   iblBrdfLutTarget
   iblIrradianceTarget
   iblPrefilterTarget
