@@ -26,6 +26,12 @@ struct SceneBounds {
   bool valid = false;
 };
 
+struct SolverTuning {
+  int solverIterations = 40;
+  int rigidSubsteps = 8;
+  float physicsDt = 1.0f / 128.0f;
+};
+
 bool isStaticTableMesh(const MeshRendererComponent* meshRenderer) {
   return meshRenderer && meshRenderer->getMesh() && meshRenderer->getMesh()->getVertexCount() == 4;
 }
@@ -58,6 +64,34 @@ void expandSceneBounds(SceneBounds& bounds,
     bounds.max = glm::max(bounds.max, worldPosition);
     bounds.valid = true;
   }
+}
+
+SolverTuning selectRigidSolverTuning(size_t dynamicBodyCount) {
+  if (dynamicBodyCount >= 20) {
+    return SolverTuning{
+      .solverIterations = 6,
+      .rigidSubsteps = 2,
+      .physicsDt = 1.0f / 60.0f,
+    };
+  }
+
+  if (dynamicBodyCount >= 12) {
+    return SolverTuning{
+      .solverIterations = 8,
+      .rigidSubsteps = 2,
+      .physicsDt = 1.0f / 72.0f,
+    };
+  }
+
+  if (dynamicBodyCount >= 6) {
+    return SolverTuning{
+      .solverIterations = 16,
+      .rigidSubsteps = 4,
+      .physicsDt = 1.0f / 96.0f,
+    };
+  }
+
+  return SolverTuning{};
 }
 
 } // namespace
@@ -136,6 +170,7 @@ void SauceEngineApp::initVulkan() {
     pRenderer = std::make_unique<sauce::Renderer>(rendererCreateInfo);
 
     pSolver = std::make_unique<physics::XPBDSolver>();
+    setupXPBDSolver();
 
     // Initialize ImGui
     sauce::ImGuiRendererCreateInfo imguiCreateInfo{
@@ -203,6 +238,12 @@ void SauceEngineApp::processInput(float deltaTime) {
       return;
     }
 
+    const bool sprintHeld =
+        glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+        glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
+    const float baseMovementSpeed = camera.getMovementSpeed();
+    camera.setMovementSpeed(sprintHeld ? baseMovementSpeed * 3.0f : baseMovementSpeed);
+
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
       camera.processDirection(Camera::Movement::FORWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
@@ -211,6 +252,8 @@ void SauceEngineApp::processInput(float deltaTime) {
       camera.processDirection(Camera::Movement::LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
       camera.processDirection(Camera::Movement::RIGHT, deltaTime);
+
+    camera.setMovementSpeed(baseMovementSpeed);
 
     if (cameraCollisionEnabled) {
       applyCameraCollisionPush(previousCameraPosition, deltaTime);
@@ -582,14 +625,23 @@ void SauceEngineApp::mainLoop() {
 
       auto constraints = std::vector<std::unique_ptr<physics::Constraint>>();
       auto rigidBodies = collectRigidBodies();
+      const size_t dynamicRigidBodyCount = static_cast<size_t>(std::count_if(
+          rigidBodies.begin(),
+          rigidBodies.end(),
+          [](const RigidBodyComponent* rigidBody) {
+            return rigidBody && rigidBody->isDynamic() && rigidBody->isCollisionEnabled();
+          }));
+      const SolverTuning solverTuning = selectRigidSolverTuning(dynamicRigidBodyCount);
+      pSolver->solverIterations = solverTuning.solverIterations;
+      pSolver->rigidSubsteps = solverTuning.rigidSubsteps;
+      const float physicsDt = solverTuning.physicsDt;
 
-      constexpr float kPhysicsDt = 1.0f / 128.0f;
       if (deltaUpdate > 1.0) {
-        deltaUpdate = kPhysicsDt;
+        deltaUpdate = physicsDt;
       }
-      while (deltaUpdate >= kPhysicsDt) {
+      while (deltaUpdate >= physicsDt) {
         updateDropDemoForces();
-        pSolver->solvePositions(rigidBodies, constraints, kPhysicsDt);
+        pSolver->solvePositions(rigidBodies, constraints, physicsDt);
         syncRigidBodiesToTransforms();
         for (auto& entity : pScene->getEntitiesMut()) {
           if (!entity.getActive()) {
@@ -603,11 +655,11 @@ void SauceEngineApp::mainLoop() {
 
             physics::ClothData* cloth = clothComp->getClothData();
             if (cloth && !cloth->empty()) {
-              pSolver->solveCloth(*cloth, kPhysicsDt);
+              pSolver->solveCloth(*cloth, physicsDt);
             }
           }
         }
-        deltaUpdate -= kPhysicsDt;
+        deltaUpdate -= physicsDt;
       }
 
       pRenderer->drawFrame(logicalDevice, *pScene, pImGuiRenderer.get());
@@ -691,7 +743,12 @@ void SauceEngineApp::setupSceneRenderer() {
 }
 
 void SauceEngineApp::setupXPBDSolver() {
-  
+  if (!pSolver) {
+    return;
+  }
+
+  pSolver->solverIterations = 40;
+  pSolver->rigidSubsteps = 8;
 }
 
 void SauceEngineApp::setupDefaultSceneSpin() {

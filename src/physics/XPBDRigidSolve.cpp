@@ -161,16 +161,16 @@ void XPBDSolver::stabilizePostSolveVelocities(size_t bodyIndex,
 
     const glm::vec3 n = normal / std::sqrt(normalLenSq);
     accumulatedNormal += n;
-    const float separatingSpeed = glm::dot(linearVelocity, n);
-    if (separatingSpeed > 0.0f) {
-      linearVelocity -= separatingSpeed * n;
+    const float closingSpeed = glm::dot(linearVelocity, n);
+    if (closingSpeed < 0.0f) {
+      linearVelocity -= closingSpeed * n;
     }
   }
 
-  constexpr float kTangentialVelocityRetention = 0.94f;
-  constexpr float kAngularVelocityRetention = 0.9f;
-  constexpr float kRestLinearSpeed = 0.08f;
-  constexpr float kRestAngularSpeed = 0.35f;
+  constexpr float kTangentialVelocityRetention = 0.995f;
+  constexpr float kAngularVelocityRetention = 0.995f;
+  constexpr float kRestLinearSpeed = 0.01f;
+  constexpr float kRestAngularSpeed = 0.05f;
 
   const float accumulatedNormalLenSq = glm::dot(accumulatedNormal, accumulatedNormal);
   if (accumulatedNormalLenSq > 1e-10f) {

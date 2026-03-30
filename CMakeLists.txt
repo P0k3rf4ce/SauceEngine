@@ -79,6 +79,45 @@ if(APPLE)
     target_link_options(${EXEC_NAME} PRIVATE "LINKER:-no_warn_duplicate_libraries")
 endif()
 
+# ── jenga_scene_builder ──────────────────────────────────────────────
+
+add_executable(jenga_scene_builder
+    src/jenga_scene_builder.cpp
+    src/app/Scene.cpp
+    src/app/components/TransformComponent.cpp
+    src/app/components/MeshRendererComponent.cpp
+    src/app/components/PointLightComponent.cpp
+    src/app/components/DirectionalLightComponent.cpp
+    src/app/modeling/GLTFLoader.cpp
+    src/app/modeling/GLTFExporter.cpp
+    src/app/modeling/Model.cpp
+    src/app/modeling/ModelNode.cpp
+    src/app/modeling/Mesh.cpp
+    src/app/modeling/Material.cpp
+    src/app/modeling/Texture.cpp
+    src/app/modeling/TextureCache.cpp
+    src/app/modeling/Transform.cpp
+)
+
+target_include_directories(jenga_scene_builder PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${TINYGLTF_INCLUDE_DIRS}
+)
+
+target_link_libraries(jenga_scene_builder
+    PUBLIC Vulkan::Vulkan
+)
+
+if(NOT WIN32)
+    target_compile_options(jenga_scene_builder PUBLIC ${SAUCE_WARNINGS})
+endif()
+
+add_custom_target(generate_jenga_scene
+    COMMAND $<TARGET_FILE:jenga_scene_builder>
+    DEPENDS jenga_scene_builder
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
 # ── modeltest ────────────────────────────────────────────────────────
 
 # add_executable(modeltest src/modeltest.cpp)

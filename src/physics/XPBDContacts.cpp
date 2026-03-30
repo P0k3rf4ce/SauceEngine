@@ -23,6 +23,9 @@ namespace physics {
 
 namespace {
 
+constexpr float kContactDepthEpsilon = 1e-5f;
+constexpr float kStaticBodyInvMassEpsilon = 1e-8f;
+
 struct CollisionBody;
 
 struct MeshContact {
@@ -114,7 +117,8 @@ public:
     std::vector<uint32_t> indices;
     indices.reserve(vertices.size());
 
-    constexpr size_t kMaxSampleVertices = 384;
+    const size_t kMaxSampleVertices =
+        std::min<size_t>(1024, std::max<size_t>(384, vertices.size() / 2));
     if (vertices.size() <= kMaxSampleVertices) {
       indices.resize(vertices.size());
       std::iota(indices.begin(), indices.end(), 0u);
@@ -513,14 +517,18 @@ std::vector<std::unique_ptr<Constraint>> XPBDSolver::generateCollisionConstraint
       appendReducedContacts(bodies[j], bodies[i], contacts);
 
       for (const auto& contact : contacts) {
-        if (contact.depth <= 0.0f || !contact.bodyA || !contact.bodyB) {
+        if (contact.depth <= kContactDepthEpsilon || !contact.bodyA || !contact.bodyB) {
           continue;
         }
 
-        if (!contact.bodyB->rigidBody->isDynamic()) {
+        const bool bodyAStatic =
+            contact.bodyA->rigidBody->getInvMass() <= kStaticBodyInvMassEpsilon;
+        const bool bodyBStatic =
+            contact.bodyB->rigidBody->getInvMass() <= kStaticBodyInvMassEpsilon;
+        if (bodyBStatic) {
           recordStaticContact(contact.bodyA->index, contact.contactNormal);
         }
-        if (!contact.bodyA->rigidBody->isDynamic()) {
+        if (bodyAStatic) {
           recordStaticContact(contact.bodyB->index, -contact.contactNormal);
         }
         appendContactConstraint(constraints, contact);

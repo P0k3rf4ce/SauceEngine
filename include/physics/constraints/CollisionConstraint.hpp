@@ -10,6 +10,11 @@
 
 namespace physics {
 
+namespace {
+constexpr float kCollisionMassEpsilon = 1e-8f;
+constexpr float kCollisionPenetrationEpsilon = 1e-5f;
+}
+
 // Position Based Dynamics Collision constraint
 struct CollisionConstraint : public Constraint {
   CollisionConstraint() = default;
@@ -63,7 +68,7 @@ private:
 
     const float w1 = va.invMass;
     const float w2 = vb.invMass;
-    if (w1 + w2 <= 1e-8f) return;
+    if (w1 + w2 <= kCollisionMassEpsilon) return;
 
     const glm::vec3 worldOffsetA = useContactOffsets ? va.orientation * localOffsetA
                                                      : glm::vec3(0.0f);
@@ -74,7 +79,7 @@ private:
 
     const float C = glm::dot(pointA - pointB, contactNormal) - penetrationDepth;
 
-    if (C >= -1e-8f) return;
+    if (C >= -kCollisionPenetrationEpsilon) return;
 
     const float alphaTilde = compliance / (deltatime * deltatime);
     const glm::vec3 angularA = glm::cross(worldOffsetA, contactNormal);
@@ -89,7 +94,7 @@ private:
         : 0.0f;
 
     const float denom = w1 + w2 + angularTermA + angularTermB + alphaTilde;
-    if (denom <= 1e-8f) return;
+    if (denom <= kCollisionMassEpsilon) return;
 
     const float deltaLambda = (-C - alphaTilde * lambda) / denom;
 
@@ -114,11 +119,11 @@ private:
 
     physics::Vertex& va = vertices[indexA];
     const float w = va.invMass;
-    if (w <= 1e-8f) return;
+    if (w <= kCollisionMassEpsilon) return;
 
     const float C = glm::dot(va.position - contactPoint, contactNormal);
 
-    if (C >= -1e-8f) return;
+    if (C >= -kCollisionPenetrationEpsilon) return;
 
     const float alphaTilde = compliance / (deltatime * deltatime);
 

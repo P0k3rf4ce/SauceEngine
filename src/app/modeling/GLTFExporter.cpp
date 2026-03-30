@@ -13,6 +13,7 @@
 #include <cstring>
 #include <algorithm>
 #include <iostream>
+#include <sstream>
 
 namespace sauce {
 namespace modeling {
@@ -26,6 +27,7 @@ GLTFExporter::GLTFExporter(const ExportOptions& options)
 bool GLTFExporter::exportScene(const Scene& scene, const std::string& filePath) {
     // Reset state
     meshMap.clear();
+    meshGroupMap.clear();
     materialMap.clear();
     textureMap.clear();
     imageMap.clear();
@@ -144,9 +146,16 @@ int GLTFExporter::getOrCreateMesh(tinygltf::Model& model, const Entity& entity) 
     auto mrcs = entity.getComponents<MeshRendererComponent>();
     if (mrcs.empty()) return -1;
 
-    // Check if all mesh pointers match a previously exported mesh group
-    // For simplicity, we always create a new GLTF mesh per entity
-    // (GLTF meshes contain primitives, one per MRC)
+    std::ostringstream signature;
+    for (const auto* mrc : mrcs) {
+        signature << mrc->getMesh().get() << ':' << mrc->getMaterial().get() << ';';
+    }
+
+    auto signatureIt = meshGroupMap.find(signature.str());
+    if (signatureIt != meshGroupMap.end()) {
+        return signatureIt->second;
+    }
+
     tinygltf::Mesh gltfMesh;
     gltfMesh.name = entity.get_name();
 
@@ -260,6 +269,7 @@ int GLTFExporter::getOrCreateMesh(tinygltf::Model& model, const Entity& entity) 
 
     int meshIdx = static_cast<int>(model.meshes.size());
     model.meshes.push_back(gltfMesh);
+    meshGroupMap.emplace(signature.str(), meshIdx);
     return meshIdx;
 }
 
