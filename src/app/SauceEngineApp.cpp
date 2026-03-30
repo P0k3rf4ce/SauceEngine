@@ -18,6 +18,7 @@ SauceEngineApp::SauceEngineApp() {
 }
 
 SauceEngineApp::~SauceEngineApp() {
+    LightComponent::cleanup();
     glfwDestroyWindow(window);
     glfwTerminate();
 }
@@ -73,6 +74,9 @@ void SauceEngineApp::initVulkan() {
     };
 
     pRenderer = std::make_unique<sauce::Renderer>(rendererCreateInfo);
+
+    // Init shadow mapping descriptor set layout
+    LightComponent::initDescriptorSetLayout(logicalDevice);
 
     // Initialize ImGui
     sauce::ImGuiRendererCreateInfo imguiCreateInfo{
@@ -240,8 +244,6 @@ void SauceEngineApp::uploadLightGPUResources() {
   auto& queue = const_cast<vk::raii::Queue&>(pRenderer->getQueue());
   auto& logicalDev = logicalDevice;
   auto& descriptorPool = pRenderer->getDescriptorPool();
-
-  LightComponent::initDescriptorSetLayout(logicalDev);
 
   for (auto& entity : pScene->getEntitiesMut()) {
     auto lights = entity.getComponents<LightComponent>();
