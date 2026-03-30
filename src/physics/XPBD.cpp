@@ -31,6 +31,29 @@ void resetClothLambdas(ClothData& cloth) {
   }
 }
 
+void projectStretch(std::vector<ClothParticle>& particles, StretchConstraint& c) {
+  const uint32_t i0 = c.particleIndices[0];
+  const uint32_t i1 = c.particleIndices[1];
+  
+  if (i0 >= particles.size() || i1 >= particles.size()) {
+    return;
+  }
+  
+  glm::vec3& x0 = particles[i0].predictedPosition;
+  glm::vec3& x1 = particles[i1].predictedPosition;
+  glm::vec3 delta = x1 - x0;
+
+  float currentDist = glm::length(delta);
+  // Avoid division by zero
+  if (currentDist < 1e-6f) {
+    return;
+  }
+  float constraint = currentDist - c.restLength;
+ 
+  x0 += (delta/currentDist) * (constraint/2.f);
+  x1 -= (delta/currentDist) * (constraint/2.f);
+}
+
 void projectBend(std::vector<ClothParticle>& particles, BendConstraint& c, float h) {
   const uint32_t i0 = c.oppositeParticleIndices[0];
   const uint32_t i1 = c.sharedEdgeParticleIndices[0];
@@ -271,6 +294,9 @@ void XPBDSolver::solveCloth(ClothData& cloth, float deltatime, const glm::vec3& 
     for (int iter = 0; iter < solverIterations; ++iter) {
       for (auto& c : cloth.bendConstraints) {
         projectBend(particles, c, h);
+      }
+      for (auto& c : cloth.stretchConstraints) {
+        projectStretch(particles, c);
       }
     }
 

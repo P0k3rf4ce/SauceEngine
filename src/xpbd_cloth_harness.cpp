@@ -12,6 +12,7 @@
 namespace {
 
 using physics::BendConstraint;
+using physics::StretchConstraint;
 using physics::ClothData;
 using physics::ClothParticle;
 using physics::XPBDSolver;
@@ -135,6 +136,28 @@ bool testPinnedParticlesRemainFixed(std::vector<std::string>& errors) {
   return true;
 }
 
+bool testStretchConstraintReducesError(std::vector<std::string>& errors) {
+  ClothData cloth;
+  cloth.particles.push_back(makeParticle(glm::vec3(200.0f, 200.0f, 200.0f), 1.0f, false));
+  cloth.particles.push_back(makeParticle(glm::vec3(1.0f, 1.0f, 1.0f), 1.0f, false));
+
+  cloth.stretchConstraints.emplace_back(
+      0,
+      1,
+	  1.f);
+
+  XPBDSolver solver;
+  solver.clothSubsteps = 4;
+  solver.solverIterations = 20;
+  solver.solveCloth(cloth, 1.0f / 60.0f, glm::vec3(0.0f));
+
+  if (glm::length(cloth.particles[1].position-cloth.particles[0].position) >= 1.f) {
+    appendError(errors, "what da helll");
+    return false;
+  }
+  return true;
+}
+
 bool testBendConstraintReducesError(std::vector<std::string>& errors) {
   ClothData cloth;
   cloth.particles.push_back(makeParticle(glm::vec3(0.0f, 1.0f, 0.0f), 0.0f, true));
@@ -194,6 +217,7 @@ int main() {
   const bool substepsOk = testSubstepsAffectIntegration(errors);
   const bool pinnedOk = testPinnedParticlesRemainFixed(errors);
   const bool bendOk = testBendConstraintReducesError(errors);
+  const bool stretchOk = testStretchConstraintReducesError(errors);
 
   if (!errors.empty()) {
     std::cerr << "XPBD cloth harness failed:\n";
@@ -207,5 +231,6 @@ int main() {
   std::cout << "  substeps: " << (substepsOk ? "ok" : "failed") << "\n";
   std::cout << "  pinned: " << (pinnedOk ? "ok" : "failed") << "\n";
   std::cout << "  bend: " << (bendOk ? "ok" : "failed") << "\n";
+  std::cout << "  stretch: " << (stretchOk ? "ok" : "failed") << "\n";
   return 0;
 }
