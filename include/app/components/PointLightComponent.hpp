@@ -2,6 +2,14 @@
 
 #include "app/components/LightComponent.hpp"
 #include <glm/glm.hpp>
+#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
+#include <vulkan/vulkan_raii.hpp>
+#include <memory>
+
+namespace sauce {
+    struct LogicalDevice;
+    struct PhysicalDevice;
+}
 
 namespace sauce {
 
@@ -55,6 +63,13 @@ public:
 
     GPUPointLight toGPUPointLight(const glm::vec3& worldPosition) const;
     GPULight toGPULight(const glm::vec3& worldPosition) const override;
+
+    // Use base class implementation for depth mapping resources
+    void initDepthMappingResources(
+        const sauce::LogicalDevice& logicalDevice,
+        const sauce::PhysicalDevice& physicalDevice,
+        const vk::raii::DescriptorPool& descriptorPool
+    );
 
 private:
     float range{0.0f};

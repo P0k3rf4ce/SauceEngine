@@ -1,4 +1,6 @@
 #include "app/components/SpotLightComponent.hpp"
+#include "app/components/LightComponent.hpp"
+#include "app/ImageUtils.hpp"
 
 namespace sauce {
 
@@ -41,6 +43,14 @@ GPULight SpotLightComponent::toGPULight(const glm::vec3& worldPosition) const {
     gpu.innerConeAngle = innerConeAngle;
     gpu.outerConeAngle = outerConeAngle;
     return gpu;
+}
+
+void SpotLightComponent::initDepthMappingResources(
+    const sauce::LogicalDevice& logicalDevice,
+    const sauce::PhysicalDevice& physicalDevice,
+    const vk::raii::DescriptorPool& descriptorPool)
+{
+    allocateDepthMappingResources(logicalDevice, physicalDevice, descriptorPool, 2048, false);
 }
 
 } // namespace sauce

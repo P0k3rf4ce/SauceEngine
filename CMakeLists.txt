@@ -59,6 +59,7 @@ target_sources(${EXEC_NAME} PRIVATE
   src/app/components/TransformComponent.cpp
   src/app/components/RigidBodyComponent.cpp
   src/app/components/MeshRendererComponent.cpp
+  src/app/components/LightComponent.cpp
   src/app/components/PointLightComponent.cpp
   src/app/components/SpotLightComponent.cpp
   src/app/components/DirectionalLightComponent.cpp
@@ -169,6 +170,7 @@ target_sources(sauceeditor PRIVATE
     src/app/components/TransformComponent.cpp
     src/app/components/RigidBodyComponent.cpp
     src/app/components/MeshRendererComponent.cpp
+    src/app/components/LightComponent.cpp
     src/app/components/PointLightComponent.cpp
     src/app/components/SpotLightComponent.cpp
     src/app/components/DirectionalLightComponent.cpp
