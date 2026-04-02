@@ -81,11 +81,6 @@ struct MaterialData {
   float     _pad0{0.0f};                              // offset 44
 };
 
-struct ScenePushConstants {
-  glm::mat4 model;
-  uint32_t lightCount;
-};
-
 struct RendererCreateInfo {
   const sauce::PhysicalDevice& physicalDevice;
   const sauce::LogicalDevice& logicalDevice;
