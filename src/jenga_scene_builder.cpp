@@ -182,9 +182,9 @@ int main() {
     constexpr float kBlockLength = 3.0f;
     constexpr float kBlockWidth = 1.0f;
     constexpr float kBlockHeight = 0.6f;
-    constexpr float kLayerGap = 0.075f;
-    constexpr float kBlockGap = 0.09f;
-    constexpr float kTowerBaseClearance = 0.08f;
+    constexpr float kLayerGap = 0.0f;
+    constexpr float kBlockGap = 0.03f;
+    constexpr float kTowerBaseClearance = 0.0f;
 
     const glm::vec3 blockScale(
         kBlockLength * 0.5f,

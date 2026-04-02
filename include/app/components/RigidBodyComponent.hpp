@@ -23,9 +23,13 @@ public:
       ) : 
     position(initPosition), velocity(initVelocity),
     orientation(initOrientation), angularVelocity(initAngularVelocity), accumulatedForce(accumulatedForce),
-    invMass(invMass), invInertiaTensor(invInertiaTensor), scale(initScale) {}
+    invMass(invMass), invInertiaTensor(invInertiaTensor),
+    storedInvMass(invMass), storedInvInertiaTensor(invInertiaTensor),
+    scale(initScale) {}
 
   bool             isDynamic()                      const { return invMass > 1e-8f; }
+  bool             canBeDynamic()                   const { return storedInvMass > 1e-8f; }
+  bool             isSleeping()                     const { return sleeping; }
 
   const glm::vec3& getPosition()                    const { return position; }
   const glm::vec3& getCenterOfMass()                const { return centerOfMass; }
@@ -52,10 +56,36 @@ public:
   void setCollisionEnabled(bool enabled)            { collisionEnabled = enabled; }
   void setInvMass(float w)                          { invMass = w; }
   void setInvInertiaTensor(const glm::mat3& I)      { invInertiaTensor = I; }
+  void setMassProperties(float invMassValue, const glm::mat3& invInertiaTensorValue) {
+    invMass = invMassValue;
+    invInertiaTensor = invInertiaTensorValue;
+    storedInvMass = invMassValue;
+    storedInvInertiaTensor = invInertiaTensorValue;
+    sleeping = false;
+  }
   void clearAccumulatedForce()                      { accumulatedForce = glm::vec3(0.0f); }
   void clearExternalForces()                        { accumulatedForce = glm::vec3(0.0f); }
   void addForce(const glm::vec3& force)             { accumulatedForce += force; }
   void offsetExternalForce(glm::vec3 force)         { accumulatedForce += force; }
+  void sleep() {
+    if (!canBeDynamic()) {
+      return;
+    }
+    sleeping = true;
+    invMass = 0.0f;
+    invInertiaTensor = glm::mat3(0.0f);
+    velocity = glm::vec3(0.0f);
+    angularVelocity = glm::vec3(0.0f);
+    clearAccumulatedForce();
+  }
+  void wake() {
+    if (!sleeping || !canBeDynamic()) {
+      return;
+    }
+    sleeping = false;
+    invMass = storedInvMass;
+    invInertiaTensor = storedInvInertiaTensor;
+  }
 
   // approximate center of mass given a mesh
   static glm::vec3 meshCenterOfMass(std::shared_ptr<modeling::Mesh> m);
@@ -87,9 +117,12 @@ private:
 
   glm::vec3 accumulatedForce;
   bool collisionEnabled = true;
+  bool sleeping = false;
 
   float invMass;
   glm::mat3 invInertiaTensor;
+  float storedInvMass = 0.0f;
+  glm::mat3 storedInvInertiaTensor = glm::mat3(0.0f);
   glm::vec3 scale = glm::vec3(1.0f);
 };
 

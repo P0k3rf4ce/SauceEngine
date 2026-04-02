@@ -24,6 +24,11 @@ struct XPBDSolver {
   // XPBD substeps for cloth (prediction + constraint projection each substep)
   int clothSubsteps = 4;
 
+  // Normalized gravity direction for support-loss detection (default: -Z)
+  glm::vec3 gravityDirection = glm::vec3(0.0f, 0.0f, -1.0f);
+
+  bool contactDebugEnabled = false;
+
   void solvePositions(std::vector<sauce::RigidBodyComponent*>& rigidBodies,
                       std::vector<std::unique_ptr<Constraint>>& constraints,
                       float deltatime);
@@ -41,18 +46,24 @@ struct XPBDSolver {
   std::vector<std::unique_ptr<Constraint>> generateCollisionConstraints(
       const std::vector<sauce::RigidBodyComponent*>& rigidBodies);
 
-private:
-  void clearStaticContactState();
-  void resetStaticContactState(size_t bodyCount);
-  void recordStaticContact(uint32_t bodyIndex, const glm::vec3& normal);
-  bool hasStaticContacts(size_t bodyIndex) const;
-  const std::vector<glm::vec3>& staticContactNormals(size_t bodyIndex) const;
-  void stabilizePostSolveVelocities(size_t bodyIndex,
-                                    glm::vec3& linearVelocity,
-                                    glm::vec3& angularVelocity) const;
+  void wakeUnsupportedBodies(
+      const std::vector<sauce::RigidBodyComponent*>& rigidBodies) const;
 
-  std::vector<std::vector<glm::vec3>> lastStaticContactNormals;
-  std::vector<uint32_t> lastStaticContactCounts;
+private:
+  struct CollisionContact {
+    uint32_t indexA = 0;
+    uint32_t indexB = 0;
+    glm::vec3 pointA = glm::vec3(0.0f);
+    glm::vec3 pointB = glm::vec3(0.0f);
+    glm::vec3 contactNormal = glm::vec3(0.0f, 1.0f, 0.0f);
+    float penetrationDepth = 0.0f;
+  };
+
+  std::vector<CollisionContact> collectCollisionContacts(
+      const std::vector<sauce::RigidBodyComponent*>& rigidBodies) const;
+  void applyCollisionVelocityResponse(
+      const std::vector<sauce::RigidBodyComponent*>& rigidBodies,
+      const std::vector<CollisionContact>& contacts) const;
 };
 
 } // namespace physics

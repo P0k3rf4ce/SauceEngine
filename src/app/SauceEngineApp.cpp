@@ -6,6 +6,7 @@
 #include <app/components/MeshRendererComponent.hpp>
 #include <app/components/ClothComponent.hpp>
 #include <app/components/LightComponent.hpp>
+#include <app/PhysicsDemoSetup.hpp>
 #include <functional>
 #include <cstring>
 #include <limits>
@@ -25,16 +26,6 @@ struct SceneBounds {
   glm::vec3 max = glm::vec3(std::numeric_limits<float>::lowest());
   bool valid = false;
 };
-
-struct SolverTuning {
-  int solverIterations = 40;
-  int rigidSubsteps = 8;
-  float physicsDt = 1.0f / 128.0f;
-};
-
-bool isStaticTableMesh(const MeshRendererComponent* meshRenderer) {
-  return meshRenderer && meshRenderer->getMesh() && meshRenderer->getMesh()->getVertexCount() == 4;
-}
 
 glm::quat integrateAngularVelocity(const glm::quat& orientation,
                                    const glm::vec3& angularVelocity,
@@ -66,32 +57,64 @@ void expandSceneBounds(SceneBounds& bounds,
   }
 }
 
-SolverTuning selectRigidSolverTuning(size_t dynamicBodyCount) {
-  if (dynamicBodyCount >= 20) {
-    return SolverTuning{
-      .solverIterations = 6,
-      .rigidSubsteps = 2,
-      .physicsDt = 1.0f / 60.0f,
-    };
-  }
+struct Ray {
+  glm::vec3 origin;
+  glm::vec3 direction;
+};
 
-  if (dynamicBodyCount >= 12) {
-    return SolverTuning{
-      .solverIterations = 8,
-      .rigidSubsteps = 2,
-      .physicsDt = 1.0f / 72.0f,
-    };
-  }
+struct AABB {
+  glm::vec3 min;
+  glm::vec3 max;
+};
 
-  if (dynamicBodyCount >= 6) {
-    return SolverTuning{
-      .solverIterations = 16,
-      .rigidSubsteps = 4,
-      .physicsDt = 1.0f / 96.0f,
-    };
-  }
+Ray screenToWorldRay(const Camera& camera, double mouseX, double mouseY,
+                     float viewportWidth, float viewportHeight) {
+  float ndcX = (2.0f * static_cast<float>(mouseX)) / viewportWidth - 1.0f;
+  float ndcY = 1.0f - (2.0f * static_cast<float>(mouseY)) / viewportHeight;
 
-  return SolverTuning{};
+  glm::mat4 proj = camera.getProjectionMatrix();
+  glm::mat4 view = camera.getViewMatrix();
+  glm::mat4 invProjView = glm::inverse(proj * view);
+
+  glm::vec4 nearPoint = invProjView * glm::vec4(ndcX, ndcY, 0.0f, 1.0f);
+  glm::vec4 farPoint  = invProjView * glm::vec4(ndcX, ndcY, 1.0f, 1.0f);
+  nearPoint /= nearPoint.w;
+  farPoint  /= farPoint.w;
+
+  return { glm::vec3(nearPoint), glm::normalize(glm::vec3(farPoint) - glm::vec3(nearPoint)) };
+}
+
+bool rayIntersectsAABB(const Ray& ray, const AABB& box, float& tOut) {
+  float tmin = 0.0f;
+  float tmax = std::numeric_limits<float>::max();
+  for (int i = 0; i < 3; ++i) {
+    if (std::abs(ray.direction[i]) < 1e-8f) {
+      if (ray.origin[i] < box.min[i] || ray.origin[i] > box.max[i])
+        return false;
+    } else {
+      float invD = 1.0f / ray.direction[i];
+      float t1 = (box.min[i] - ray.origin[i]) * invD;
+      float t2 = (box.max[i] - ray.origin[i]) * invD;
+      if (t1 > t2) std::swap(t1, t2);
+      tmin = std::max(tmin, t1);
+      tmax = std::min(tmax, t2);
+      if (tmin > tmax) return false;
+    }
+  }
+  tOut = tmin;
+  return true;
+}
+
+AABB computeWorldAABB(const modeling::Mesh& mesh, const glm::mat4& modelMatrix) {
+  AABB result;
+  result.min = glm::vec3(std::numeric_limits<float>::max());
+  result.max = glm::vec3(std::numeric_limits<float>::lowest());
+  for (const auto& v : mesh.getVertices()) {
+    glm::vec3 wp = glm::vec3(modelMatrix * glm::vec4(v.position, 1.0f));
+    result.min = glm::min(result.min, wp);
+    result.max = glm::max(result.max, wp);
+  }
+  return result;
 }
 
 } // namespace
@@ -204,6 +227,7 @@ void SauceEngineApp::initWindow() {
 
     glfwSetWindowUserPointer(window, this);
     glfwSetCursorPosCallback(window, mouseCallback);
+    glfwSetMouseButtonCallback(window, mouseButtonCallback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   }
 
@@ -228,11 +252,16 @@ void SauceEngineApp::processInput(float deltaTime) {
       return;
     }
 
+    if (cameraCollisionCooldown > 0.0f) {
+      cameraCollisionCooldown = std::max(0.0f, cameraCollisionCooldown - deltaTime);
+    }
+
     auto& camera = pScene->getCameraRW();
     const glm::vec3 previousCameraPosition = camera.getPos();
+    const bool cameraCollisionActive = cameraCollisionEnabled && cameraCollisionCooldown <= 0.0f;
 
     if (!cursorCaptured) {
-      if (cameraCollisionEnabled) {
+      if (cameraCollisionActive) {
         applyCameraCollisionPush(previousCameraPosition, deltaTime);
       }
       return;
@@ -255,7 +284,7 @@ void SauceEngineApp::processInput(float deltaTime) {
 
     camera.setMovementSpeed(baseMovementSpeed);
 
-    if (cameraCollisionEnabled) {
+    if (cameraCollisionActive) {
       applyCameraCollisionPush(previousCameraPosition, deltaTime);
     }
   }
@@ -372,59 +401,11 @@ Entity* SauceEngineApp::findDefaultSceneSpinEntity() {
 }
 
 RigidBodyComponent* SauceEngineApp::ensureEntityRigidBody(Entity& entity) {
-    auto* meshRenderer = entity.getComponent<MeshRendererComponent>();
-    auto* transform = entity.getComponent<TransformComponent>();
-    if (!meshRenderer || !meshRenderer->getMesh() || !transform) {
-      return nullptr;
-    }
-
-    auto* rigidBody = entity.getComponent<RigidBodyComponent>();
-    if (!rigidBody) {
-      entity.addComponent<RigidBodyComponent>(
-        transform->getTranslation(),
-        glm::vec3(0.0f),
-        transform->getRotation(),
-        glm::vec3(0.0f)
-      );
-      rigidBody = entity.getComponent<RigidBodyComponent>();
-    }
-
-    if (!rigidBody) {
-      return nullptr;
-    }
-
-    configureRigidBodyFromEntity(entity, *rigidBody);
-    return rigidBody;
+    return physics_demo::ensureEntityRigidBody(entity);
 }
 
 void SauceEngineApp::configureRigidBodyFromEntity(Entity& entity, RigidBodyComponent& rigidBody) {
-    auto* meshRenderer = entity.getComponent<MeshRendererComponent>();
-    auto* transform = entity.getComponent<TransformComponent>();
-    if (!meshRenderer || !meshRenderer->getMesh() || !transform) {
-      return;
-    }
-
-    rigidBody.setPosition(transform->getTranslation());
-    rigidBody.setOrientation(transform->getRotation());
-    rigidBody.setScale(transform->getScale());
-    const glm::vec3 centerOfMass = RigidBodyComponent::meshCenterOfMass(meshRenderer->getMesh());
-    rigidBody.setCenterOfMass(centerOfMass);
-
-    float invMass = 0.0f;
-    if (!isStaticTableMesh(meshRenderer)) {
-      invMass = RigidBodyComponent::scaledMeshInvMass(meshRenderer->getMesh(), transform->getScale());
-      if (invMass <= std::numeric_limits<float>::epsilon()) {
-        invMass = 1.0f;
-      }
-    }
-    rigidBody.setInvMass(invMass);
-    rigidBody.setInvInertiaTensor(
-      RigidBodyComponent::meshInvInertiaTensor(
-        meshRenderer->getMesh(),
-        centerOfMass,
-        invMass,
-        transform->getScale())
-    );
+    physics_demo::configureRigidBodyFromEntity(entity, rigidBody);
 }
 
 void SauceEngineApp::applyCameraCollisionPush(const glm::vec3& previousCameraPosition, float deltaTime) {
@@ -456,6 +437,10 @@ void SauceEngineApp::applyCameraCollisionPush(const glm::vec3& previousCameraPos
       }
 
       auto* rigidBody = entity.getComponent<RigidBodyComponent>();
+      if (!rigidBody && !dropDemoActive) {
+        continue;
+      }
+
       const glm::vec3 centerOfMass = rigidBody
           ? rigidBody->getCenterOfMass()
           : RigidBodyComponent::meshCenterOfMass(meshRenderer->getMesh());
@@ -482,7 +467,7 @@ void SauceEngineApp::applyCameraCollisionPush(const glm::vec3& previousCameraPos
         rigidBody = ensureEntityRigidBody(entity);
       }
 
-      if (!rigidBody || !rigidBody->isDynamic() || !rigidBody->isCollisionEnabled()) {
+      if (!rigidBody || !rigidBody->isCollisionEnabled()) {
         continue;
       }
 
@@ -493,7 +478,25 @@ void SauceEngineApp::applyCameraCollisionPush(const glm::vec3& previousCameraPos
       }
 
       const float penetration = combinedRadius - distance;
-      rigidBody->setWorldCenterOfMass(bodyCenter + contactNormal * penetration);
+      if (rigidBody->isSleeping()) {
+        rigidBody->wake();
+      }
+      if (!rigidBody->isDynamic()) {
+        continue;
+      }
+
+      constexpr float kPenetrationCorrectionFraction = 0.2f;
+      constexpr float kMaxPenetrationCorrection = 0.03f;
+      constexpr float kAlignedPushScale = 0.35f;
+      constexpr float kMaxAlignedPushSpeed = 0.5f;
+      constexpr float kNormalPushScale = 1.2f;
+      constexpr float kMaxNormalPushSpeed = 0.2f;
+      constexpr float kAngularPushScale = 0.02f;
+
+      const float correctionDistance = std::min(
+          penetration * kPenetrationCorrectionFraction,
+          kMaxPenetrationCorrection);
+      rigidBody->setWorldCenterOfMass(bodyCenter + contactNormal * correctionDistance);
 
       glm::vec3 velocity = rigidBody->getVelocity();
       const float inwardSpeed = glm::dot(velocity, -contactNormal);
@@ -502,17 +505,62 @@ void SauceEngineApp::applyCameraCollisionPush(const glm::vec3& previousCameraPos
       }
 
       if (cameraSpeed > 0.0f) {
-        const float alignedPushSpeed = std::max(glm::dot(cameraMoveDirection, contactNormal), 0.0f) * cameraSpeed;
+        const float alignedComponent = std::max(glm::dot(cameraMoveDirection, contactNormal), 0.0f);
+        const float alignedPushSpeed = std::min(
+            alignedComponent * cameraSpeed * kAlignedPushScale,
+            kMaxAlignedPushSpeed);
         velocity += cameraMoveDirection * alignedPushSpeed;
       }
 
-      velocity += contactNormal * (penetration * 8.0f);
+      velocity += contactNormal * std::min(correctionDistance * kNormalPushScale, kMaxNormalPushSpeed);
       rigidBody->setVelocity(velocity);
 
       if (cameraSpeed > 0.0f) {
         rigidBody->setAngularVelocity(
             rigidBody->getAngularVelocity() +
-            glm::cross(cameraMoveDirection, contactNormal) * (cameraSpeed * 0.35f));
+            glm::cross(cameraMoveDirection, contactNormal) * (cameraSpeed * kAngularPushScale));
+      }
+    }
+}
+
+void SauceEngineApp::wakeContactNeighbors(Entity& source, RigidBodyComponent& sourceBody) {
+    if (!pScene) {
+      return;
+    }
+
+    const glm::vec3 sourceCenter = sourceBody.getWorldCenterOfMass();
+    const auto* sourceMesh = source.getComponent<MeshRendererComponent>();
+    if (!sourceMesh || !sourceMesh->getMesh()) {
+      return;
+    }
+
+    const float sourceRadius = computeScaledMeshRadius(
+        *sourceMesh->getMesh(), sourceBody.getCenterOfMass(), sourceBody.getScale());
+    constexpr float kNeighborMargin = 0.15f;
+
+    for (auto& entity : pScene->getEntitiesMut()) {
+      if (!entity.getActive() || &entity == &source) {
+        continue;
+      }
+
+      auto* rigidBody = entity.getComponent<RigidBodyComponent>();
+      if (!rigidBody || !rigidBody->isSleeping() || !rigidBody->canBeDynamic()) {
+        continue;
+      }
+
+      auto* meshRenderer = entity.getComponent<MeshRendererComponent>();
+      if (!meshRenderer || !meshRenderer->getMesh()) {
+        continue;
+      }
+
+      const float neighborRadius = computeScaledMeshRadius(
+          *meshRenderer->getMesh(), rigidBody->getCenterOfMass(), rigidBody->getScale());
+      const glm::vec3 neighborCenter = rigidBody->getWorldCenterOfMass();
+      const float dist = glm::length(neighborCenter - sourceCenter);
+      const float touchDist = sourceRadius + neighborRadius + kNeighborMargin;
+
+      if (dist < touchDist) {
+        rigidBody->wake();
       }
     }
 }
@@ -523,64 +571,29 @@ void SauceEngineApp::startDropDemo() {
     }
 
     dropDemoActive = false;
-
-    for (auto& entity : pScene->getEntitiesMut()) {
-      if (!entity.getActive()) {
-        continue;
-      }
-
-      auto* rigidBody = ensureEntityRigidBody(entity);
-      auto* meshRenderer = entity.getComponent<MeshRendererComponent>();
-      auto* transform = entity.getComponent<TransformComponent>();
-      if (!rigidBody || !meshRenderer || !meshRenderer->getMesh()) {
-        continue;
-      }
-
-      if (transform) {
-        rigidBody->setPosition(transform->getTranslation());
-        rigidBody->setOrientation(transform->getRotation());
-      }
-      rigidBody->setVelocity(glm::vec3(0.0f));
-      rigidBody->setAngularVelocity(glm::vec3(0.0f));
-      rigidBody->clearAccumulatedForce();
-      rigidBody->setCollisionEnabled(true);
-
-      if (isStaticTableMesh(meshRenderer)) {
-        rigidBody->setInvMass(0.0f);
-        rigidBody->setInvInertiaTensor(glm::mat3(0.0f));
-        continue;
-      }
-    }
-
+    physics_demo::armScene(*pScene);
     dropDemoActive = true;
+    cameraCollisionCooldown = 0.2f;
 }
 
 void SauceEngineApp::updateDropDemoForces() {
     if (!dropDemoActive || !pScene) {
       return;
     }
-    constexpr glm::vec3 kGravityAcceleration(0.0f, 0.0f, -9.81f);
-    constexpr float kLinearDamping = 0.25f;
 
-    for (auto& entity : pScene->getEntitiesMut()) {
-      auto* rigidBody = entity.getComponent<RigidBodyComponent>();
-      if (!rigidBody || !entity.getActive()) {
-        continue;
-      }
-
-      if (!rigidBody->isDynamic()) {
-        rigidBody->clearAccumulatedForce();
-        continue;
-      }
-
-      const glm::vec3 acceleration = kGravityAcceleration - rigidBody->getVelocity() * kLinearDamping;
-      rigidBody->setAccumulatedForce(acceleration / rigidBody->getInvMass());
-    }
-}
+    physics_demo::applyForces(*pScene);
+  }
 
 void SauceEngineApp::mouseCallback(GLFWwindow* window, double xposIn, double yposIn) {
     auto* app = static_cast<SauceEngineApp*>(glfwGetWindowUserPointer(window));
-    if (!app || !app->cursorCaptured) {
+    if (!app) {
+      return;
+    }
+
+    if (!app->cursorCaptured) {
+      if (app->draggedEntity) {
+        app->updateDrag(xposIn, yposIn);
+      }
       return;
     }
 
@@ -606,6 +619,26 @@ void SauceEngineApp::mouseCallback(GLFWwindow* window, double xposIn, double ypo
     app->pScene->getCameraRW().processMouseMovement(xoffset, yoffset);
   }
 
+void SauceEngineApp::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+    auto* app = static_cast<SauceEngineApp*>(glfwGetWindowUserPointer(window));
+    if (!app || app->cursorCaptured) {
+      return;
+    }
+
+    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+      if (action == GLFW_PRESS) {
+        if (ImGui::GetIO().WantCaptureMouse) {
+          return;
+        }
+        double mx, my;
+        glfwGetCursorPos(window, &mx, &my);
+        app->beginDrag(mx, my);
+      } else if (action == GLFW_RELEASE) {
+        app->endDrag();
+      }
+    }
+  }
+
 void SauceEngineApp::mainLoop() {
     while (!glfwWindowShouldClose(window)) {
       auto currentFrameTime = std::chrono::steady_clock::now();
@@ -629,9 +662,9 @@ void SauceEngineApp::mainLoop() {
           rigidBodies.begin(),
           rigidBodies.end(),
           [](const RigidBodyComponent* rigidBody) {
-            return rigidBody && rigidBody->isDynamic() && rigidBody->isCollisionEnabled();
+            return rigidBody && rigidBody->canBeDynamic() && rigidBody->isCollisionEnabled();
           }));
-      const SolverTuning solverTuning = selectRigidSolverTuning(dynamicRigidBodyCount);
+      const auto solverTuning = physics_demo::selectRigidSolverTuning(dynamicRigidBodyCount);
       pSolver->solverIterations = solverTuning.solverIterations;
       pSolver->rigidSubsteps = solverTuning.rigidSubsteps;
       const float physicsDt = solverTuning.physicsDt;
@@ -641,7 +674,32 @@ void SauceEngineApp::mainLoop() {
       }
       while (deltaUpdate >= physicsDt) {
         updateDropDemoForces();
+
+        if (draggedEntity) {
+          auto* dragRB = draggedEntity->getComponent<RigidBodyComponent>();
+          if (dragRB) {
+            glm::vec3 toTarget = dragTargetPosition - dragRB->getPosition();
+            constexpr float kMaxDragStep = 0.2f;
+            float maxDisp = kMaxDragStep * static_cast<float>(pSolver->rigidSubsteps);
+            float dist = glm::length(toTarget);
+            if (dist > maxDisp) {
+              toTarget *= maxDisp / dist;
+            }
+            dragRB->setVelocity(toTarget / physicsDt);
+            dragRB->setAngularVelocity(glm::vec3(0.0f));
+          }
+        }
+
         pSolver->solvePositions(rigidBodies, constraints, physicsDt);
+
+        if (draggedEntity) {
+          auto* dragRB = draggedEntity->getComponent<RigidBodyComponent>();
+          if (dragRB) {
+            dragRB->setVelocity(glm::vec3(0.0f));
+            dragRB->setAngularVelocity(glm::vec3(0.0f));
+          }
+        }
+
         syncRigidBodiesToTransforms();
         for (auto& entity : pScene->getEntitiesMut()) {
           if (!entity.getActive()) {
@@ -673,37 +731,13 @@ void SauceEngineApp::buildExampleUI() {
   }
 
 void SauceEngineApp::syncRigidBodiesToTransforms() {
-    if (!pScene) {
-      return;
-    }
-
-    for (auto& entity : pScene->getEntitiesMut()) {
-      auto* rigidBody = entity.getComponent<RigidBodyComponent>();
-      auto* transform = entity.getComponent<TransformComponent>();
-      if (!rigidBody || !transform) {
-        continue;
-      }
-
-      transform->setTranslation(rigidBody->getPosition());
-      transform->setRotation(rigidBody->getOrientation());
+    if (pScene) {
+      physics_demo::syncRigidBodiesToTransforms(*pScene);
     }
   }
 
 std::vector<RigidBodyComponent*> SauceEngineApp::collectRigidBodies() {
-  std::vector<RigidBodyComponent*> rigidBodies;
-  if (!pScene) {
-    return rigidBodies;
-  }
-
-  auto& entities = pScene->getEntitiesMut();
-  rigidBodies.reserve(entities.size());
-  for (auto& entity : entities) {
-    if (auto* rigidBody = entity.getComponent<RigidBodyComponent>()) {
-      rigidBodies.push_back(rigidBody);
-    }
-  }
-
-  return rigidBodies;
+  return pScene ? physics_demo::collectRigidBodies(*pScene) : std::vector<RigidBodyComponent*>{};
 }
 
 void SauceEngineApp::uploadMeshGPUResources() {
@@ -961,5 +995,106 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
 
   cmd.end();
 }
+
+void SauceEngineApp::beginDrag(double mouseX, double mouseY) {
+    if (!pScene) { return; }
+
+    const auto& camera = pScene->getCameraRW();
+    const Ray ray = screenToWorldRay(camera, mouseX, mouseY,
+                                     static_cast<float>(width), static_cast<float>(height));
+
+    Entity* bestEntity = nullptr;
+    float bestT = std::numeric_limits<float>::max();
+
+    for (auto& entity : pScene->getEntitiesMut()) {
+      if (!entity.getActive()) { continue; }
+      auto* meshRenderer = entity.getComponent<MeshRendererComponent>();
+      auto* transform = entity.getComponent<TransformComponent>();
+      auto* rigidBody = entity.getComponent<RigidBodyComponent>();
+      if (!meshRenderer || !meshRenderer->getMesh() || !transform || !rigidBody) { continue; }
+      if (!rigidBody->canBeDynamic()) { continue; }
+
+      const AABB box = computeWorldAABB(*meshRenderer->getMesh(), transform->getLocalMatrix());
+      float t = 0.0f;
+      if (rayIntersectsAABB(ray, box, t) && t < bestT) {
+        bestT = t;
+        bestEntity = &entity;
+      }
+    }
+
+    if (!bestEntity) { return; }
+
+    auto* rigidBody = bestEntity->getComponent<RigidBodyComponent>();
+
+    glm::mat4 view = camera.getViewMatrix();
+    dragPlaneNormal = -glm::vec3(view[0][2], view[1][2], view[2][2]);
+    dragPlanePoint = rigidBody->getPosition();
+
+    float denom = glm::dot(ray.direction, dragPlaneNormal);
+    if (std::abs(denom) < 1e-8f) { return; }
+    float tPlane = glm::dot(dragPlanePoint - ray.origin, dragPlaneNormal) / denom;
+    glm::vec3 hitOnPlane = ray.origin + tPlane * ray.direction;
+
+    dragOffset = rigidBody->getPosition() - hitOnPlane;
+    dragPrevPosition = rigidBody->getPosition();
+    dragTargetPosition = rigidBody->getPosition();
+    dragSmoothedVelocity = glm::vec3(0.0f);
+    draggedEntity = bestEntity;
+
+    if (rigidBody->isSleeping()) {
+      rigidBody->wake();
+    }
+    rigidBody->setInvMass(0.0f);
+    rigidBody->setInvInertiaTensor(glm::mat3(0.0f));
+    rigidBody->setVelocity(glm::vec3(0.0f));
+    rigidBody->setAngularVelocity(glm::vec3(0.0f));
+  }
+
+void SauceEngineApp::updateDrag(double mouseX, double mouseY) {
+    if (!draggedEntity || !pScene) { return; }
+
+    auto* rigidBody = draggedEntity->getComponent<RigidBodyComponent>();
+    if (!rigidBody) {
+      draggedEntity = nullptr;
+      return;
+    }
+
+    const auto& camera = pScene->getCameraRW();
+    const Ray ray = screenToWorldRay(camera, mouseX, mouseY,
+                                     static_cast<float>(width), static_cast<float>(height));
+
+    float denom = glm::dot(ray.direction, dragPlaneNormal);
+    if (std::abs(denom) < 1e-8f) { return; }
+    float tPlane = glm::dot(dragPlanePoint - ray.origin, dragPlaneNormal) / denom;
+    glm::vec3 hitOnPlane = ray.origin + tPlane * ray.direction;
+
+    glm::vec3 newPos = hitOnPlane + dragOffset;
+
+    const float dt = std::max(static_cast<float>(deltaFrame), 1e-4f);
+    const glm::vec3 frameVel = (newPos - dragTargetPosition) / dt;
+    constexpr float kSmoothFactor = 0.3f;
+    dragSmoothedVelocity = glm::mix(dragSmoothedVelocity, frameVel, kSmoothFactor);
+
+    dragTargetPosition = newPos;
+  }
+
+void SauceEngineApp::endDrag() {
+    if (!draggedEntity) { return; }
+
+    auto* rigidBody = draggedEntity->getComponent<RigidBodyComponent>();
+    if (rigidBody) {
+      constexpr float kMaxThrowSpeed = 4.0f;
+      glm::vec3 throwVel = dragSmoothedVelocity;
+      float speed = glm::length(throwVel);
+      if (speed > kMaxThrowSpeed) {
+        throwVel *= kMaxThrowSpeed / speed;
+      }
+      rigidBody->sleep();
+      rigidBody->wake();
+      rigidBody->setVelocity(throwVel);
+    }
+
+    draggedEntity = nullptr;
+  }
 
 } // namespace sauce

@@ -20,8 +20,6 @@ namespace {
 struct RigidSolveBuffers {
   std::vector<physics::Vertex> vertices;
   std::vector<sauce::RigidBodyComponent*> rigidBodies;
-  std::vector<glm::vec3> previousCenters;
-  std::vector<glm::quat> previousOrientations;
 };
 
 std::vector<sauce::RigidBodyComponent*> collectSimulatedRigidBodies(
@@ -51,17 +49,11 @@ void initializeRigidSolveBuffers(const std::vector<sauce::RigidBodyComponent*>& 
                                  RigidSolveBuffers& buffers) {
   buffers.vertices.clear();
   buffers.rigidBodies.clear();
-  buffers.previousCenters.clear();
-  buffers.previousOrientations.clear();
 
   buffers.vertices.reserve(rigidBodies.size());
   buffers.rigidBodies.reserve(rigidBodies.size());
-  buffers.previousCenters.reserve(rigidBodies.size());
-  buffers.previousOrientations.reserve(rigidBodies.size());
 
   for (auto* rigidBody : rigidBodies) {
-    buffers.previousCenters.push_back(rigidBody->getWorldCenterOfMass());
-    buffers.previousOrientations.push_back(rigidBody->getOrientation());
     rigidBody->update(deltaTime);
     buffers.rigidBodies.push_back(rigidBody);
     buffers.vertices.push_back({
@@ -109,83 +101,134 @@ glm::vec3 reconstructAngularVelocity(const glm::quat& previousOrientation,
   return axis * (angle / deltaTime);
 }
 
+glm::mat3 worldInvInertiaTensor(const sauce::RigidBodyComponent& rigidBody) {
+  const glm::mat3 rotation = glm::mat3_cast(rigidBody.getOrientation());
+  return rotation * rigidBody.getInvInertiaTensor() * glm::transpose(rotation);
+}
+
+glm::vec3 velocityAtPoint(const sauce::RigidBodyComponent& rigidBody, const glm::vec3& offset) {
+  return rigidBody.getVelocity() + glm::cross(rigidBody.getAngularVelocity(), offset);
+}
+
+float angularEffectiveMass(const sauce::RigidBodyComponent& rigidBody,
+                           const glm::vec3& offset,
+                           const glm::vec3& direction) {
+  if (rigidBody.getInvMass() <= 1e-8f) {
+    return 0.0f;
+  }
+
+  const glm::mat3 worldInvInertia = worldInvInertiaTensor(rigidBody);
+  const glm::vec3 angular = glm::cross(offset, direction);
+  return glm::dot(glm::cross(worldInvInertia * angular, offset), direction);
+}
+
+void applyImpulse(sauce::RigidBodyComponent& rigidBody,
+                  const glm::vec3& impulse,
+                  const glm::vec3& offset) {
+  if (rigidBody.getInvMass() <= 1e-8f) {
+    return;
+  }
+
+  rigidBody.setVelocity(rigidBody.getVelocity() + rigidBody.getInvMass() * impulse);
+  const glm::mat3 worldInvInertia = worldInvInertiaTensor(rigidBody);
+  rigidBody.setAngularVelocity(
+      rigidBody.getAngularVelocity() + worldInvInertia * glm::cross(offset, impulse));
+}
+
 } // namespace
 
-void XPBDSolver::clearStaticContactState() {
-  lastStaticContactNormals.clear();
-  lastStaticContactCounts.clear();
-}
+void XPBDSolver::applyCollisionVelocityResponse(
+    const std::vector<sauce::RigidBodyComponent*>& rigidBodies,
+    const std::vector<CollisionContact>& contacts) const {
+  constexpr float kVelocityEpsilon = 1e-6f;
+  constexpr float kBounceThreshold = 0.15f;
+  constexpr float kFrictionCoefficient = 0.6f;
+  constexpr float kSeparatingThreshold = 0.5f;
+  constexpr int kVelocityPasses = 4;
+  constexpr float kRelaxation = 0.8f;
+  constexpr float kGravity = 9.81f;
+  constexpr float kDt = 1.0f / 60.0f;
 
-void XPBDSolver::resetStaticContactState(size_t bodyCount) {
-  lastStaticContactNormals.clear();
-  lastStaticContactCounts.clear();
-  lastStaticContactNormals.resize(bodyCount);
-  lastStaticContactCounts.resize(bodyCount, 0);
-}
+  for (int pass = 0; pass < kVelocityPasses; ++pass) {
+    for (const auto& contact : contacts) {
+      if (contact.indexA >= rigidBodies.size() || contact.indexB >= rigidBodies.size()) {
+        continue;
+      }
 
-void XPBDSolver::recordStaticContact(uint32_t bodyIndex, const glm::vec3& normal) {
-  if (bodyIndex >= lastStaticContactNormals.size()) {
-    return;
-  }
+      auto* bodyA = rigidBodies[contact.indexA];
+      auto* bodyB = rigidBodies[contact.indexB];
+      if (!bodyA || !bodyB) {
+        continue;
+      }
 
-  lastStaticContactNormals[bodyIndex].push_back(normal);
-  ++lastStaticContactCounts[bodyIndex];
-}
+      const float invMassA = bodyA->getInvMass();
+      const float invMassB = bodyB->getInvMass();
+      if (invMassA + invMassB <= 1e-8f) {
+        continue;
+      }
 
-bool XPBDSolver::hasStaticContacts(size_t bodyIndex) const {
-  return bodyIndex < lastStaticContactCounts.size() && lastStaticContactCounts[bodyIndex] > 0;
-}
+      const float normalLenSq = glm::dot(contact.contactNormal, contact.contactNormal);
+      if (normalLenSq <= kVelocityEpsilon) {
+        continue;
+      }
 
-const std::vector<glm::vec3>& XPBDSolver::staticContactNormals(size_t bodyIndex) const {
-  static const std::vector<glm::vec3> emptyNormals;
-  if (bodyIndex >= lastStaticContactNormals.size()) {
-    return emptyNormals;
-  }
+      const glm::vec3 normal = contact.contactNormal / std::sqrt(normalLenSq);
+      const glm::vec3 centerA = bodyA->getWorldCenterOfMass();
+      const glm::vec3 centerB = bodyB->getWorldCenterOfMass();
+      const glm::vec3 offsetA = contact.pointA - centerA;
+      const glm::vec3 offsetB = contact.pointB - centerB;
 
-  return lastStaticContactNormals[bodyIndex];
-}
+      glm::vec3 relativeVelocity =
+          velocityAtPoint(*bodyA, offsetA) - velocityAtPoint(*bodyB, offsetB);
+      const float normalSpeed = glm::dot(relativeVelocity, normal);
 
-void XPBDSolver::stabilizePostSolveVelocities(size_t bodyIndex,
-                                              glm::vec3& linearVelocity,
-                                              glm::vec3& angularVelocity) const {
-  if (!hasStaticContacts(bodyIndex)) {
-    return;
-  }
+      float normalImpulseMagnitude = 0.0f;
+      if (normalSpeed < -kBounceThreshold) {
+        const float normalMass = invMassA + invMassB +
+            angularEffectiveMass(*bodyA, offsetA, normal) +
+            angularEffectiveMass(*bodyB, offsetB, normal);
+        if (normalMass > kVelocityEpsilon) {
+          normalImpulseMagnitude = -normalSpeed / normalMass;
+          const glm::vec3 normalImpulse = kRelaxation * normalImpulseMagnitude * normal;
+          applyImpulse(*bodyA, normalImpulse, offsetA);
+          applyImpulse(*bodyB, -normalImpulse, offsetB);
+          relativeVelocity = velocityAtPoint(*bodyA, offsetA) - velocityAtPoint(*bodyB, offsetB);
+        }
+      }
 
-  glm::vec3 accumulatedNormal(0.0f);
-  for (const auto& normal : staticContactNormals(bodyIndex)) {
-    const float normalLenSq = glm::dot(normal, normal);
-    if (normalLenSq <= 1e-10f) {
-      continue;
+      if (normalSpeed > kSeparatingThreshold) {
+        continue;
+      }
+
+      const glm::vec3 tangentialVelocity =
+          relativeVelocity - glm::dot(relativeVelocity, normal) * normal;
+      const float tangentialSpeedSq = glm::dot(tangentialVelocity, tangentialVelocity);
+      if (tangentialSpeedSq <= kVelocityEpsilon) {
+        continue;
+      }
+
+      const glm::vec3 tangent = tangentialVelocity / std::sqrt(tangentialSpeedSq);
+      const float tangentialMass = invMassA + invMassB +
+          angularEffectiveMass(*bodyA, offsetA, tangent) +
+          angularEffectiveMass(*bodyB, offsetB, tangent);
+      if (tangentialMass <= kVelocityEpsilon) {
+        continue;
+      }
+
+      float frictionBasis = std::max(normalImpulseMagnitude, -std::min(normalSpeed, 0.0f));
+      if (frictionBasis < kVelocityEpsilon) {
+        const float effectiveMass = 1.0f / (invMassA + invMassB);
+        frictionBasis = effectiveMass * kGravity * kDt * 0.25f;
+      }
+      const float tangentialImpulseLimit = kFrictionCoefficient * frictionBasis;
+      const float tangentialImpulseMagnitude = std::clamp(
+          -glm::dot(relativeVelocity, tangent) / tangentialMass,
+          -tangentialImpulseLimit,
+          tangentialImpulseLimit);
+      const glm::vec3 tangentialImpulse = kRelaxation * tangentialImpulseMagnitude * tangent;
+      applyImpulse(*bodyA, tangentialImpulse, offsetA);
+      applyImpulse(*bodyB, -tangentialImpulse, offsetB);
     }
-
-    const glm::vec3 n = normal / std::sqrt(normalLenSq);
-    accumulatedNormal += n;
-    const float closingSpeed = glm::dot(linearVelocity, n);
-    if (closingSpeed < 0.0f) {
-      linearVelocity -= closingSpeed * n;
-    }
-  }
-
-  constexpr float kTangentialVelocityRetention = 0.995f;
-  constexpr float kAngularVelocityRetention = 0.995f;
-  constexpr float kRestLinearSpeed = 0.01f;
-  constexpr float kRestAngularSpeed = 0.05f;
-
-  const float accumulatedNormalLenSq = glm::dot(accumulatedNormal, accumulatedNormal);
-  if (accumulatedNormalLenSq > 1e-10f) {
-    const glm::vec3 contactNormal = accumulatedNormal / std::sqrt(accumulatedNormalLenSq);
-    const float normalSpeed = glm::dot(linearVelocity, contactNormal);
-    const glm::vec3 tangentialVelocity = linearVelocity - normalSpeed * contactNormal;
-    linearVelocity = normalSpeed * contactNormal + tangentialVelocity * kTangentialVelocityRetention;
-  }
-
-  angularVelocity *= kAngularVelocityRetention;
-
-  if (glm::length2(linearVelocity) < kRestLinearSpeed * kRestLinearSpeed &&
-      glm::length2(angularVelocity) < kRestAngularSpeed * kRestAngularSpeed) {
-    linearVelocity = glm::vec3(0.0f);
-    angularVelocity = glm::vec3(0.0f);
   }
 }
 
@@ -193,9 +236,6 @@ void XPBDSolver::solvePositions(
     std::vector<sauce::RigidBodyComponent*>& rigidBodies,
     std::vector<std::unique_ptr<Constraint>>& constraints,
     float deltatime) {
-  /*
-   * adapted from https://matthias-research.github.io/pages/publications/posBasedDyn.pdf
-   */
   if (deltatime <= 0.0f) {
     return;
   }
@@ -203,9 +243,12 @@ void XPBDSolver::solvePositions(
   auto simulatedBodies = collectSimulatedRigidBodies(rigidBodies);
   if (simulatedBodies.empty()) {
     constraints.clear();
-    clearStaticContactState();
     return;
   }
+
+  const int substeps = std::max(1, rigidSubsteps);
+  const float h = deltatime / static_cast<float>(substeps);
+  RigidSolveBuffers buffers;
 
   std::vector<glm::vec3> initialCenters;
   std::vector<glm::quat> initialOrientations;
@@ -216,16 +259,52 @@ void XPBDSolver::solvePositions(
     initialOrientations.push_back(rigidBody->getOrientation());
   }
 
-  const int substeps = std::max(1, rigidSubsteps);
-  const float h = deltatime / static_cast<float>(substeps);
+  constexpr float kMaxLinearSpeed = 8.0f;
+  constexpr float kMaxAngularSpeed = 12.0f;
 
-  RigidSolveBuffers buffers;
+  auto clampVelocity = [](glm::vec3 v, float maxSpeed) -> glm::vec3 {
+    const float speedSq = glm::length2(v);
+    if (speedSq > maxSpeed * maxSpeed) {
+      return v * (maxSpeed / std::sqrt(speedSq));
+    }
+    return v;
+  };
+
+  std::vector<glm::vec3> substepCenters(simulatedBodies.size());
+  std::vector<glm::quat> substepOrientations(simulatedBodies.size());
+
   for (int substep = 0; substep < substeps; ++substep) {
-    resetStaticContactState(simulatedBodies.size());
+    for (size_t i = 0; i < simulatedBodies.size(); ++i) {
+      substepCenters[i] = simulatedBodies[i]->getWorldCenterOfMass();
+      substepOrientations[i] = simulatedBodies[i]->getOrientation();
+    }
+
     initializeRigidSolveBuffers(simulatedBodies, h, buffers);
     constraints = generateCollisionConstraints(buffers.rigidBodies);
+
+    for (size_t i = 0; i < buffers.rigidBodies.size(); ++i) {
+      auto* rb = buffers.rigidBodies[i];
+      if (rb && buffers.vertices[i].invMass != rb->getInvMass()) {
+        buffers.vertices[i].invMass = rb->getInvMass();
+        buffers.vertices[i].invInertiaTensor = rb->getInvInertiaTensor();
+      }
+    }
+
     projectConstraints(buffers.vertices, constraints, h);
     applyProjectedRigidState(buffers.vertices, buffers.rigidBodies);
+
+    for (size_t i = 0; i < simulatedBodies.size(); ++i) {
+      auto* rigidBody = simulatedBodies[i];
+      if (!rigidBody || rigidBody->getInvMass() <= 1e-8f) {
+        continue;
+      }
+      rigidBody->setVelocity(clampVelocity(
+          (rigidBody->getWorldCenterOfMass() - substepCenters[i]) / h,
+          kMaxLinearSpeed));
+      rigidBody->setAngularVelocity(clampVelocity(
+          reconstructAngularVelocity(substepOrientations[i], rigidBody->getOrientation(), h),
+          kMaxAngularSpeed));
+    }
   }
 
   for (size_t i = 0; i < simulatedBodies.size(); ++i) {
@@ -234,22 +313,46 @@ void XPBDSolver::solvePositions(
       continue;
     }
 
-    if (rigidBody->getInvMass() <= 1e-8f || deltatime <= 0.0f) {
+    if (rigidBody->getInvMass() <= 1e-8f) {
       rigidBody->setVelocity(glm::vec3(0.0f));
       rigidBody->setAngularVelocity(glm::vec3(0.0f));
       continue;
     }
 
-    glm::vec3 velocity = (rigidBody->getWorldCenterOfMass() - initialCenters[i]) / deltatime;
-    glm::vec3 angularVelocity = reconstructAngularVelocity(
-        initialOrientations[i],
-        rigidBody->getOrientation(),
-        deltatime);
-    stabilizePostSolveVelocities(i, velocity, angularVelocity);
-
-    rigidBody->setVelocity(velocity);
-    rigidBody->setAngularVelocity(angularVelocity);
+    rigidBody->setVelocity(clampVelocity(
+        (rigidBody->getWorldCenterOfMass() - initialCenters[i]) / deltatime,
+        kMaxLinearSpeed));
+    rigidBody->setAngularVelocity(clampVelocity(
+        reconstructAngularVelocity(initialOrientations[i], rigidBody->getOrientation(), deltatime),
+        kMaxAngularSpeed));
   }
+
+  applyCollisionVelocityResponse(simulatedBodies, collectCollisionContacts(simulatedBodies));
+
+  constexpr float kSleepLinearThreshold = 0.05f;
+  constexpr float kSleepAngularThreshold = 0.1f;
+  constexpr float kAutoSleepLinear = 0.01f;
+  constexpr float kAutoSleepAngular = 0.02f;
+  for (auto* rigidBody : simulatedBodies) {
+    if (!rigidBody || rigidBody->getInvMass() <= 1e-8f) {
+      continue;
+    }
+    const float linSpeedSq = glm::length2(rigidBody->getVelocity());
+    const float angSpeedSq = glm::length2(rigidBody->getAngularVelocity());
+    if (linSpeedSq < kSleepLinearThreshold * kSleepLinearThreshold) {
+      rigidBody->setVelocity(rigidBody->getVelocity() * 0.7f);
+    }
+    if (angSpeedSq < kSleepAngularThreshold * kSleepAngularThreshold) {
+      rigidBody->setAngularVelocity(rigidBody->getAngularVelocity() * 0.7f);
+    }
+    if (linSpeedSq < kAutoSleepLinear * kAutoSleepLinear &&
+        angSpeedSq < kAutoSleepAngular * kAutoSleepAngular &&
+        rigidBody->canBeDynamic()) {
+      rigidBody->sleep();
+    }
+  }
+
+  wakeUnsupportedBodies(simulatedBodies);
 }
 
 } // namespace physics

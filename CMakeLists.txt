@@ -203,6 +203,44 @@ endif()
 
 add_test(NAME xpbd_cloth_harness COMMAND xpbd_cloth_harness)
 
+# ── xpbd_rigid_harness ───────────────────────────────────────────────
+
+add_executable(xpbd_rigid_harness
+    src/xpbd_rigid_harness.cpp
+    src/app/Scene.cpp
+    src/app/PhysicsDemoSetup.cpp
+    src/app/components/TransformComponent.cpp
+    src/app/components/MeshRendererComponent.cpp
+    src/app/components/RigidBodyComponent.cpp
+    src/app/components/PointLightComponent.cpp
+    src/app/components/DirectionalLightComponent.cpp
+    src/app/modeling/GLTFLoader.cpp
+    src/app/modeling/GLTFExporter.cpp
+    src/app/modeling/Model.cpp
+    src/app/modeling/ModelNode.cpp
+    src/app/modeling/Mesh.cpp
+    src/app/modeling/Material.cpp
+    src/app/modeling/Texture.cpp
+    src/app/modeling/TextureCache.cpp
+    src/app/modeling/Transform.cpp
+    src/physics/SphereBVH.cpp
+    src/physics/SphereCollider.cpp
+    src/physics/XPBD.cpp
+    src/physics/XPBDContacts.cpp
+    src/physics/XPBDRigidSolve.cpp
+)
+
+target_include_directories(xpbd_rigid_harness PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${TINYGLTF_INCLUDE_DIRS}
+)
+
+target_link_libraries(xpbd_rigid_harness PUBLIC Vulkan::Vulkan)
+
+if(NOT WIN32)
+    target_compile_options(xpbd_rigid_harness PUBLIC ${SAUCE_WARNINGS})
+endif()
+
 # ── SauceEditor ──────────────────────────────────────────────────────
 
 file(GLOB_RECURSE EDITOR_SOURCES CONFIGURE_DEPENDS

@@ -74,6 +74,16 @@ private:
   std::string defaultSceneSpinEntityName;
   glm::vec3 defaultSceneSpinAngularVelocity = glm::vec3(1.35f, 1.9f, 0.65f);
   float cameraCollisionRadius = 0.35f;
+  float cameraCollisionCooldown = 0.0f;
+
+  Entity* draggedEntity = nullptr;
+  glm::vec3 dragPlaneNormal = glm::vec3(0.0f);
+  glm::vec3 dragPlanePoint = glm::vec3(0.0f);
+  glm::vec3 dragOffset = glm::vec3(0.0f);
+  glm::vec3 dragPrevPosition = glm::vec3(0.0f);
+  glm::vec3 dragTargetPosition = glm::vec3(0.0f);
+  glm::vec3 dragSmoothedVelocity = glm::vec3(0.0f);
+  bool leftMouseDown = false;
 
   std::unique_ptr<sauce::Instance> pInstance;
 
@@ -97,8 +107,13 @@ private:
   void mainLoop();
   void processInput(float deltaTime);
   static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn);
+  static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 
   void buildExampleUI();
+
+  void beginDrag(double mouseX, double mouseY);
+  void updateDrag(double mouseX, double mouseY);
+  void endDrag();
 
   void uploadMeshGPUResources();
   void setupSceneRenderer();
@@ -111,6 +126,7 @@ private:
   RigidBodyComponent* ensureEntityRigidBody(Entity& entity);
   void configureRigidBodyFromEntity(Entity& entity, RigidBodyComponent& rigidBody);
   void applyCameraCollisionPush(const glm::vec3& previousCameraPosition, float deltaTime);
+  void wakeContactNeighbors(Entity& source, RigidBodyComponent& sourceBody);
   void startDropDemo();
   void updateDropDemoForces();
   void syncRigidBodiesToTransforms();
