@@ -134,7 +134,11 @@ add_custom_command(TARGET modelviewer POST_BUILD
 
 add_executable(xpbd_cloth_harness
     src/xpbd_cloth_harness.cpp
+    src/app/components/ClothComponent.cpp
     src/app/components/MeshRendererComponent.cpp
+    src/app/components/TransformComponent.cpp
+    src/app/modeling/Mesh.cpp
+    src/app/modeling/Transform.cpp
     src/physics/Cloth.cpp
     src/physics/SphereCollider.cpp
     src/physics/XPBD.cpp

@@ -1,7 +1,13 @@
+#include <app/Entity.hpp>
+#include <app/components/ClothComponent.hpp>
+#include <app/components/TransformComponent.hpp>
+#include <app/modeling/Mesh.hpp>
+
 #include <physics/Cloth.hpp>
 #include <physics/XPBD.hpp>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include <cmath>
 #include <iostream>
@@ -49,6 +55,31 @@ ClothParticle makeParticle(
       .invMass = invMass,
       .pinned = pinned,
   };
+}
+
+sauce::Vertex makeRenderVertex(const glm::vec3& position, const glm::vec2& uv) {
+  return sauce::Vertex {
+      .position = position,
+      .normal = glm::vec3(0.0f, 1.0f, 0.0f),
+      .texCoords = uv,
+      .color = glm::vec3(1.0f),
+      .tangent = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f),
+  };
+}
+
+std::shared_ptr<sauce::modeling::Mesh> makeQuadMesh() {
+  std::vector<sauce::Vertex> vertices {
+      makeRenderVertex(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec2(0.0f, 0.0f)),
+      makeRenderVertex(glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(1.0f, 0.0f)),
+      makeRenderVertex(glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(0.0f, 1.0f)),
+      makeRenderVertex(glm::vec3(1.0f, 1.0f, 0.0f), glm::vec2(1.0f, 1.0f)),
+  };
+  std::vector<uint32_t> indices { 0, 1, 2, 2, 1, 3 };
+
+  auto mesh = std::make_shared<sauce::modeling::Mesh>(vertices, indices);
+  mesh->generateNormals();
+  mesh->generateTangents();
+  return mesh;
 }
 
 float computeBendError(const ClothData& cloth, const BendConstraint& constraint) {
@@ -209,6 +240,181 @@ bool testBendConstraintReducesError(std::vector<std::string>& errors) {
   return true;
 }
 
+bool testClothComponentRebuildFromMesh(std::vector<std::string>& errors) {
+  auto mesh = makeQuadMesh();
+
+  sauce::ClothSettings settings;
+  settings.defaultInvMass = 0.5f;
+  settings.stretchCompliance = 0.02f;
+  settings.bendCompliance = 0.03f;
+  settings.pinnedParticleIndices = { 0, 3, 999 };
+
+  sauce::Entity entity("ClothEntity");
+  entity.addComponent<sauce::TransformComponent>(sauce::modeling::Transform(
+      glm::vec3(10.0f, 2.0f, -1.0f),
+      glm::angleAxis(1.57079632679f, glm::vec3(0.0f, 0.0f, 1.0f)),
+      glm::vec3(1.0f)));
+  entity.addComponent<sauce::ClothComponent>(mesh, settings);
+
+  auto* clothComponent = entity.getComponent<sauce::ClothComponent>();
+  if (!clothComponent || !clothComponent->hasClothData()) {
+    appendError(errors, "ClothComponent rebuild from mesh did not produce cloth data");
+    return false;
+  }
+
+  if (clothComponent->getRuntimeMesh() == nullptr ||
+      clothComponent->getRuntimeMesh() == mesh) {
+    appendError(errors, "ClothComponent runtime mesh was not created as a distinct copy");
+    return false;
+  }
+
+  const auto* clothData = clothComponent->getClothData();
+  if (!clothData || clothData->particles.size() != 4) {
+    appendError(errors, "ClothComponent cloth particle count did not match source mesh vertices");
+    return false;
+  }
+
+  const glm::vec3 expectedWorldPosition(10.0f, 3.0f, -1.0f);
+  if (!approxEqual(clothData->particles[1].position, expectedWorldPosition)) {
+    appendError(errors, "ClothComponent did not initialize particle positions in world space");
+    return false;
+  }
+
+  if (!clothData->particles[0].pinned || !clothData->particles[3].pinned ||
+      clothData->particles[1].pinned || clothData->particles[2].pinned) {
+    appendError(errors, "ClothComponent did not apply pinned particle settings correctly");
+    return false;
+  }
+
+  for (const auto& stretchConstraint : clothData->stretchConstraints) {
+    if (!approxEqual(stretchConstraint.compliance, settings.stretchCompliance)) {
+      appendError(errors, "ClothComponent did not apply stretch compliance to generated constraints");
+      return false;
+    }
+  }
+
+  for (const auto& bendConstraint : clothData->bendConstraints) {
+    if (!approxEqual(bendConstraint.compliance, settings.bendCompliance)) {
+      appendError(errors, "ClothComponent did not apply bend compliance to generated constraints");
+      return false;
+    }
+  }
+
+  sauce::ClothComponent invalidCloth;
+  if (invalidCloth.rebuildFromMesh(nullptr, settings) || invalidCloth.hasClothData()) {
+    appendError(errors, "ClothComponent rebuild from null mesh did not fail cleanly");
+    return false;
+  }
+
+  return true;
+}
+
+bool testClothComponentTransformSync(std::vector<std::string>& errors) {
+  auto mesh = makeQuadMesh();
+
+  sauce::Entity entity("TransformSyncCloth");
+  entity.addComponent<sauce::TransformComponent>(sauce::modeling::Transform(
+      glm::vec3(2.0f, 0.0f, 0.0f),
+      glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
+      glm::vec3(1.0f)));
+  entity.addComponent<sauce::ClothComponent>(mesh);
+
+  auto* clothComponent = entity.getComponent<sauce::ClothComponent>();
+  auto* transformComponent = entity.getComponent<sauce::TransformComponent>();
+  auto* clothData = clothComponent ? clothComponent->getClothData() : nullptr;
+  if (!clothComponent || !transformComponent || !clothData || clothData->particles.size() < 2) {
+    appendError(errors, "Transform sync cloth fixture failed to initialize");
+    return false;
+  }
+
+  clothData->particles[1].position = glm::vec3(3.0f, 0.0f, 0.0f);
+  clothData->particles[1].previousPosition = glm::vec3(4.0f, 0.0f, 0.0f);
+  clothData->particles[1].predictedPosition = glm::vec3(3.0f, 1.0f, 0.0f);
+  clothData->particles[1].velocity = glm::vec3(2.0f, 0.0f, 0.0f);
+
+  transformComponent->setTranslation(glm::vec3(5.0f, 1.0f, 0.0f));
+  transformComponent->setRotation(
+      glm::angleAxis(1.57079632679f, glm::vec3(0.0f, 0.0f, 1.0f)));
+
+  clothComponent->syncSimulationTransform();
+
+  if (!approxEqual(clothData->particles[1].position, glm::vec3(5.0f, 2.0f, 0.0f)) ||
+      !approxEqual(clothData->particles[1].previousPosition, glm::vec3(5.0f, 3.0f, 0.0f)) ||
+      !approxEqual(clothData->particles[1].predictedPosition, glm::vec3(4.0f, 2.0f, 0.0f)) ||
+      !approxEqual(clothData->particles[1].velocity, glm::vec3(0.0f, 2.0f, 0.0f))) {
+    appendError(errors, "ClothComponent did not rigidly sync particle state to owner transform changes");
+    return false;
+  }
+
+  const glm::vec3 positionBeforeNoOp = clothData->particles[1].position;
+  const glm::vec3 previousBeforeNoOp = clothData->particles[1].previousPosition;
+  const glm::vec3 predictedBeforeNoOp = clothData->particles[1].predictedPosition;
+  const glm::vec3 velocityBeforeNoOp = clothData->particles[1].velocity;
+
+  clothComponent->syncSimulationTransform();
+
+  if (!approxEqual(clothData->particles[1].position, positionBeforeNoOp) ||
+      !approxEqual(clothData->particles[1].previousPosition, previousBeforeNoOp) ||
+      !approxEqual(clothData->particles[1].predictedPosition, predictedBeforeNoOp) ||
+      !approxEqual(clothData->particles[1].velocity, velocityBeforeNoOp)) {
+    appendError(errors, "ClothComponent repeated transform sync was not a no-op");
+    return false;
+  }
+
+  sauce::Entity noTransformEntity("NoTransformCloth");
+  noTransformEntity.addComponent<sauce::ClothComponent>(mesh);
+  auto* noTransformCloth = noTransformEntity.getComponent<sauce::ClothComponent>();
+  auto* noTransformClothData = noTransformCloth ? noTransformCloth->getClothData() : nullptr;
+  if (!noTransformCloth || !noTransformClothData ||
+      !approxEqual(noTransformClothData->particles[1].position, glm::vec3(1.0f, 0.0f, 0.0f))) {
+    appendError(errors, "ClothComponent did not treat a missing TransformComponent as identity");
+    return false;
+  }
+
+  return true;
+}
+
+bool testClothComponentRuntimeMeshSync(std::vector<std::string>& errors) {
+  auto mesh = makeQuadMesh();
+
+  sauce::Entity entity("RuntimeMeshCloth");
+  entity.addComponent<sauce::TransformComponent>(sauce::modeling::Transform(
+      glm::vec3(10.0f, 0.0f, 0.0f),
+      glm::angleAxis(1.57079632679f, glm::vec3(0.0f, 0.0f, 1.0f)),
+      glm::vec3(1.0f)));
+  entity.addComponent<sauce::ClothComponent>(mesh);
+
+  auto* clothComponent = entity.getComponent<sauce::ClothComponent>();
+  auto* clothData = clothComponent ? clothComponent->getClothData() : nullptr;
+  if (!clothComponent || !clothData || clothData->particles.size() < 2) {
+    appendError(errors, "Runtime mesh sync cloth fixture failed to initialize");
+    return false;
+  }
+
+  clothData->particles[1].position = glm::vec3(10.0f, 2.0f, 0.0f);
+  if (!clothComponent->syncRuntimeMesh()) {
+    appendError(errors, "ClothComponent syncRuntimeMesh failed unexpectedly");
+    return false;
+  }
+
+  const auto runtimeMesh = clothComponent->getRuntimeMesh();
+  if (!runtimeMesh ||
+      !approxEqual(runtimeMesh->getVertices()[1].position, glm::vec3(2.0f, 0.0f, 0.0f))) {
+    appendError(errors, "ClothComponent syncRuntimeMesh did not write inverse-transformed local vertex positions");
+    return false;
+  }
+
+  for (const auto& vertex : runtimeMesh->getVertices()) {
+    if (!isFinite(vertex.position) || !isFinite(vertex.normal) ||
+        !isFinite(glm::vec3(vertex.tangent))) {
+      appendError(errors, "ClothComponent syncRuntimeMesh produced non-finite mesh attributes");
+      return false;
+    }
+  }
+
+  return true;
+}
+
 } // namespace
 
 int main() {
@@ -218,6 +424,9 @@ int main() {
   const bool pinnedOk = testPinnedParticlesRemainFixed(errors);
   const bool bendOk = testBendConstraintReducesError(errors);
   const bool stretchOk = testStretchConstraintReducesError(errors);
+  const bool componentRebuildOk = testClothComponentRebuildFromMesh(errors);
+  const bool componentTransformSyncOk = testClothComponentTransformSync(errors);
+  const bool componentRuntimeMeshSyncOk = testClothComponentRuntimeMeshSync(errors);
 
   if (!errors.empty()) {
     std::cerr << "XPBD cloth harness failed:\n";
@@ -232,5 +441,8 @@ int main() {
   std::cout << "  pinned: " << (pinnedOk ? "ok" : "failed") << "\n";
   std::cout << "  bend: " << (bendOk ? "ok" : "failed") << "\n";
   std::cout << "  stretch: " << (stretchOk ? "ok" : "failed") << "\n";
+  std::cout << "  component rebuild: " << (componentRebuildOk ? "ok" : "failed") << "\n";
+  std::cout << "  transform sync: " << (componentTransformSyncOk ? "ok" : "failed") << "\n";
+  std::cout << "  runtime mesh sync: " << (componentRuntimeMeshSyncOk ? "ok" : "failed") << "\n";
   return 0;
 }

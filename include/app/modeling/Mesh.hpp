@@ -18,6 +18,7 @@ public:
          const std::vector<uint32_t>& indices);
 
     const std::vector<sauce::Vertex>& getVertices() const { return vertices; }
+    std::vector<sauce::Vertex>& getVerticesMutable() { return vertices; }
     const std::vector<uint32_t>& getIndices() const { return indices; }
 
     size_t getVertexCount() const { return vertices.size(); }
