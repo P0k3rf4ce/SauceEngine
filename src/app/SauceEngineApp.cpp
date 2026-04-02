@@ -840,7 +840,40 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
   vk::ClearValue clearColor = vk::ClearColorValue { 0.0f, 0.0f, 0.0f, 1.0f };
   vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
 
-  bool firstDraw = true;
+  // Pass 0: Clear and Render Skybox
+  {
+    vk::RenderingAttachmentInfo colorAttachment {
+      .imageView = swapChain.getImageViews()[imageIndex],
+      .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+      .loadOp = vk::AttachmentLoadOp::eClear,
+      .storeOp = vk::AttachmentStoreOp::eStore,
+      .clearValue = clearColor,
+    };
+    vk::RenderingAttachmentInfo depthAttachment {
+      .imageView = pRenderer->getDepthImageView(),
+      .imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+      .loadOp = vk::AttachmentLoadOp::eClear,
+      .storeOp = vk::AttachmentStoreOp::eStore,
+      .clearValue = clearDepth,
+    };
+    vk::RenderingInfo renderingInfo {
+      .renderArea = { .offset = { 0, 0 }, .extent = extent },
+      .layerCount = 1,
+      .colorAttachmentCount = 1,
+      .pColorAttachments = &colorAttachment,
+      .pDepthAttachment = &depthAttachment,
+    };
+    cmd.beginRendering(renderingInfo);
+    cmd.setViewport(0, vk::Viewport(0.0f, 0.0f,
+      static_cast<float>(extent.width), static_cast<float>(extent.height), 0.0f, 1.0f));
+    cmd.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), extent));
+    
+    pRenderer->renderEnvironmentMap(cmd);
+    
+    cmd.endRendering();
+  }
+
+  bool firstDraw = false; // We already cleared in Pass 0
 
   for (auto& entity : pScene->getEntitiesMut()) {
     if (!entity.getActive()) continue;

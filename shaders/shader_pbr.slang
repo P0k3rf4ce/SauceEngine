@@ -57,11 +57,11 @@ static const float PI = 3.14159265359;
 // Vertex Input — matches Vertex in Vertex.hpp
 // ============================================================================
 struct VSInput {
-    float3 inPosition;          // location 0
-    float3 inNormal;            // location 1
-    float2 inTexCoord;          // location 2
-    float3 inColour;            // location 3
-    float4 tangent;             // location 4 (w = bitangent handedness)
+    [[vk::location(0)]] float3 inPosition;
+    [[vk::location(1)]] float3 inNormal;
+    [[vk::location(2)]] float2 inTexCoord;
+    [[vk::location(3)]] float3 inColour;
+    [[vk::location(4)]] float4 tangent;
 };
 
 // ============================================================================
@@ -332,18 +332,9 @@ float4 fragMain(VSOutput vertIn) : SV_TARGET {
     // glTF metallic-roughness: G = roughness, B = metallic
     float4 mrSample  = metallicRoughnessMap.Sample(vertIn.texCoord);
     float  metallic  = mrSample.b * material.metallicFactor;
-    float  roughness = mrSample.g * material.roughnessFactor;
-    roughness = clamp(roughness, 0.04, 1.0); // avoid zero roughness (NaN in GGX)
-
-    // Ambient occlusion — blend with strength
-    float ao = occlusionMap.Sample(vertIn.texCoord).r;
-    ao = 1.0 + material.occlusionStrength * (ao - 1.0);
-
-    // Emissive
-    float3 emissive = emissiveMap.Sample(vertIn.texCoord).rgb
-                    * material.emissiveFactor;
-
-    // ---- Surface normal (normal mapping) ----
+    float  roughness = clamp(mrSample.g * material.roughnessFactor, 0.04, 1.0);
+    float ao = 1.0 + material.occlusionStrength * (occlusionMap.Sample(vertIn.texCoord).r - 1.0);
+    float3 emissive = emissiveMap.Sample(vertIn.texCoord).rgb * material.emissiveFactor;
     float3x3 tbn = constructTBN(vertIn.normal, vertIn.tangent);
     float3 N = getNormalFromMap(tbn, vertIn.texCoord, material.normalScale);
 
@@ -387,25 +378,20 @@ float4 fragMain(VSOutput vertIn) : SV_TARGET {
     float3 kS = F;
     float3 kD = (1.0 - kS) * (1.0 - metallic);
 
-    // Diffuse IBL
-    float3 irradiance = irradianceMap.Sample(N).rgb;
+    // Hardcoded 90 degree X rotation for IBL
+    // x' = x, y' = -z, z' = y
+    float3 rotatedN = float3(N.x, -N.z, N.y);
+    float3 irradiance = irradianceMap.Sample(rotatedN).rgb;
     float3 diffuseIBL = irradiance * albedo;
 
-    // Specular IBL (Split-sum approximation)
     float3 R = reflect(-V, N);
-    const float MAX_REFLECTION_LOD = 4.0; // matches mip levels in prefilter map
-    float3 prefilteredColor = prefilterMap.SampleLevel(R, roughness * MAX_REFLECTION_LOD).rgb;
+    float3 rotatedR = float3(R.x, -R.z, R.y);
+    const float MAX_REFLECTION_LOD = 4.0;
+    float3 prefilteredColor = prefilterMap.SampleLevel(rotatedR, roughness * MAX_REFLECTION_LOD).rgb;
     float2 brdf = brdfLUT.Sample(float2(max(dot(N, V), 0.0), roughness)).rg;
     float3 specularIBL = prefilteredColor * (F * brdf.x + brdf.y);
 
-    float3 ambient = (kD * diffuseIBL + specularIBL) * ao;
-
-    // ---- Final colour ----
-    float3 color = ambient + Lo + emissive;
-
-    // ---- Tone mapping (Reinhard) ----
-    // TODO(tasks 11-12): Remove once post-process pass (postprocess.slang) is wired into the renderer
+    float3 color = (kD * diffuseIBL + specularIBL) * ao + Lo + emissive;
     color = color / (color + 1.0);
-
     return float4(color, alpha);
 }

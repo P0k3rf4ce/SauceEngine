@@ -27,7 +27,10 @@ float3 uvToDir(uint face, float2 uv) {
 }
 
 float2 dirToEquirectUV(float3 dir) {
-    float phi = atan2(dir.z, dir.x);
+    // phi in [-PI, PI], theta in [-PI/2, PI/2]
+    // Using atan2(z, -x) is a common convention to align the center of the 
+    // equirectangular map with the -Z axis.
+    float phi = atan2(dir.z, -dir.x); 
     float theta = asin(dir.y);
     float2 uv = float2(phi / (2.0 * PI) + 0.5, theta / PI + 0.5);
     return uv;

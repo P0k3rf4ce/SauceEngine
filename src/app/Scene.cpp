@@ -4,6 +4,7 @@
 #include "app/components/TransformComponent.hpp"
 #include "app/components/MeshRendererComponent.hpp"
 #include "app/components/PointLightComponent.hpp"
+#include "app/components/SpotLightComponent.hpp"
 #include "app/components/DirectionalLightComponent.hpp"
 #include <unordered_map>
 #include <iostream>
@@ -121,6 +122,12 @@ void Scene::loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
         const auto& info = node->getLightInfo().value();
         if (info.type == modeling::LightInfo::Type::Point) {
             entity.addComponent<PointLightComponent>(info.color, info.intensity, info.range);
+        } else if (info.type == modeling::LightInfo::Type::Spot) {
+            // glTF spot lights point along local -Z; apply the node's rotation to get world direction
+            glm::vec3 direction = glm::normalize(node->getTransform().getRotation() * glm::vec3(0.0f, 0.0f, -1.0f));
+            entity.addComponent<SpotLightComponent>(info.color, info.intensity, info.range,
+                                                     direction,
+                                                     info.innerConeAngle, info.outerConeAngle);
         } else if (info.type == modeling::LightInfo::Type::Directional) {
             entity.addComponent<DirectionalLightComponent>(info.color, info.intensity);
         }
