@@ -23,12 +23,7 @@
 namespace sauce {
 namespace {
 
-struct PrimitiveAsset {
-  std::shared_ptr<modeling::Mesh> mesh;
-  std::shared_ptr<modeling::Material> sourceMaterial;
-};
-
-PrimitiveAsset loadPrimitiveAsset(const std::filesystem::path& path) {
+std::shared_ptr<modeling::Mesh> loadPrimitiveMesh(const std::filesystem::path& path) {
   modeling::GLTFLoader loader;
   const auto model = loader.loadModel(path.string());
   if (!model) {
@@ -36,17 +31,11 @@ PrimitiveAsset loadPrimitiveAsset(const std::filesystem::path& path) {
   }
 
   const auto& meshes = model->getAllMeshes();
-  const auto& materials = model->getAllMaterials();
   if (meshes.empty() || !meshes.front()) {
     throw std::runtime_error("Asset has no mesh: " + path.string());
   }
 
-  PrimitiveAsset asset;
-  asset.mesh = meshes.front();
-  if (!materials.empty()) {
-    asset.sourceMaterial = materials.front();
-  }
-  return asset;
+  return meshes.front();
 }
 
 std::shared_ptr<modeling::Material> makeWoodMaterial(const std::string& name,
@@ -152,10 +141,7 @@ int main() {
   try {
     const auto projectRoot = std::filesystem::current_path();
     const auto textureDirectory = std::filesystem::absolute(projectRoot / "testScene" / "textures2");
-    const auto cubeAsset = loadPrimitiveAsset((projectRoot / "assets/models/Cube.gltf").string());
-    if (!cubeAsset.mesh) {
-      throw std::runtime_error("Required primitive meshes are unavailable.");
-    }
+    const auto cubeMesh = loadPrimitiveMesh((projectRoot / "assets/models/Cube.gltf").string());
 
     CameraCreateInfo cameraInfo{
         .scrWidth = 1280.0f,
@@ -213,7 +199,7 @@ int main() {
         addMeshEntity(
             scene,
             "JengaBlock_" + std::to_string(blockIndex++),
-            cubeAsset.mesh,
+            cubeMesh,
             blockMaterial,
             position,
             rotation,

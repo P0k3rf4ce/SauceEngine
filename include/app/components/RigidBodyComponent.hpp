@@ -39,7 +39,6 @@ public:
   const glm::quat& getOrientation()                 const { return orientation; }
   const glm::vec3& getAngularVelocity()             const { return angularVelocity; }
   const glm::vec3& getAccumulatedForce()            const { return accumulatedForce; }
-  const glm::vec3& getExternalForces()              const { return accumulatedForce; }
   bool             isCollisionEnabled()             const { return collisionEnabled; }
   float            getInvMass()                     const { return invMass; }
   const glm::mat3& getInvInertiaTensor()            const { return invInertiaTensor; }
@@ -52,7 +51,6 @@ public:
   void setOrientation(const glm::quat& q)           { orientation = q; }
   void setAngularVelocity(const glm::vec3& w)       { angularVelocity = w; }
   void setAccumulatedForce(const glm::vec3& force)  { accumulatedForce = force; }
-  void setExternalForces(const glm::vec3& force)    { accumulatedForce = force; }
   void setCollisionEnabled(bool enabled)            { collisionEnabled = enabled; }
   void setInvMass(float w)                          { invMass = w; }
   void setInvInertiaTensor(const glm::mat3& I)      { invInertiaTensor = I; }
@@ -64,9 +62,6 @@ public:
     sleeping = false;
   }
   void clearAccumulatedForce()                      { accumulatedForce = glm::vec3(0.0f); }
-  void clearExternalForces()                        { accumulatedForce = glm::vec3(0.0f); }
-  void addForce(const glm::vec3& force)             { accumulatedForce += force; }
-  void offsetExternalForce(glm::vec3 force)         { accumulatedForce += force; }
   void sleep() {
     if (!canBeDynamic()) {
       return;

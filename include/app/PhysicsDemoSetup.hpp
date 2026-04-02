@@ -19,7 +19,6 @@ struct SolverTuning {
 };
 
 SolverTuning selectRigidSolverTuning(size_t dynamicBodyCount);
-bool isStaticTableMesh(const MeshRendererComponent* meshRenderer);
 RigidBodyComponent* ensureEntityRigidBody(Entity& entity);
 void configureRigidBodyFromEntity(Entity& entity, RigidBodyComponent& rigidBody);
 void armScene(Scene& scene);

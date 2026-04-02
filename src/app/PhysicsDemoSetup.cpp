@@ -12,6 +12,12 @@
 
 namespace sauce::physics_demo {
 
+namespace {
+bool isStaticTableMesh(const MeshRendererComponent* meshRenderer) {
+  return meshRenderer && meshRenderer->getMesh() && meshRenderer->getMesh()->getVertexCount() == 4;
+}
+} // namespace
+
 SolverTuning selectRigidSolverTuning(size_t dynamicBodyCount) {
   if (dynamicBodyCount >= 20) {
     return SolverTuning{
@@ -38,10 +44,6 @@ SolverTuning selectRigidSolverTuning(size_t dynamicBodyCount) {
   }
 
   return SolverTuning{};
-}
-
-bool isStaticTableMesh(const MeshRendererComponent* meshRenderer) {
-  return meshRenderer && meshRenderer->getMesh() && meshRenderer->getMesh()->getVertexCount() == 4;
 }
 
 void configureRigidBodyFromEntity(Entity& entity, RigidBodyComponent& rigidBody) {
@@ -106,15 +108,10 @@ void armScene(Scene& scene) {
 
     auto* rigidBody = ensureEntityRigidBody(entity);
     auto* meshRenderer = entity.getComponent<MeshRendererComponent>();
-    auto* transform = entity.getComponent<TransformComponent>();
     if (!rigidBody || !meshRenderer || !meshRenderer->getMesh()) {
       continue;
     }
 
-    if (transform) {
-      rigidBody->setPosition(transform->getTranslation());
-      rigidBody->setOrientation(transform->getRotation());
-    }
     rigidBody->setVelocity(glm::vec3(0.0f));
     rigidBody->setAngularVelocity(glm::vec3(0.0f));
     rigidBody->clearAccumulatedForce();

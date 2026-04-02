@@ -6,7 +6,6 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <cstdint>
-#include <limits>
 
 namespace physics {
 
@@ -19,37 +18,12 @@ constexpr float kStaticFrictionCoefficient = 0.8f;
 struct CollisionConstraint : public Constraint {
   CollisionConstraint() = default;
 
-  CollisionConstraint(uint32_t a, uint32_t b, glm::vec3 normal, float depth,
+  CollisionConstraint(uint32_t a, uint32_t b, glm::vec3 normal,
                       glm::vec3 offsetA, glm::vec3 offsetB, float comp = 0.0f)
-      : Constraint(comp), indexA(a), indexB(b), contactNormal(normal), penetrationDepth(depth),
+      : Constraint(comp), indexA(a), indexB(b), contactNormal(normal),
         localOffsetA(offsetA), localOffsetB(offsetB) {}
 
   void solve(std::vector<physics::Vertex>& vertices, float deltatime) override {
-    solveDynamic(vertices, deltatime);
-  }
-
-  uint32_t indexA = 0;
-  uint32_t indexB = 0;
-  glm::vec3 contactNormal = glm::vec3(0.0f, 1.0f, 0.0f);
-  float penetrationDepth = 0.0f;
-  glm::vec3 localOffsetA = glm::vec3(0.0f);
-  glm::vec3 localOffsetB = glm::vec3(0.0f);
-
-private:
-  static glm::mat3 worldInvInertiaTensor(const physics::Vertex& v) {
-    const glm::mat3 rotation = glm::mat3_cast(v.orientation);
-    return rotation * v.invInertiaTensor * glm::transpose(rotation);
-  }
-
-  float computeGeneralizedInverseMass(const physics::Vertex& v,
-                                      const glm::vec3& worldOffset,
-                                      const glm::vec3& direction,
-                                      const glm::mat3& worldInvInertia) const {
-    const glm::vec3 angular = glm::cross(worldOffset, direction);
-    return v.invMass + glm::dot(glm::cross(worldInvInertia * angular, worldOffset), direction);
-  }
-
-  void solveDynamic(std::vector<physics::Vertex>& vertices, float deltatime) {
     if (indexA >= vertices.size() || indexB >= vertices.size()) return;
 
     physics::Vertex& va = vertices[indexA];
@@ -64,7 +38,7 @@ private:
     const glm::vec3 pointA = va.position + worldOffsetA;
     const glm::vec3 pointB = vb.position + worldOffsetB;
 
-    const float C = glm::dot(pointA - pointB, contactNormal) - penetrationDepth;
+    const float C = glm::dot(pointA - pointB, contactNormal);
     if (C >= -kCollisionPenetrationEpsilon) return;
 
     const float alphaTilde = compliance / (deltatime * deltatime);
@@ -129,6 +103,26 @@ private:
     const glm::vec3 dOmegaTangentB = worldInvInertiaB * glm::cross(postOffsetB, -tangentImpulse);
     va.orientation = glm::normalize(va.orientation + 0.5f * glm::quat(0.0f, dOmegaTangentA) * va.orientation);
     vb.orientation = glm::normalize(vb.orientation + 0.5f * glm::quat(0.0f, dOmegaTangentB) * vb.orientation);
+  }
+
+  uint32_t indexA = 0;
+  uint32_t indexB = 0;
+  glm::vec3 contactNormal = glm::vec3(0.0f, 1.0f, 0.0f);
+  glm::vec3 localOffsetA = glm::vec3(0.0f);
+  glm::vec3 localOffsetB = glm::vec3(0.0f);
+
+private:
+  static glm::mat3 worldInvInertiaTensor(const physics::Vertex& v) {
+    const glm::mat3 rotation = glm::mat3_cast(v.orientation);
+    return rotation * v.invInertiaTensor * glm::transpose(rotation);
+  }
+
+  float computeGeneralizedInverseMass(const physics::Vertex& v,
+                                      const glm::vec3& worldOffset,
+                                      const glm::vec3& direction,
+                                      const glm::mat3& worldInvInertia) const {
+    const glm::vec3 angular = glm::cross(worldOffset, direction);
+    return v.invMass + glm::dot(glm::cross(worldInvInertia * angular, worldOffset), direction);
   }
 };
 

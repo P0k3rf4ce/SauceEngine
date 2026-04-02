@@ -75,7 +75,6 @@ struct PlanePenetrationStats {
 struct ContactDumpEntry {
   std::string bodyA;
   std::string bodyB;
-  float depth = 0.0f;
   glm::vec3 normal = glm::vec3(0.0f);
 };
 
@@ -390,13 +389,12 @@ std::vector<ContactDumpEntry> collectContactDump(
     dump.push_back({
         ownerA ? ownerA->get_name() : "?",
         ownerB ? ownerB->get_name() : "?",
-        collision->penetrationDepth,
         collision->contactNormal,
     });
   }
 
   std::sort(dump.begin(), dump.end(), [](const ContactDumpEntry& a, const ContactDumpEntry& b) {
-    return a.depth > b.depth;
+    return a.bodyA < b.bodyA;
   });
   return dump;
 }
@@ -498,7 +496,6 @@ int main(int argc, char** argv) {
         std::cout
             << "  [" << i << "] "
             << entry.bodyA << "/" << entry.bodyB
-            << " depth=" << entry.depth
             << " normal=(" << entry.normal.x << "," << entry.normal.y << "," << entry.normal.z << ")"
             << "\n";
       }

@@ -523,48 +523,6 @@ void SauceEngineApp::applyCameraCollisionPush(const glm::vec3& previousCameraPos
     }
 }
 
-void SauceEngineApp::wakeContactNeighbors(Entity& source, RigidBodyComponent& sourceBody) {
-    if (!pScene) {
-      return;
-    }
-
-    const glm::vec3 sourceCenter = sourceBody.getWorldCenterOfMass();
-    const auto* sourceMesh = source.getComponent<MeshRendererComponent>();
-    if (!sourceMesh || !sourceMesh->getMesh()) {
-      return;
-    }
-
-    const float sourceRadius = computeScaledMeshRadius(
-        *sourceMesh->getMesh(), sourceBody.getCenterOfMass(), sourceBody.getScale());
-    constexpr float kNeighborMargin = 0.15f;
-
-    for (auto& entity : pScene->getEntitiesMut()) {
-      if (!entity.getActive() || &entity == &source) {
-        continue;
-      }
-
-      auto* rigidBody = entity.getComponent<RigidBodyComponent>();
-      if (!rigidBody || !rigidBody->isSleeping() || !rigidBody->canBeDynamic()) {
-        continue;
-      }
-
-      auto* meshRenderer = entity.getComponent<MeshRendererComponent>();
-      if (!meshRenderer || !meshRenderer->getMesh()) {
-        continue;
-      }
-
-      const float neighborRadius = computeScaledMeshRadius(
-          *meshRenderer->getMesh(), rigidBody->getCenterOfMass(), rigidBody->getScale());
-      const glm::vec3 neighborCenter = rigidBody->getWorldCenterOfMass();
-      const float dist = glm::length(neighborCenter - sourceCenter);
-      const float touchDist = sourceRadius + neighborRadius + kNeighborMargin;
-
-      if (dist < touchDist) {
-        rigidBody->wake();
-      }
-    }
-}
-
 void SauceEngineApp::startDropDemo() {
     if (!pScene) {
       return;
@@ -679,13 +637,39 @@ void SauceEngineApp::mainLoop() {
           auto* dragRB = draggedEntity->getComponent<RigidBodyComponent>();
           if (dragRB) {
             glm::vec3 toTarget = dragTargetPosition - dragRB->getPosition();
-            constexpr float kMaxDragStep = 0.2f;
-            float maxDisp = kMaxDragStep * static_cast<float>(pSolver->rigidSubsteps);
-            float dist = glm::length(toTarget);
-            if (dist > maxDisp) {
-              toTarget *= maxDisp / dist;
+
+            constexpr float kMaxDragStepXY = 0.08f;
+            constexpr float kMaxDragStepDown = 0.025f;
+            const float substeps = static_cast<float>(pSolver->rigidSubsteps);
+
+            const glm::vec3 gravDir = pSolver->gravityDirection;
+            const float downComponent = glm::dot(toTarget, gravDir);
+            const glm::vec3 downVec = downComponent * gravDir;
+            const glm::vec3 lateralVec = toTarget - downVec;
+
+            float lateralLen = glm::length(lateralVec);
+            float maxLateral = kMaxDragStepXY * substeps;
+            glm::vec3 clampedLateral = lateralVec;
+            if (lateralLen > maxLateral) {
+              clampedLateral *= maxLateral / lateralLen;
             }
-            dragRB->setVelocity(toTarget / physicsDt);
+
+            glm::vec3 clampedDown = downVec;
+            if (downComponent > 0.0f) {
+              float maxDown = kMaxDragStepDown * substeps;
+              if (downComponent > maxDown) {
+                clampedDown = maxDown * gravDir;
+              }
+            } else {
+              float upLen = -downComponent;
+              float maxUp = kMaxDragStepXY * substeps;
+              if (upLen > maxUp) {
+                clampedDown = -maxUp * gravDir;
+              }
+            }
+
+            glm::vec3 clampedDisp = clampedLateral + clampedDown;
+            dragRB->setVelocity(clampedDisp / physicsDt);
             dragRB->setAngularVelocity(glm::vec3(0.0f));
           }
         }
@@ -1069,7 +1053,6 @@ void SauceEngineApp::beginDrag(double mouseX, double mouseY) {
     glm::vec3 hitOnPlane = ray.origin + tPlane * ray.direction;
 
     dragOffset = rigidBody->getPosition() - hitOnPlane;
-    dragPrevPosition = rigidBody->getPosition();
     dragTargetPosition = rigidBody->getPosition();
     dragSmoothedVelocity = glm::vec3(0.0f);
     draggedEntity = bestEntity;

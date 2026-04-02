@@ -1,7 +1,6 @@
 #include <physics/XPBD.hpp>
 #include <physics/SphereBVH.hpp>
 #include <physics/SphereCollider.hpp>
-#include <physics/constraints/Constraint.hpp>
 #include <physics/constraints/CollisionConstraint.hpp>
 
 #include <app/Entity.hpp>
@@ -1116,6 +1115,14 @@ std::vector<std::unique_ptr<Constraint>> XPBDSolver::generateCollisionConstraint
   const auto contacts = collectCollisionContacts(rigidBodies);
   constraints.reserve(contacts.size());
 
+  std::vector<bool> wasActiveBeforeWake(rigidBodies.size(), false);
+  for (size_t i = 0; i < rigidBodies.size(); ++i) {
+    auto* rb = rigidBodies[i];
+    if (!rb) continue;
+    wasActiveBeforeWake[i] = rb->isDynamic() ||
+        (rb->canBeDynamic() && rb->getInvMass() <= 1e-8f && !rb->isSleeping());
+  }
+
   for (const auto& contact : contacts) {
     if (contact.indexA >= rigidBodies.size() || contact.indexB >= rigidBodies.size()) {
       continue;
@@ -1127,16 +1134,17 @@ std::vector<std::unique_ptr<Constraint>> XPBDSolver::generateCollisionConstraint
       continue;
     }
 
-    constexpr float kWakeImpactSpeedSq = 1.0f;  // 1.0 m/s — only wake on significant impact
-    auto shouldWake = [&](sauce::RigidBodyComponent* waker, sauce::RigidBodyComponent* sleeper) {
+    auto shouldWake = [&](uint32_t wakerIdx, sauce::RigidBodyComponent* sleeper) -> bool {
       if (!sleeper->isSleeping() || !sleeper->canBeDynamic()) return false;
-      if (waker->isSleeping()) return false;
-      bool isKinematic = waker->canBeDynamic() && waker->getInvMass() <= 1e-8f;
-      if (isKinematic) return true;
-      return waker->isDynamic() && glm::length2(waker->getVelocity()) > kWakeImpactSpeedSq;
+      if (!wasActiveBeforeWake[wakerIdx]) return false;
+      auto* waker = rigidBodies[wakerIdx];
+      if (!waker) return false;
+      if (waker->isDynamic()) return true;
+      constexpr float kKinematicWakeSpeedSq = 0.1f;
+      return glm::length2(waker->getVelocity()) > kKinematicWakeSpeedSq;
     };
-    if (shouldWake(bodyA, bodyB)) { bodyB->wake(); }
-    if (shouldWake(bodyB, bodyA)) { bodyA->wake(); }
+    if (shouldWake(contact.indexA, bodyB)) { bodyB->wake(); }
+    if (shouldWake(contact.indexB, bodyA)) { bodyA->wake(); }
 
     const glm::vec3 centerA = bodyA->getWorldCenterOfMass();
     const glm::vec3 centerB = bodyB->getWorldCenterOfMass();
@@ -1148,10 +1156,8 @@ std::vector<std::unique_ptr<Constraint>> XPBDSolver::generateCollisionConstraint
         contact.indexA,
         contact.indexB,
         contact.contactNormal,
-        0.0f,
         localOffsetA,
-        localOffsetB,
-        0.0f));
+        localOffsetB));
   }
 
   return constraints;

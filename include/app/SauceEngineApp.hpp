@@ -80,10 +80,8 @@ private:
   glm::vec3 dragPlaneNormal = glm::vec3(0.0f);
   glm::vec3 dragPlanePoint = glm::vec3(0.0f);
   glm::vec3 dragOffset = glm::vec3(0.0f);
-  glm::vec3 dragPrevPosition = glm::vec3(0.0f);
   glm::vec3 dragTargetPosition = glm::vec3(0.0f);
   glm::vec3 dragSmoothedVelocity = glm::vec3(0.0f);
-  bool leftMouseDown = false;
 
   std::unique_ptr<sauce::Instance> pInstance;
 
@@ -126,7 +124,6 @@ private:
   RigidBodyComponent* ensureEntityRigidBody(Entity& entity);
   void configureRigidBodyFromEntity(Entity& entity, RigidBodyComponent& rigidBody);
   void applyCameraCollisionPush(const glm::vec3& previousCameraPosition, float deltaTime);
-  void wakeContactNeighbors(Entity& source, RigidBodyComponent& sourceBody);
   void startDropDemo();
   void updateDropDemoForces();
   void syncRigidBodiesToTransforms();
