@@ -63,7 +63,8 @@ private:
       const std::vector<sauce::RigidBodyComponent*>& rigidBodies) const;
   void applyCollisionVelocityResponse(
       const std::vector<sauce::RigidBodyComponent*>& rigidBodies,
-      const std::vector<CollisionContact>& contacts) const;
+      const std::vector<CollisionContact>& contacts,
+      float deltatime) const;
 };
 
 } // namespace physics

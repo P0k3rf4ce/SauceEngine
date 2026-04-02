@@ -983,9 +983,8 @@ bool tryBuildCollisionBody(uint32_t index,
 void appendReducedContacts(const CollisionBody& sampleBody,
                            const CollisionBody& targetBody,
                            std::vector<MeshContact>& contacts) {
-  bool isActive = sampleBody.rigidBody->isDynamic() ||
-                  (sampleBody.rigidBody->canBeDynamic() && !sampleBody.rigidBody->isSleeping());
-  if (!isActive) {
+  // Sleeping bodies still contribute collision geometry; only true statics opt out.
+  if (!sampleBody.rigidBody->canBeDynamic()) {
     return;
   }
 
@@ -1152,12 +1151,14 @@ std::vector<std::unique_ptr<Constraint>> XPBDSolver::generateCollisionConstraint
     const glm::quat invOrientationB = glm::inverse(bodyB->getOrientation());
     const glm::vec3 localOffsetA = invOrientationA * (contact.pointA - centerA);
     const glm::vec3 localOffsetB = invOrientationB * (contact.pointB - centerB);
+    constexpr float kCollisionCompliance = 1.2e-7f;
     constraints.push_back(std::make_unique<CollisionConstraint>(
         contact.indexA,
         contact.indexB,
         contact.contactNormal,
         localOffsetA,
-        localOffsetB));
+        localOffsetB,
+        kCollisionCompliance));
   }
 
   return constraints;
@@ -1165,7 +1166,7 @@ std::vector<std::unique_ptr<Constraint>> XPBDSolver::generateCollisionConstraint
 
 void XPBDSolver::wakeUnsupportedBodies(
     const std::vector<sauce::RigidBodyComponent*>& rigidBodies) const {
-  constexpr float kSupportVerticalMargin = 0.05f;
+  constexpr float kSupportVerticalMargin = 0.12f;
 
   const glm::vec3 up = -gravityDirection;
 

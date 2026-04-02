@@ -7,6 +7,7 @@
 #include <app/components/ClothComponent.hpp>
 #include <app/components/LightComponent.hpp>
 #include <app/PhysicsDemoSetup.hpp>
+#include <algorithm>
 #include <functional>
 #include <cstring>
 #include <limits>
@@ -121,6 +122,12 @@ AABB computeWorldAABB(const modeling::Mesh& mesh, const glm::mat4& modelMatrix) 
 
 SauceEngineApp::SauceEngineApp() {
   pImGuiComponentManager = std::make_unique<sauce::ui::ImGuiComponentManager>();
+}
+
+void SauceEngineApp::setPhysicsTickRate(double hz) {
+  constexpr double kMinHz = 10.0;
+  constexpr double kMaxHz = 500.0;
+  physicsTickRate = std::clamp(hz, kMinHz, kMaxHz);
 }
 
 SauceEngineApp::~SauceEngineApp() {
@@ -602,7 +609,6 @@ void SauceEngineApp::mainLoop() {
       auto currentFrameTime = std::chrono::steady_clock::now();
       deltaFrame = std::chrono::duration<float>(currentFrameTime - lastFrameTime).count();
       lastFrameTime = currentFrameTime;
-      deltaUpdate += deltaFrame;
 
       glfwPollEvents();
       processInput(deltaFrame);
@@ -612,7 +618,7 @@ void SauceEngineApp::mainLoop() {
       pImGuiRenderer->newFrame();
       buildExampleUI();
 
-      // Run XPBD only if 1/TICKRATE seconds passed since last physics run 
+      // Fixed physics step: dt = 1 / physicsTickRate (from -t / setPhysicsTickRate)
 
       auto constraints = std::vector<std::unique_ptr<physics::Constraint>>();
       auto rigidBodies = collectRigidBodies();
@@ -625,9 +631,19 @@ void SauceEngineApp::mainLoop() {
       const auto solverTuning = physics_demo::selectRigidSolverTuning(dynamicRigidBodyCount);
       pSolver->solverIterations = solverTuning.solverIterations;
       pSolver->rigidSubsteps = solverTuning.rigidSubsteps;
-      const float physicsDt = solverTuning.physicsDt;
+      const float physicsDt = 1.0f / static_cast<float>(physicsTickRate);
 
-      if (deltaUpdate > 1.0) {
+      constexpr int kMaxPhysicsStepsPerFrame = 8;
+      constexpr float kMaxFrameDtFactor = 3.0f;
+      const float clampedFrame =
+          std::min(static_cast<float>(deltaFrame), physicsDt * kMaxFrameDtFactor);
+      deltaUpdate += clampedFrame;
+      const float maxCarry = physicsDt * static_cast<float>(kMaxPhysicsStepsPerFrame);
+      if (deltaUpdate > maxCarry) {
+        deltaUpdate = maxCarry;
+      }
+
+      if (deltaUpdate > 1.0f) {
         deltaUpdate = physicsDt;
       }
       while (deltaUpdate >= physicsDt) {

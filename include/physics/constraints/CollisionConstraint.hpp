@@ -11,7 +11,10 @@ namespace physics {
 
 namespace {
 constexpr float kCollisionMassEpsilon = 1e-8f;
-constexpr float kCollisionPenetrationEpsilon = 1e-5f;
+// Ignore penetration shallower than this (m) to stop GS + velocity fighting on noise.
+constexpr float kCollisionPenetrationSlop = 1.4e-4f;
+constexpr float kNormalCorrectionRelax = 0.82f;
+constexpr float kTangentCorrectionRelax = 0.78f;
 constexpr float kStaticFrictionCoefficient = 0.8f;
 }
 
@@ -39,7 +42,7 @@ struct CollisionConstraint : public Constraint {
     const glm::vec3 pointB = vb.position + worldOffsetB;
 
     const float C = glm::dot(pointA - pointB, contactNormal);
-    if (C >= -kCollisionPenetrationEpsilon) return;
+    if (C >= -kCollisionPenetrationSlop) return;
 
     const float alphaTilde = compliance / (deltatime * deltatime);
     const glm::mat3 worldInvInertiaA = worldInvInertiaTensor(va);
@@ -52,14 +55,16 @@ struct CollisionConstraint : public Constraint {
     const float denom = normalInvMass + alphaTilde;
     if (denom <= kCollisionMassEpsilon) return;
 
-    const float deltaLambda = (-C - alphaTilde * lambda) / denom;
+    const float rawDeltaLambda = (-C - alphaTilde * lambda) / denom;
+    const float appliedDeltaLambda = rawDeltaLambda * kNormalCorrectionRelax;
+    lambda += appliedDeltaLambda;
 
     // Snapshot contact point positions before normal correction
     const glm::vec3 prePointA = pointA;
     const glm::vec3 prePointB = pointB;
 
     // Apply normal correction
-    const glm::vec3 normalImpulse = deltaLambda * contactNormal;
+    const glm::vec3 normalImpulse = appliedDeltaLambda * contactNormal;
     va.position += w1 * normalImpulse;
     vb.position -= w2 * normalImpulse;
 
@@ -68,15 +73,13 @@ struct CollisionConstraint : public Constraint {
     va.orientation = glm::normalize(va.orientation + 0.5f * glm::quat(0.0f, dOmegaA) * va.orientation);
     vb.orientation = glm::normalize(vb.orientation + 0.5f * glm::quat(0.0f, dOmegaB) * vb.orientation);
 
-    lambda += deltaLambda;
-
     const glm::vec3 postPointA = va.position + va.orientation * localOffsetA;
     const glm::vec3 postPointB = vb.position + vb.orientation * localOffsetB;
     const glm::vec3 relativeSlide = (postPointA - prePointA) - (postPointB - prePointB);
     const glm::vec3 tangentialSlide = relativeSlide - glm::dot(relativeSlide, contactNormal) * contactNormal;
     const float tangentialSlideLenSq = glm::dot(tangentialSlide, tangentialSlide);
 
-    const float normalCorrectionLen = std::abs(deltaLambda);
+    const float normalCorrectionLen = std::abs(appliedDeltaLambda);
     const float frictionBudget = kStaticFrictionCoefficient * normalCorrectionLen;
     if (tangentialSlideLenSq <= kCollisionMassEpsilon ||
         tangentialSlideLenSq <= frictionBudget * frictionBudget) {
@@ -94,7 +97,7 @@ struct CollisionConstraint : public Constraint {
         computeGeneralizedInverseMass(vb, postOffsetB, tangentDir, worldInvInertiaB);
     if (tangentInvMass <= kCollisionMassEpsilon) return;
 
-    const float tangentLambda = -excessSlide / tangentInvMass;
+    const float tangentLambda = (-excessSlide / tangentInvMass) * kTangentCorrectionRelax;
     const glm::vec3 tangentImpulse = tangentLambda * tangentDir;
     va.position += w1 * tangentImpulse;
     vb.position -= w2 * tangentImpulse;

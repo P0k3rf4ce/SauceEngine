@@ -88,6 +88,7 @@ add_executable(jenga_scene_builder
     src/app/components/MeshRendererComponent.cpp
     src/app/components/PointLightComponent.cpp
     src/app/components/DirectionalLightComponent.cpp
+    src/app/components/SpotLightComponent.cpp
     src/app/modeling/GLTFLoader.cpp
     src/app/modeling/GLTFExporter.cpp
     src/app/modeling/Model.cpp
@@ -214,6 +215,7 @@ add_executable(xpbd_rigid_harness
     src/app/components/RigidBodyComponent.cpp
     src/app/components/PointLightComponent.cpp
     src/app/components/DirectionalLightComponent.cpp
+    src/app/components/SpotLightComponent.cpp
     src/app/modeling/GLTFLoader.cpp
     src/app/modeling/GLTFExporter.cpp
     src/app/modeling/Model.cpp

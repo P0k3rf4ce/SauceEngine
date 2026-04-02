@@ -21,24 +21,24 @@ bool isStaticTableMesh(const MeshRendererComponent* meshRenderer) {
 SolverTuning selectRigidSolverTuning(size_t dynamicBodyCount) {
   if (dynamicBodyCount >= 20) {
     return SolverTuning{
-        .solverIterations = 20,
-        .rigidSubsteps = 8,
+        .solverIterations = 30,
+        .rigidSubsteps = 10,
         .physicsDt = 1.0f / 60.0f,
     };
   }
 
   if (dynamicBodyCount >= 12) {
     return SolverTuning{
-        .solverIterations = 16,
-        .rigidSubsteps = 4,
+        .solverIterations = 26,
+        .rigidSubsteps = 6,
         .physicsDt = 1.0f / 72.0f,
     };
   }
 
   if (dynamicBodyCount >= 6) {
     return SolverTuning{
-        .solverIterations = 16,
-        .rigidSubsteps = 4,
+        .solverIterations = 22,
+        .rigidSubsteps = 5,
         .physicsDt = 1.0f / 96.0f,
     };
   }

@@ -139,15 +139,20 @@ void applyImpulse(sauce::RigidBodyComponent& rigidBody,
 
 void XPBDSolver::applyCollisionVelocityResponse(
     const std::vector<sauce::RigidBodyComponent*>& rigidBodies,
-    const std::vector<CollisionContact>& contacts) const {
+    const std::vector<CollisionContact>& contacts,
+    float deltatime) const {
   constexpr float kVelocityEpsilon = 1e-6f;
-  constexpr float kBounceThreshold = 0.15f;
-  constexpr float kFrictionCoefficient = 0.6f;
-  constexpr float kSeparatingThreshold = 0.5f;
-  constexpr int kVelocityPasses = 4;
-  constexpr float kRelaxation = 0.8f;
+  constexpr float kBounceThreshold = 0.08f;
+  constexpr float kFrictionCoefficient = 0.5f;
+  constexpr float kSeparatingThreshold = 0.55f;
+  constexpr int kVelocityPasses = 3;
+  constexpr float kRelaxation = 0.55f;
   constexpr float kGravity = 9.81f;
-  constexpr float kDt = 1.0f / 60.0f;
+  constexpr float kPenetrationBiasScale = 0.18f;
+  constexpr float kPenetrationBiasMax = 0.45f;
+  constexpr float kPenetrationBiasMinDepth = 2e-3f;
+
+  const float h = std::max(deltatime, 1e-5f);
 
   for (int pass = 0; pass < kVelocityPasses; ++pass) {
     for (const auto& contact : contacts) {
@@ -182,13 +187,20 @@ void XPBDSolver::applyCollisionVelocityResponse(
           velocityAtPoint(*bodyA, offsetA) - velocityAtPoint(*bodyB, offsetB);
       const float normalSpeed = glm::dot(relativeVelocity, normal);
 
+      const float overlap = std::max(0.0f, contact.penetrationDepth);
+      const float penetrationBias =
+          (overlap < kPenetrationBiasMinDepth)
+              ? 0.0f
+              : std::min(kPenetrationBiasMax, overlap * kPenetrationBiasScale / h);
+      const float effectiveNormalSpeed = normalSpeed - penetrationBias;
+
       float normalImpulseMagnitude = 0.0f;
-      if (normalSpeed < -kBounceThreshold) {
+      if (effectiveNormalSpeed < -kBounceThreshold) {
         const float normalMass = invMassA + invMassB +
             angularEffectiveMass(*bodyA, offsetA, normal) +
             angularEffectiveMass(*bodyB, offsetB, normal);
         if (normalMass > kVelocityEpsilon) {
-          normalImpulseMagnitude = -normalSpeed / normalMass;
+          normalImpulseMagnitude = -effectiveNormalSpeed / normalMass;
           const glm::vec3 normalImpulse = kRelaxation * normalImpulseMagnitude * normal;
           applyImpulse(*bodyA, normalImpulse, offsetA);
           applyImpulse(*bodyB, -normalImpulse, offsetB);
@@ -196,7 +208,8 @@ void XPBDSolver::applyCollisionVelocityResponse(
         }
       }
 
-      if (normalSpeed > kSeparatingThreshold) {
+      const float normalSpeedAfter = glm::dot(relativeVelocity, normal);
+      if (normalSpeedAfter > kSeparatingThreshold) {
         continue;
       }
 
@@ -218,7 +231,7 @@ void XPBDSolver::applyCollisionVelocityResponse(
       float frictionBasis = std::max(normalImpulseMagnitude, -std::min(normalSpeed, 0.0f));
       if (frictionBasis < kVelocityEpsilon) {
         const float effectiveMass = 1.0f / (invMassA + invMassB);
-        frictionBasis = effectiveMass * kGravity * kDt * 0.25f;
+        frictionBasis = effectiveMass * kGravity * h * 0.3f;
       }
       const float tangentialImpulseLimit = kFrictionCoefficient * frictionBasis;
       const float tangentialImpulseMagnitude = std::clamp(
@@ -327,12 +340,13 @@ void XPBDSolver::solvePositions(
         kMaxAngularSpeed));
   }
 
-  applyCollisionVelocityResponse(simulatedBodies, collectCollisionContacts(simulatedBodies));
+  const auto frameContacts = collectCollisionContacts(simulatedBodies);
+  applyCollisionVelocityResponse(simulatedBodies, frameContacts, deltatime);
 
   constexpr float kSleepLinearThreshold = 0.05f;
   constexpr float kSleepAngularThreshold = 0.1f;
-  constexpr float kAutoSleepLinear = 0.01f;
-  constexpr float kAutoSleepAngular = 0.02f;
+  constexpr float kAutoSleepLinear = 0.012f;
+  constexpr float kAutoSleepAngular = 0.024f;
   for (auto* rigidBody : simulatedBodies) {
     if (!rigidBody || rigidBody->getInvMass() <= 1e-8f) {
       continue;
@@ -340,10 +354,10 @@ void XPBDSolver::solvePositions(
     const float linSpeedSq = glm::length2(rigidBody->getVelocity());
     const float angSpeedSq = glm::length2(rigidBody->getAngularVelocity());
     if (linSpeedSq < kSleepLinearThreshold * kSleepLinearThreshold) {
-      rigidBody->setVelocity(rigidBody->getVelocity() * 0.7f);
+      rigidBody->setVelocity(rigidBody->getVelocity() * 0.86f);
     }
     if (angSpeedSq < kSleepAngularThreshold * kSleepAngularThreshold) {
-      rigidBody->setAngularVelocity(rigidBody->getAngularVelocity() * 0.7f);
+      rigidBody->setAngularVelocity(rigidBody->getAngularVelocity() * 0.86f);
     }
     if (linSpeedSq < kAutoSleepLinear * kAutoSleepLinear &&
         angSpeedSq < kAutoSleepAngular * kAutoSleepAngular &&

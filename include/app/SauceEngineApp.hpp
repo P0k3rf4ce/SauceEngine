@@ -136,10 +136,12 @@ public:
   void setSceneFile(const std::string& path) { sceneFile = path; }
   void setCameraCollisionEnabled(bool enabled) { cameraCollisionEnabled = enabled; }
   void setIBLFile(const std::string& path) { iblFile = path; }
+  void setPhysicsTickRate(double hz);
 
 private:
   std::string sceneFile;
   std::string iblFile;
+  double physicsTickRate = 128.0;
   uint32_t width;
   uint32_t height;
 };
