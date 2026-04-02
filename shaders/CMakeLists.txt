@@ -38,6 +38,7 @@ add_slang_shader_target(shaderTarget SOURCES shader.slang OUTPUT shader.spv)
 add_slang_shader_target(shaderLightsTarget SOURCES shader_lights.slang OUTPUT shader_lights.spv)
 add_slang_shader_target(postProcessTarget SOURCES postprocess.slang OUTPUT postprocess.spv)
 add_slang_shader_target(shaderPBRTarget SOURCES shader_pbr.slang OUTPUT shader_pbr.spv)
+add_slang_shader_target(skyboxTarget SOURCES skybox.slang OUTPUT skybox.spv)
 
 add_slang_compute_target(iblBrdfLutTarget SOURCES ibl_brdf_lut.slang OUTPUT ibl_brdf_lut.spv)
 add_slang_compute_target(iblIrradianceTarget SOURCES ibl_irradiance.slang OUTPUT ibl_irradiance.spv)
@@ -65,7 +66,7 @@ function(add_glsl_shader_target TARGET SOURCE OUTPUT)
   add_custom_target(${TARGET} DEPENDS ${SHADERS_DIR}/${OUTPUT})
 endfunction()
 
-if(GLSLC)
+if(GLSLC AND NOT WIN32)
   add_glsl_shader_target(editorGridVert editor_grid.vert editor_grid.vert.spv)
   add_glsl_shader_target(editorGridFrag editor_grid.frag editor_grid.frag.spv)
   add_glsl_shader_target(editorUnlitVert editor_unlit.vert editor_unlit.vert.spv)
@@ -74,18 +75,22 @@ if(GLSLC)
   add_glsl_shader_target(editorLitFrag editor_lit.frag editor_lit.frag.spv)
 endif()
 
+add_slang_compute_target(iblEquirectToCubeTarget SOURCES ibl_equirect_to_cube.slang OUTPUT ibl_equirect_to_cube.spv)
+
 add_custom_target(shaders DEPENDS
   shaderTarget
   shaderLightsTarget
   postProcessTarget
   shaderPBRTarget
+  skyboxTarget
   iblBrdfLutTarget
   iblIrradianceTarget
   iblPrefilterTarget
-  $<$<BOOL:${GLSLC}>:editorGridVert>
-  $<$<BOOL:${GLSLC}>:editorGridFrag>
-  $<$<BOOL:${GLSLC}>:editorUnlitVert>
-  $<$<BOOL:${GLSLC}>:editorUnlitFrag>
-  $<$<BOOL:${GLSLC}>:editorLitVert>
-  $<$<BOOL:${GLSLC}>:editorLitFrag>
+  iblEquirectToCubeTarget
+  $<$<AND:$<BOOL:${GLSLC}>,$<NOT:$<BOOL:${WIN32}>>>:editorGridVert>
+  $<$<AND:$<BOOL:${GLSLC}>,$<NOT:$<BOOL:${WIN32}>>>:editorGridFrag>
+  $<$<AND:$<BOOL:${GLSLC}>,$<NOT:$<BOOL:${WIN32}>>>:editorUnlitVert>
+  $<$<AND:$<BOOL:${GLSLC}>,$<NOT:$<BOOL:${WIN32}>>>:editorUnlitFrag>
+  $<$<AND:$<BOOL:${GLSLC}>,$<NOT:$<BOOL:${WIN32}>>>:editorLitVert>
+  $<$<AND:$<BOOL:${GLSLC}>,$<NOT:$<BOOL:${WIN32}>>>:editorLitFrag>
 )

@@ -22,9 +22,11 @@
 #include <cmath>
 #include <cstring>
 #include <csignal>
+#ifndef _WIN32
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
 #include <editor/zip_file.hpp>
 
 namespace sauce::editor {
@@ -814,6 +816,7 @@ void EditorApp::mainLoop() {
 
     // Check if play mode process has exited on its own
     if (playModeActive && playProcessPid > 0) {
+#ifndef _WIN32
       int status;
       pid_t result = waitpid(playProcessPid, &status, WNOHANG);
       if (result != 0) {
@@ -827,6 +830,7 @@ void EditorApp::mainLoop() {
         }
         setStatusMessage("Play mode ended");
       }
+#endif
     }
 
     // Upload mesh GPU resources for any newly imported models
@@ -1707,6 +1711,7 @@ void EditorApp::startPlayMode() {
 
   SAUCE_LOG("Play", "Starting play mode: {} {}", engineExe.string(), playModeTempFile);
 
+#ifndef _WIN32
   pid_t pid = fork();
   if (pid == 0) {
     // Child process - exec SauceEngine with the temp scene file
@@ -1722,11 +1727,16 @@ void EditorApp::startPlayMode() {
     setStatusMessage("Play: Failed to launch engine");
     SAUCE_LOG("Play", "fork() failed");
   }
+#else
+  setStatusMessage("Play: Not supported on Windows yet");
+  SAUCE_LOG("Play", "Play mode not implemented for Windows");
+#endif
 }
 
 void EditorApp::stopPlayMode() {
   if (!playModeActive) return;
 
+#ifndef _WIN32
   if (playProcessPid > 0) {
     SAUCE_LOG("Play", "Stopping SauceEngine (PID {})", playProcessPid);
     kill(playProcessPid, SIGTERM);
@@ -1745,6 +1755,7 @@ void EditorApp::stopPlayMode() {
     }
     playProcessPid = -1;
   }
+#endif
 
   // Clean up temp file
   if (!playModeTempFile.empty()) {

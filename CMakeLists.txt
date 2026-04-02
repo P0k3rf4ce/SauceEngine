@@ -140,6 +140,7 @@ add_custom_command(TARGET modelviewer POST_BUILD
 )
 
 # SauceEditor executable
+if (NOT WIN32)
 add_executable(sauceeditor src/editor/main.cpp)
 
 target_include_directories(sauceeditor PRIVATE
@@ -187,6 +188,7 @@ target_link_libraries(sauceeditor PRIVATE nlohmann_json::nlohmann_json)
 # Editor only needs GLSL shaders, not the Slang ones
 if(TARGET editorGridVert)
   add_dependencies(sauceeditor editorGridVert editorGridFrag editorUnlitVert editorUnlitFrag)
+endif()
 endif()
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/launcher)

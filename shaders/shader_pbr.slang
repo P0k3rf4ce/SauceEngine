@@ -56,11 +56,11 @@ static const float PI = 3.14159265359;
 // Vertex Input — matches Vertex in Vertex.hpp
 // ============================================================================
 struct VSInput {
-    float3 inPosition;          // location 0
-    float3 inNormal;            // location 1
-    float2 inTexCoord;          // location 2
-    float3 inColour;            // location 3
-    float4 tangent;             // location 4 (w = bitangent handedness)
+    [[vk::location(0)]] float3 inPosition;
+    [[vk::location(1)]] float3 inNormal;
+    [[vk::location(2)]] float2 inTexCoord;
+    [[vk::location(3)]] float3 inColour;
+    [[vk::location(4)]] float4 tangent;
 };
 
 // ============================================================================
@@ -144,6 +144,7 @@ ConstantBuffer<MaterialData> material;
 // ============================================================================
 [[vk::push_constant]]
 cbuffer PushConstants {
+    float4x4 model;
     uint lightCount;
 };
 
@@ -167,7 +168,7 @@ VSOutput vertMain(VSInput input) {
     VSOutput output;
 
     // World-space position
-    float4 worldPos4 = mul(ubo.model, float4(input.inPosition, 1.0));
+    float4 worldPos4 = mul(model, float4(input.inPosition, 1.0));
     output.worldPos = worldPos4.xyz;
 
     // Clip-space position
@@ -176,7 +177,7 @@ VSOutput vertMain(VSInput input) {
     // Transform normal to world space
     // NOTE: Assumes uniform scale. For non-uniform scale the CPU should pass
     //       transpose(inverse(model)) as a separate normal matrix.
-    float3x3 normalMatrix = (float3x3)ubo.model;
+    float3x3 normalMatrix = (float3x3)model;
     output.normal = normalize(mul(normalMatrix, input.inNormal));
 
     // Transform tangent to world space (same matrix; valid for uniform scale)
@@ -330,18 +331,9 @@ float4 fragMain(VSOutput vertIn) : SV_TARGET {
     // glTF metallic-roughness: G = roughness, B = metallic
     float4 mrSample  = metallicRoughnessMap.Sample(vertIn.texCoord);
     float  metallic  = mrSample.b * material.metallicFactor;
-    float  roughness = mrSample.g * material.roughnessFactor;
-    roughness = clamp(roughness, 0.04, 1.0); // avoid zero roughness (NaN in GGX)
-
-    // Ambient occlusion — blend with strength
-    float ao = occlusionMap.Sample(vertIn.texCoord).r;
-    ao = 1.0 + material.occlusionStrength * (ao - 1.0);
-
-    // Emissive
-    float3 emissive = emissiveMap.Sample(vertIn.texCoord).rgb
-                    * material.emissiveFactor;
-
-    // ---- Surface normal (normal mapping) ----
+    float  roughness = clamp(mrSample.g * material.roughnessFactor, 0.04, 1.0);
+    float ao = 1.0 + material.occlusionStrength * (occlusionMap.Sample(vertIn.texCoord).r - 1.0);
+    float3 emissive = emissiveMap.Sample(vertIn.texCoord).rgb * material.emissiveFactor;
     float3x3 tbn = constructTBN(vertIn.normal, vertIn.tangent);
     float3 N = getNormalFromMap(tbn, vertIn.texCoord, material.normalScale);
 
@@ -380,20 +372,25 @@ float4 fragMain(VSOutput vertIn) : SV_TARGET {
         Lo += (kD * albedo / PI + specular) * radiance * NdotL;
     }
 
-    // ---- Ambient (constant placeholder — no IBL) ----
-    // TODO: Replace with IBL irradiance (task 10)
-    float3 ambient = float3(0.03, 0.03, 0.03) * albedo * ao;
+    // ---- Ambient (IBL) ----
+    float3 F = fresnelSchlick(max(dot(N, V), 0.0), F0);
+    float3 kS = F;
+    float3 kD = (1.0 - kS) * (1.0 - metallic);
 
-    // ---- Final colour ----
-    float3 color = ambient + Lo + emissive;
+    // Hardcoded 90 degree X rotation for IBL
+    // x' = x, y' = -z, z' = y
+    float3 rotatedN = float3(N.x, -N.z, N.y);
+    float3 irradiance = irradianceMap.Sample(rotatedN).rgb;
+    float3 diffuseIBL = irradiance * albedo;
 
-    // ---- Tone mapping (Reinhard) ----
-    // TODO(tasks 11-12): Remove once post-process pass (postprocess.slang) is wired into the renderer
+    float3 R = reflect(-V, N);
+    float3 rotatedR = float3(R.x, -R.z, R.y);
+    const float MAX_REFLECTION_LOD = 4.0;
+    float3 prefilteredColor = prefilterMap.SampleLevel(rotatedR, roughness * MAX_REFLECTION_LOD).rgb;
+    float2 brdf = brdfLUT.Sample(float2(max(dot(N, V), 0.0), roughness)).rg;
+    float3 specularIBL = prefilteredColor * (F * brdf.x + brdf.y);
+
+    float3 color = (kD * diffuseIBL + specularIBL) * ao + Lo + emissive;
     color = color / (color + 1.0);
-
-    // ---- Gamma correction ----
-    // TODO(tasks 11-12): Remove once rendering to sRGB framebuffer or post-process handles this
-    color = pow(color, float3(1.0 / 2.2, 1.0 / 2.2, 1.0 / 2.2));
-
     return float4(color, alpha);
 }

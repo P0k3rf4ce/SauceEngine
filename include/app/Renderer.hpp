@@ -122,8 +122,24 @@ public:
       .descriptorSetLayouts = { *descriptorSetLayout0, *descriptorSetLayout1, *modeling::Material::getDescriptorSetLayout() },
       .colorFormat = pSwapChain->getSurfaceFormat().format,
       .shaderPath = "shaders/shader_pbr.spv",
+      .hasPushConstants = true,
+      .pushConstantSize = 68, // sizeof(ScenePushConstants): mat4 (64) + uint32 (4)
     };
     pPipeline = std::make_unique<sauce::GraphicsPipeline>(mainPipelineConfig);
+
+    sauce::GraphicsPipelineConfig skyboxPipelineConfig {
+      .physicalDevice = createInfo.physicalDevice,
+      .logicalDevice = createInfo.logicalDevice,
+      .descriptorSetLayouts = { *descriptorSetLayout0, *descriptorSetLayout1 },
+      .colorFormat = pSwapChain->getSurfaceFormat().format,
+      .shaderPath = "shaders/skybox.spv",
+      .hasVertexInput = true,
+      .vertexAttributeCount = 1,
+      .enableCulling = false,
+      .depthWrite = false,
+      .depthCompareOp = vk::CompareOp::eLessOrEqual,
+    };
+    pSkyboxPipeline = std::make_unique<sauce::GraphicsPipeline>(skyboxPipelineConfig);
 
     sauce::GraphicsPipelineConfig postProcessPipelineConfig {
       .physicalDevice = createInfo.physicalDevice,
@@ -133,6 +149,8 @@ public:
       .shaderPath = "shaders/postprocess.spv",
       .hasVertexInput = false,
       .depthTestEnable = false,
+      .hasPushConstants = false,
+      .pushConstantSize = 0,
     };
     pPostProcessPipeline = std::make_unique<sauce::GraphicsPipeline>(postProcessPipelineConfig);
 
@@ -254,11 +272,13 @@ public:
     descriptorSetLayout0 = vk::raii::DescriptorSetLayout{ *logicalDevice, perFrameDsLayoutInfo };
 
     // Set 1: Environment Layout (IBL Maps)
-    std::array<vk::DescriptorSetLayoutBinding, 3> environmentBindings;
+    std::array<vk::DescriptorSetLayoutBinding, 4> environmentBindings;
     // IBL Maps: Irradiance, Prefilter, BRDF LUT
     environmentBindings[0] = { .binding = 0, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
     environmentBindings[1] = { .binding = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
     environmentBindings[2] = { .binding = 2, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
+    // High-res environment map for skybox
+    environmentBindings[3] = { .binding = 3, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment };
 
     vk::DescriptorSetLayoutCreateInfo environmentDsLayoutInfo {
       .bindingCount = static_cast<uint32_t>(environmentBindings.size()),
@@ -325,8 +345,7 @@ public:
 
     vk::DescriptorBufferInfo lightSSBOInfo { .buffer = *lightSSBO, .offset = 0, .range = lightSSBOSize };
     
-    // Fallback for IBL maps
-    vk::DescriptorImageInfo iblInfo { .sampler = *defaultSampler, .imageView = *defaultImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    updateEnvironmentDescriptorSets();
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
       vk::DescriptorBufferInfo uboInfo { .buffer = uniformBuffers[i], .offset = 0, .range = sizeof(UniformBufferObject) };
@@ -338,12 +357,6 @@ public:
       logicalDevice->updateDescriptorSets(writes, {});
     }
 
-    std::array<vk::WriteDescriptorSet, 3> envWrites;
-    envWrites[0] = { .dstSet = environmentDescriptorSets[0], .dstBinding = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &iblInfo };
-    envWrites[1] = { .dstSet = environmentDescriptorSets[0], .dstBinding = 1, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &iblInfo };
-    envWrites[2] = { .dstSet = environmentDescriptorSets[0], .dstBinding = 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &iblInfo };
-    logicalDevice->updateDescriptorSets(envWrites, {});
-
     vk::DescriptorBufferInfo matUboInfo { .buffer = *materialBuffer, .offset = 0, .range = sizeof(MaterialData) };
     vk::DescriptorImageInfo defaultImageInfo { .sampler = *defaultSampler, .imageView = *defaultImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
 
@@ -353,6 +366,37 @@ public:
     }
     matWrites[5] = { .dstSet = defaultMaterialDescriptorSets[0], .dstBinding = 5, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eUniformBuffer, .pBufferInfo = &matUboInfo };
     logicalDevice->updateDescriptorSets(matWrites, {});
+  }
+
+  void updateEnvironmentDescriptorSets() {
+    // Fallback for IBL maps
+    vk::DescriptorImageInfo irrInfo { .sampler = *defaultSampler, .imageView = *defaultCubeImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    vk::DescriptorImageInfo prefInfo { .sampler = *defaultSampler, .imageView = *defaultCubeImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    vk::DescriptorImageInfo brdfInfo { .sampler = *defaultSampler, .imageView = *defaultImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    vk::DescriptorImageInfo envInfo { .sampler = *defaultSampler, .imageView = *defaultCubeImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+
+    if (pIBLMaps) {
+        irrInfo = { .sampler = *pIBLMaps->sampler, .imageView = *pIBLMaps->irradianceMapView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+        prefInfo = { .sampler = *pIBLMaps->sampler, .imageView = *pIBLMaps->prefilterMapView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+        brdfInfo = { .sampler = *pIBLMaps->sampler, .imageView = *pIBLMaps->brdfLUTView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+        envInfo = { .sampler = *pIBLMaps->sampler, .imageView = *pIBLMaps->envCubemapView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+    }
+    std::array<vk::WriteDescriptorSet, 4> envWrites;
+    envWrites[0] = { .dstSet = environmentDescriptorSets[0], .dstBinding = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &irrInfo };
+    envWrites[1] = { .dstSet = environmentDescriptorSets[0], .dstBinding = 1, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &prefInfo };
+    envWrites[2] = { .dstSet = environmentDescriptorSets[0], .dstBinding = 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &brdfInfo };
+    envWrites[3] = { .dstSet = environmentDescriptorSets[0], .dstBinding = 3, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .pImageInfo = &envInfo };
+    (*this->pLogicalDevice)->updateDescriptorSets(envWrites, {});
+  }
+
+  void renderEnvironmentMap(vk::raii::CommandBuffer& commandBuffer) {
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, **pSkyboxPipeline);
+    commandBuffer.bindVertexBuffers(0, *vertexBuffer, {0});
+    commandBuffer.bindIndexBuffer(*indexBuffer, 0, vk::IndexType::eUint16);
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pSkyboxPipeline->getLayout(), 0, *descriptorSets[frameIndex], nullptr);
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pSkyboxPipeline->getLayout(), 1, *environmentDescriptorSets[0], nullptr);
+
+    commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
   }
 
   void createPostProcessDescriptorSets(const sauce::LogicalDevice& logicalDevice) {
@@ -631,6 +675,13 @@ public:
 
     commandBuffers[frameIndex].beginRendering(renderingInfo);
 
+    commandBuffers[frameIndex].setViewport(
+        0, vk::Viewport(0.0f, 0.0f, static_cast<float>(pSwapChain->getExtent().width),
+        static_cast<float>(pSwapChain->getExtent().height), 0.0f, 1.0f));
+    commandBuffers[frameIndex].setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), pSwapChain->getExtent()));
+
+    renderEnvironmentMap(commandBuffers[frameIndex]);
+
     commandBuffers[frameIndex].bindPipeline(vk::PipelineBindPoint::eGraphics, **pPipeline);
     commandBuffers[frameIndex].bindVertexBuffers(0, *vertexBuffer, {0});
     commandBuffers[frameIndex].bindIndexBuffer( *indexBuffer, 0, vk::IndexType::eUint16 );
@@ -638,16 +689,18 @@ public:
     commandBuffers[frameIndex].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pPipeline->getLayout(), 1, *environmentDescriptorSets[0], nullptr);
     commandBuffers[frameIndex].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pPipeline->getLayout(), 2, *defaultMaterialDescriptorSets[0], nullptr);
 
-    commandBuffers[frameIndex].setViewport(
-        0, vk::Viewport(0.0f, 0.0f, static_cast<float>(pSwapChain->getExtent().width),
-        static_cast<float>(pSwapChain->getExtent().height), 0.0f, 1.0f));
-    commandBuffers[frameIndex].setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), pSwapChain->getExtent()));
-
-    const uint32_t lightCount = 0;
-    commandBuffers[frameIndex].pushConstants<uint32_t>(
+    struct ScenePushConstants {
+      glm::mat4 model;
+      uint32_t lightCount;
+    };
+    ScenePushConstants pushData {
+      .model = glm::mat4(1.0f),
+      .lightCount = 0
+    };
+    commandBuffers[frameIndex].pushConstants<ScenePushConstants>(
         *pPipeline->getLayout(),
-        vk::ShaderStageFlagBits::eFragment,
-        0u, { lightCount }
+        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+        0u, pushData
     );
 
     commandBuffers[frameIndex].drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
@@ -814,8 +867,6 @@ public:
 
     // Create uniform buffer object with transformation matrices
     sauce::UniformBufferObject ubo {
-      // Model matrix: rotates the object 90 degrees per second around the Z axis
-      .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
       .view = scene.getCameraRO().getViewMatrix(),
       .proj = scene.getCameraRO().getProjectionMatrix(),
       .cameraPos = scene.getCameraRO().getPos(),
@@ -870,6 +921,28 @@ public:
 
     defaultImageView = ImageUtils::createImageView(logicalDevice, defaultImage, vk::Format::eR8G8B8A8Unorm, vk::ImageAspectFlagBits::eColor);
 
+    // Create default cubemap fallback (black)
+    ImageUtils::createImage(
+        physicalDevice, logicalDevice, 1, 1,
+        vk::Format::eR8G8B8A8Unorm, vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        defaultCubeImage, defaultCubeImageMemory, 1, 6, vk::ImageCreateFlagBits::eCubeCompatible
+    );
+
+    ImageUtils::transitionImageLayout(
+        logicalDevice, commandPool, *pQueue, defaultCubeImage,
+        vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal,
+        {}, vk::AccessFlagBits2::eShaderRead,
+        vk::PipelineStageFlagBits2::eNone, vk::PipelineStageFlagBits2::eFragmentShader,
+        1, 6
+    );
+
+    defaultCubeImageView = ImageUtils::createImageView(
+        logicalDevice, defaultCubeImage, vk::Format::eR8G8B8A8Unorm, 
+        vk::ImageAspectFlagBits::eColor, vk::ImageViewType::eCube, 1, 6
+    );
+
     vk::SamplerCreateInfo samplerInfo {
       .magFilter = vk::Filter::eLinear,
       .minFilter = vk::Filter::eLinear,
@@ -920,6 +993,13 @@ public:
 
   const vk::raii::Buffer& getMaterialBuffer() const { return materialBuffer; }
 
+  void loadIBL(const std::string& hdrPath) {
+    IBLGenerator generator(*pPhysicalDevice, *pLogicalDevice);
+    pIBLMaps = generator.generateIBLMaps(hdrPath, commandPool, *pQueue);
+    // Re-create descriptor sets to bind the new IBL maps
+    updateEnvironmentDescriptorSets();
+  }
+
 private:
   // Stored references for swapchain recreation
   const sauce::PhysicalDevice* pPhysicalDevice;
@@ -943,6 +1023,7 @@ private:
   bool framebufferResized = false;
 
   std::unique_ptr<sauce::GraphicsPipeline> pPipeline;
+  std::unique_ptr<sauce::GraphicsPipeline> pSkyboxPipeline;
   std::unique_ptr<sauce::GraphicsPipeline> pPostProcessPipeline;
 
   vk::raii::DescriptorSetLayout descriptorSetLayout0 = nullptr;
@@ -983,12 +1064,19 @@ private:
   vk::raii::Image defaultImage = nullptr;
   vk::raii::DeviceMemory defaultImageMemory = nullptr;
   vk::raii::ImageView defaultImageView = nullptr;
+
+  vk::raii::Image defaultCubeImage = nullptr;
+  vk::raii::DeviceMemory defaultCubeImageMemory = nullptr;
+  vk::raii::ImageView defaultCubeImageView = nullptr;
+
   vk::raii::Sampler defaultSampler = nullptr;
 
   vk::raii::Image offscreenImage = nullptr;
   vk::raii::DeviceMemory offscreenImageMemory = nullptr;
   vk::raii::ImageView offscreenImageView = nullptr;
   vk::raii::Sampler offscreenSampler = nullptr;
+
+  glm::vec3 envRotation = glm::vec3(0.0f);
 
   std::unique_ptr<IBLMaps> pIBLMaps;
 };

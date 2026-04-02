@@ -22,10 +22,12 @@ struct GraphicsPipelineConfig {
   const std::string vertEntryPoint = "vertMain";
   const std::string fragEntryPoint = "fragMain";
   bool hasVertexInput = true;
+  uint32_t vertexAttributeCount = 5;
   bool enableBlending = false;
   bool enableCulling = true;
   bool depthWrite = true;
   bool depthTestEnable = true;
+  vk::CompareOp depthCompareOp = vk::CompareOp::eLess;
   bool hasPushConstants = false;
   uint32_t pushConstantSize = 0;
 };
@@ -120,10 +122,13 @@ private:
     
     auto bindingDescription = Vertex::getBindingDescription();
     auto attributeDescriptions = Vertex::getAttributeDescription();
+    uint32_t attrCount = config.hasVertexInput ? config.vertexAttributeCount : 0u;
+    if (attrCount > attributeDescriptions.size()) attrCount = static_cast<uint32_t>(attributeDescriptions.size());
+
     vk::PipelineVertexInputStateCreateInfo vertexInputInfo {
       .vertexBindingDescriptionCount = config.hasVertexInput ? 1u : 0u,
       .pVertexBindingDescriptions = config.hasVertexInput ? &bindingDescription : nullptr,
-      .vertexAttributeDescriptionCount = config.hasVertexInput ? static_cast<uint32_t>(attributeDescriptions.size()) : 0u,
+      .vertexAttributeDescriptionCount = attrCount,
       .pVertexAttributeDescriptions = config.hasVertexInput ? attributeDescriptions.data() : nullptr,
     };
 
@@ -140,7 +145,7 @@ private:
       .depthClampEnable = vk::False,
       .rasterizerDiscardEnable = vk::False,
       .polygonMode = vk::PolygonMode::eFill,
-      .cullMode = vk::CullModeFlagBits::eBack,
+      .cullMode = config.enableCulling ? vk::CullModeFlagBits::eBack : vk::CullModeFlagBits::eNone,
       .frontFace = vk::FrontFace::eCounterClockwise,
       .depthBiasEnable = vk::False,
       .depthBiasSlopeFactor = 1.0f,
@@ -156,7 +161,7 @@ private:
     vk::PipelineDepthStencilStateCreateInfo depthStencil {
       .depthTestEnable = config.depthTestEnable ? vk::True : vk::False,
       .depthWriteEnable = config.depthWrite ? vk::True : vk::False,
-      .depthCompareOp = vk::CompareOp::eLess,
+      .depthCompareOp = config.depthCompareOp,
       .depthBoundsTestEnable = vk::False,
       .stencilTestEnable = vk::False,
     };
@@ -184,16 +189,16 @@ private:
     };
 
     vk::PushConstantRange pushConstantRange {
-      .stageFlags = vk::ShaderStageFlagBits::eFragment,
+      .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
       .offset = 0,
-      .size = sizeof(uint32_t),
+      .size = config.pushConstantSize,
     };
 
     vk::PipelineLayoutCreateInfo pipelineLayoutInfo {
       .setLayoutCount = static_cast<uint32_t>(config.descriptorSetLayouts.size()),
       .pSetLayouts = config.descriptorSetLayouts.data(),
-      .pushConstantRangeCount = 1,
-      .pPushConstantRanges = &pushConstantRange,
+      .pushConstantRangeCount = config.hasPushConstants ? 1u : 0u,
+      .pPushConstantRanges = config.hasPushConstants ? &pushConstantRange : nullptr,
     };
 
     layout = vk::raii::PipelineLayout { *config.logicalDevice, pipelineLayoutInfo };
@@ -234,14 +239,14 @@ private:
       vk::PipelineShaderStageCreateInfo* shaderStages,
       const GraphicsPipelineConfig& config
   ) {
-    // Vertex input - empty if no vertex input (e.g. grid fullscreen triangle)
     auto bindingDescription = Vertex::getBindingDescription();
     auto attributeDescriptions = Vertex::getAttributeDescription();
     vk::PipelineVertexInputStateCreateInfo vertexInputInfo {};
     if (config.hasVertexInput) {
+      uint32_t attrCount = std::min(config.vertexAttributeCount, static_cast<uint32_t>(attributeDescriptions.size()));
       vertexInputInfo.vertexBindingDescriptionCount = 1;
       vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-      vertexInputInfo.vertexAttributeDescriptionCount = attributeDescriptions.size();
+      vertexInputInfo.vertexAttributeDescriptionCount = attrCount;
       vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
     }
 
