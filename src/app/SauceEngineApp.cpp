@@ -6,6 +6,7 @@
 #include <app/components/MeshRendererComponent.hpp>
 #include <app/components/ClothComponent.hpp>
 #include <app/components/LightComponent.hpp>
+#include <app/Log.hpp>
 #include <app/PhysicsDemoSetup.hpp>
 #include <algorithm>
 #include <functional>
@@ -21,6 +22,14 @@
 namespace sauce {
 
 namespace {
+
+float clampMagnitudeScale(const glm::vec3& value, float maxMagnitude) {
+  const float lengthSq = glm::length2(value);
+  if (lengthSq <= maxMagnitude * maxMagnitude || maxMagnitude <= 0.0f) {
+    return 1.0f;
+  }
+  return maxMagnitude / std::sqrt(lengthSq);
+}
 
 struct SceneBounds {
   glm::vec3 min = glm::vec3(std::numeric_limits<float>::max());
@@ -67,6 +76,87 @@ struct AABB {
   glm::vec3 min;
   glm::vec3 max;
 };
+
+std::string formatVec3(const glm::vec3& v) {
+  return std::format("[{:.4f},{:.4f},{:.4f}]", v.x, v.y, v.z);
+}
+
+std::string buildAllRigidBodyPositions(Scene& scene) {
+  std::string out = "[";
+  bool first = true;
+  for (auto& entity : scene.getEntitiesMut()) {
+    auto* rigidBody = entity.getComponent<RigidBodyComponent>();
+    if (!entity.getActive() || !rigidBody) {
+      continue;
+    }
+
+    if (!first) {
+      out += ", ";
+    }
+    first = false;
+    out += std::format(
+        "{{name:\"{}\", pos:{}, com:{}}}",
+        entity.get_name(),
+        formatVec3(rigidBody->getPosition()),
+        formatVec3(rigidBody->getWorldCenterOfMass()));
+  }
+  out += "]";
+  return out;
+}
+
+struct DragTraceNeighbor {
+  Entity* entity = nullptr;
+  RigidBodyComponent* rigidBody = nullptr;
+  float distance = 0.0f;
+  float speed = 0.0f;
+};
+
+std::vector<DragTraceNeighbor> collectDragTraceNeighbors(Scene& scene,
+                                                         Entity* focusEntity,
+                                                         RigidBodyComponent* focusBody) {
+  std::vector<DragTraceNeighbor> neighbors;
+  if (!focusEntity || !focusBody) {
+    return neighbors;
+  }
+
+  const glm::vec3 focusCenter = focusBody->getWorldCenterOfMass();
+  for (auto& entity : scene.getEntitiesMut()) {
+    if (&entity == focusEntity || !entity.getActive()) {
+      continue;
+    }
+
+    auto* rigidBody = entity.getComponent<RigidBodyComponent>();
+    if (!rigidBody) {
+      continue;
+    }
+
+    const float distance = glm::distance(focusCenter, rigidBody->getWorldCenterOfMass());
+    const float speed = glm::length(rigidBody->getVelocity());
+    if (distance > 1.2f && speed < 0.2f) {
+      continue;
+    }
+
+    neighbors.push_back(DragTraceNeighbor{
+        .entity = &entity,
+        .rigidBody = rigidBody,
+        .distance = distance,
+        .speed = speed,
+    });
+  }
+
+  std::sort(neighbors.begin(), neighbors.end(), [](const DragTraceNeighbor& a, const DragTraceNeighbor& b) {
+    if (a.distance != b.distance) {
+      return a.distance < b.distance;
+    }
+    return a.speed > b.speed;
+  });
+
+  if (neighbors.size() > 6) {
+    neighbors.resize(6);
+  }
+
+  return neighbors;
+}
 
 Ray screenToWorldRay(const Camera& camera, double mouseX, double mouseY,
                      float viewportWidth, float viewportHeight) {
@@ -652,51 +742,128 @@ void SauceEngineApp::mainLoop() {
         if (draggedEntity) {
           auto* dragRB = draggedEntity->getComponent<RigidBodyComponent>();
           if (dragRB) {
-            glm::vec3 toTarget = dragTargetPosition - dragRB->getPosition();
+            pSolver->dragBody = dragRB;
+            if (dragRB->isSleeping()) {
+              dragRB->wake();
+            }
 
-            constexpr float kMaxDragStepXY = 0.08f;
-            constexpr float kMaxDragStepDown = 0.025f;
-            const float substeps = static_cast<float>(pSolver->rigidSubsteps);
-
+            const glm::vec3 toTarget = dragTargetPosition - dragRB->getPosition();
             const glm::vec3 gravDir = pSolver->gravityDirection;
-            const float downComponent = glm::dot(toTarget, gravDir);
-            const glm::vec3 downVec = downComponent * gravDir;
-            const glm::vec3 lateralVec = toTarget - downVec;
+            const float intentSpeed = glm::length(dragSmoothedVelocity);
+            const float wreckingBlend = glm::smoothstep(1.0f, 4.5f, intentSpeed);
+            const float targetLag = glm::length(toTarget);
+            const float lagBlend = glm::smoothstep(0.08f, 0.45f, targetLag);
+            const glm::vec3 currentVelocity = dragRB->getVelocity();
+            const glm::vec3 desiredVelocity =
+                dragSmoothedVelocity * 0.85f + toTarget * 7.5f;
+            const float verticalSpeed = glm::dot(desiredVelocity, gravDir);
+            const glm::vec3 desiredVerticalVelocity = verticalSpeed * gravDir;
+            const glm::vec3 desiredLateralVelocity = desiredVelocity - desiredVerticalVelocity;
 
-            float lateralLen = glm::length(lateralVec);
-            float maxLateral = kMaxDragStepXY * substeps;
-            glm::vec3 clampedLateral = lateralVec;
-            if (lateralLen > maxLateral) {
-              clampedLateral *= maxLateral / lateralLen;
-            }
+            constexpr float kGentleLateralSpeed = 2.8f;
+            constexpr float kGentleCatchupLateralSpeed = 5.0f;
+            constexpr float kGentleDownwardSpeed = 1.4f;
+            constexpr float kGentleCatchupDownwardSpeed = 2.4f;
+            constexpr float kGentleUpwardSpeed = 1.8f;
+            constexpr float kGentleCatchupUpwardSpeed = 2.8f;
+            constexpr float kWreckingLateralSpeed = 9.0f;
+            constexpr float kWreckingDownwardSpeed = 6.0f;
+            constexpr float kWreckingUpwardSpeed = 7.0f;
+            const auto blendDragLimit = [&](float gentle, float catchup, float wrecking) {
+              return std::lerp(std::lerp(gentle, catchup, lagBlend), wrecking, wreckingBlend);
+            };
 
-            glm::vec3 clampedDown = downVec;
-            if (downComponent > 0.0f) {
-              float maxDown = kMaxDragStepDown * substeps;
-              if (downComponent > maxDown) {
-                clampedDown = maxDown * gravDir;
-              }
+            const float lateralSpeedLimit = blendDragLimit(
+                kGentleLateralSpeed, kGentleCatchupLateralSpeed, kWreckingLateralSpeed);
+            const float downwardSpeedLimit = blendDragLimit(
+                kGentleDownwardSpeed, kGentleCatchupDownwardSpeed, kWreckingDownwardSpeed);
+            const float upwardSpeedLimit = blendDragLimit(
+                kGentleUpwardSpeed, kGentleCatchupUpwardSpeed, kWreckingUpwardSpeed);
+
+            glm::vec3 clampedDesiredLateralVelocity = desiredLateralVelocity;
+            clampedDesiredLateralVelocity *=
+                clampMagnitudeScale(desiredLateralVelocity, lateralSpeedLimit);
+
+            glm::vec3 clampedDesiredVerticalVelocity = desiredVerticalVelocity;
+            if (verticalSpeed > 0.0f) {
+              clampedDesiredVerticalVelocity *=
+                  clampMagnitudeScale(desiredVerticalVelocity, downwardSpeedLimit);
             } else {
-              float upLen = -downComponent;
-              float maxUp = kMaxDragStepXY * substeps;
-              if (upLen > maxUp) {
-                clampedDown = -maxUp * gravDir;
-              }
+              clampedDesiredVerticalVelocity *=
+                  clampMagnitudeScale(desiredVerticalVelocity, upwardSpeedLimit);
             }
 
-            glm::vec3 clampedDisp = clampedLateral + clampedDown;
-            dragRB->setVelocity(clampedDisp / physicsDt);
-            dragRB->setAngularVelocity(glm::vec3(0.0f));
+            const glm::vec3 clampedDesiredVelocity =
+                clampedDesiredLateralVelocity + clampedDesiredVerticalVelocity;
+            const glm::vec3 desiredAcceleration =
+                (clampedDesiredVelocity - currentVelocity) / std::max(physicsDt, 1e-4f);
+            const float verticalAcceleration = glm::dot(desiredAcceleration, gravDir);
+            const glm::vec3 desiredVerticalAcceleration = verticalAcceleration * gravDir;
+            const glm::vec3 desiredLateralAcceleration =
+                desiredAcceleration - desiredVerticalAcceleration;
+
+            constexpr float kGentleLateralAcceleration = 22.0f;
+            constexpr float kGentleCatchupLateralAcceleration = 44.0f;
+            constexpr float kGentleDownwardAcceleration = 14.0f;
+            constexpr float kGentleCatchupDownwardAcceleration = 24.0f;
+            constexpr float kGentleUpwardAcceleration = 16.0f;
+            constexpr float kGentleCatchupUpwardAcceleration = 28.0f;
+            constexpr float kWreckingLateralAcceleration = 70.0f;
+            constexpr float kWreckingDownwardAcceleration = 52.0f;
+            constexpr float kWreckingUpwardAcceleration = 58.0f;
+
+            const float lateralAccelerationLimit = blendDragLimit(
+                kGentleLateralAcceleration,
+                kGentleCatchupLateralAcceleration,
+                kWreckingLateralAcceleration);
+            const float downwardAccelerationLimit = blendDragLimit(
+                kGentleDownwardAcceleration,
+                kGentleCatchupDownwardAcceleration,
+                kWreckingDownwardAcceleration);
+            const float upwardAccelerationLimit = blendDragLimit(
+                kGentleUpwardAcceleration,
+                kGentleCatchupUpwardAcceleration,
+                kWreckingUpwardAcceleration);
+
+            glm::vec3 clampedLateralAcceleration = desiredLateralAcceleration;
+            clampedLateralAcceleration *=
+                clampMagnitudeScale(desiredLateralAcceleration, lateralAccelerationLimit);
+
+            glm::vec3 clampedVerticalAcceleration = desiredVerticalAcceleration;
+            if (verticalAcceleration > 0.0f) {
+              clampedVerticalAcceleration *=
+                  clampMagnitudeScale(desiredVerticalAcceleration, downwardAccelerationLimit);
+            } else {
+              clampedVerticalAcceleration *=
+                  clampMagnitudeScale(desiredVerticalAcceleration, upwardAccelerationLimit);
+            }
+
+            const glm::vec3 driveVelocity =
+                currentVelocity + (clampedLateralAcceleration + clampedVerticalAcceleration) * physicsDt;
+            dragRB->setVelocity(driveVelocity);
+            dragRB->setAngularVelocity(dragRB->getAngularVelocity() * 0.15f);
           }
+        }
+        if (!draggedEntity || !draggedEntity->getComponent<RigidBodyComponent>()) {
+          pSolver->dragBody = nullptr;
+        }
+
+        const bool traceDragStep =
+            dragTraceEntity && (draggedEntity == dragTraceEntity || dragTraceReleaseStepsRemaining > 0);
+        if (traceDragStep) {
+          logDragTraceSnapshot("pre", physicsDt);
         }
 
         pSolver->solvePositions(rigidBodies, constraints, physicsDt);
-
-        if (draggedEntity) {
-          auto* dragRB = draggedEntity->getComponent<RigidBodyComponent>();
-          if (dragRB) {
-            dragRB->setVelocity(glm::vec3(0.0f));
-            dragRB->setAngularVelocity(glm::vec3(0.0f));
+        if (traceDragStep) {
+          logDragTraceSnapshot("post", physicsDt);
+          ++dragTraceStep;
+          if (draggedEntity != dragTraceEntity && dragTraceReleaseStepsRemaining > 0) {
+            --dragTraceReleaseStepsRemaining;
+            if (dragTraceReleaseStepsRemaining == 0) {
+              Log::verbose("drag-trace", "phase=complete entity={}", dragTraceEntity->get_name());
+              dragTraceEntity = nullptr;
+            }
           }
         }
 
@@ -1072,14 +1239,25 @@ void SauceEngineApp::beginDrag(double mouseX, double mouseY) {
     dragTargetPosition = rigidBody->getPosition();
     dragSmoothedVelocity = glm::vec3(0.0f);
     draggedEntity = bestEntity;
+    dragTraceEntity = bestEntity;
+    dragTraceStep = 0;
+    dragTraceReleaseStepsRemaining = 0;
 
     if (rigidBody->isSleeping()) {
       rigidBody->wake();
     }
-    rigidBody->setInvMass(0.0f);
-    rigidBody->setInvInertiaTensor(glm::mat3(0.0f));
     rigidBody->setVelocity(glm::vec3(0.0f));
     rigidBody->setAngularVelocity(glm::vec3(0.0f));
+    rigidBody->clearAccumulatedForce();
+
+    Log::verbose(
+        "drag-trace",
+        "phase=begin entity={} target={} offset={} plane_point={} plane_normal={}",
+        bestEntity->get_name(),
+        formatVec3(dragTargetPosition),
+        formatVec3(dragOffset),
+        formatVec3(dragPlanePoint),
+        formatVec3(dragPlaneNormal));
   }
 
 void SauceEngineApp::updateDrag(double mouseX, double mouseY) {
@@ -1108,6 +1286,14 @@ void SauceEngineApp::updateDrag(double mouseX, double mouseY) {
     dragSmoothedVelocity = glm::mix(dragSmoothedVelocity, frameVel, kSmoothFactor);
 
     dragTargetPosition = newPos;
+
+    Log::verbose(
+        "drag-trace",
+        "phase=update entity={} target={} frame_vel={} smooth_vel={}",
+        draggedEntity->get_name(),
+        formatVec3(dragTargetPosition),
+        formatVec3(frameVel),
+        formatVec3(dragSmoothedVelocity));
   }
 
 void SauceEngineApp::endDrag() {
@@ -1116,17 +1302,75 @@ void SauceEngineApp::endDrag() {
     auto* rigidBody = draggedEntity->getComponent<RigidBodyComponent>();
     if (rigidBody) {
       constexpr float kMaxThrowSpeed = 4.0f;
-      glm::vec3 throwVel = dragSmoothedVelocity;
+      glm::vec3 throwVel = glm::mix(rigidBody->getVelocity(), dragSmoothedVelocity, 0.35f);
       float speed = glm::length(throwVel);
       if (speed > kMaxThrowSpeed) {
         throwVel *= kMaxThrowSpeed / speed;
       }
-      rigidBody->sleep();
       rigidBody->wake();
       rigidBody->setVelocity(throwVel);
+      dragTraceReleaseStepsRemaining = std::max(32, static_cast<int>(std::ceil(physicsTickRate * 1.5)));
+      Log::verbose(
+          "drag-trace",
+          "phase=end entity={} throw_vel={} release_steps={}",
+          draggedEntity->get_name(),
+          formatVec3(throwVel),
+          dragTraceReleaseStepsRemaining);
     }
 
     draggedEntity = nullptr;
+  }
+
+void SauceEngineApp::logDragTraceSnapshot(const char* timing, float physicsDt) {
+    if (!pScene || !dragTraceEntity || !Log::isPalantirMode()) {
+      return;
+    }
+
+    auto* focusBody = dragTraceEntity->getComponent<RigidBodyComponent>();
+    if (!focusBody) {
+      return;
+    }
+
+    const bool dragging = draggedEntity == dragTraceEntity;
+    Log::verbose(
+        "drag-trace",
+        "step={} timing={} dt={:.6f} dragging={} release_steps={} entity={} target={} pos={} com={} vel={} angvel={} sleeping={} invMass={:.5f}",
+        dragTraceStep,
+        timing,
+        physicsDt,
+        dragging ? 1 : 0,
+        dragTraceReleaseStepsRemaining,
+        dragTraceEntity->get_name(),
+        formatVec3(dragTargetPosition),
+        formatVec3(focusBody->getPosition()),
+        formatVec3(focusBody->getWorldCenterOfMass()),
+        formatVec3(focusBody->getVelocity()),
+        formatVec3(focusBody->getAngularVelocity()),
+        focusBody->isSleeping() ? 1 : 0,
+        focusBody->getInvMass());
+
+    for (const auto& neighbor : collectDragTraceNeighbors(*pScene, dragTraceEntity, focusBody)) {
+      Log::verbose(
+          "drag-trace",
+          "step={} timing={} neighbor={} dist={:.4f} speed={:.4f} pos={} com={} vel={} angvel={} sleeping={}",
+          dragTraceStep,
+          timing,
+          neighbor.entity ? neighbor.entity->get_name() : "?",
+          neighbor.distance,
+          neighbor.speed,
+          formatVec3(neighbor.rigidBody->getPosition()),
+          formatVec3(neighbor.rigidBody->getWorldCenterOfMass()),
+          formatVec3(neighbor.rigidBody->getVelocity()),
+          formatVec3(neighbor.rigidBody->getAngularVelocity()),
+          neighbor.rigidBody->isSleeping() ? 1 : 0);
+    }
+
+    Log::verbose(
+        "drag-trace",
+        "step={} timing={} all_positions={}",
+        dragTraceStep,
+        timing,
+        buildAllRigidBodyPositions(*pScene));
   }
 
 } // namespace sauce

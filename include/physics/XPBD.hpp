@@ -2,8 +2,11 @@
 
 #include <glm/glm.hpp>
 
+#include <cstddef>
 #include <cstdint>
+#include <map>
 #include <memory>
+#include <utility>
 #include <vector>
 
 namespace sauce {
@@ -26,6 +29,11 @@ struct XPBDSolver {
 
   // Normalized gravity direction for support-loss detection (default: -Z)
   glm::vec3 gravityDirection = glm::vec3(0.0f, 0.0f, -1.0f);
+
+  // Dragging keeps the selected body dynamic, but its contacts can use a reduced friction
+  // coefficient so blocks can be extracted without turning the full tower into a low-friction pile.
+  const sauce::RigidBodyComponent* dragBody = nullptr;
+  float dragContactFrictionScale = 0.02f;
 
   bool contactDebugEnabled = false;
 
@@ -50,6 +58,10 @@ struct XPBDSolver {
       const std::vector<sauce::RigidBodyComponent*>& rigidBodies) const;
 
 private:
+  void captureCollisionLambdaWarmStart(
+      const std::vector<sauce::RigidBodyComponent*>& rigidBodies,
+      const std::vector<std::unique_ptr<Constraint>>& constraints);
+
   struct CollisionContact {
     uint32_t indexA = 0;
     uint32_t indexB = 0;
@@ -65,6 +77,8 @@ private:
       const std::vector<sauce::RigidBodyComponent*>& rigidBodies,
       const std::vector<CollisionContact>& contacts,
       float deltatime) const;
+
+  std::map<std::pair<uintptr_t, uintptr_t>, std::vector<float>> collisionLambdaWarmStart;
 };
 
 } // namespace physics

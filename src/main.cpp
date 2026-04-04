@@ -3,6 +3,7 @@
 #include <vector>
 
 #include <launcher/optionParser.hpp>
+#include <app/Log.hpp>
 #include <app/SauceEngineApp.hpp>
 #include <app/ui/ImGuiComponentManager.hpp>
 #include <app/ui/components/Button.hpp>
@@ -13,11 +14,13 @@
 #include <app/ui/components/Tooltip.hpp>
 
 int main(int argc, const char *argv[]) {
+  sauce::Log::init();
   const AppOptions ops(argc, argv);
 
   if (ops.help) {
     std::cout << "Usage: " << argv[0] << " <options> [scene_file]" << std::endl;
     std::cout << ops.getHelpMessage() << std::endl;
+    sauce::Log::shutdown();
     return 1;
   }
 
@@ -33,8 +36,10 @@ int main(int argc, const char *argv[]) {
     mainApp.setPhysicsTickRate(ops.tickrate);
     mainApp.run(ops.scr_width, ops.scr_height);
   } catch (std::exception& e) {
+    sauce::Log::shutdown();
     std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
   }
+  sauce::Log::shutdown();
   return EXIT_SUCCESS;
 }

@@ -11,7 +11,8 @@ struct Constraint {
   explicit Constraint(float comp) : compliance(comp) {}
   virtual ~Constraint() = default;
   virtual void solve(std::vector<physics::Vertex>& vertices, float deltatime) = 0;
-  void resetLambda() { lambda = 0.0f; }
+  virtual void resetLambda() { lambda = 0.0f; }
+  float accumulatedLambda() const { return lambda; }
   float compliance = 0.0f;
 
 protected:

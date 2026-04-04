@@ -16,11 +16,14 @@
 #include <sstream>
 #include <array>
 #include <cmath>
+#include <cstring>
 #include <iostream>
 #include <limits>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -76,6 +79,28 @@ struct ContactDumpEntry {
   std::string bodyA;
   std::string bodyB;
   glm::vec3 normal = glm::vec3(0.0f);
+};
+
+struct PiecewiseTransferBlock {
+  std::string name;
+  RigidBodyComponent* rigidBody = nullptr;
+  glm::quat targetOrientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+  glm::vec3 extractWaypoint = glm::vec3(0.0f);
+  glm::vec3 liftWaypoint = glm::vec3(0.0f);
+  glm::vec3 travelWaypoint = glm::vec3(0.0f);
+  glm::vec3 targetPosition = glm::vec3(0.0f);
+  glm::vec3 hoverWaypoint = glm::vec3(0.0f);
+};
+
+struct PiecewiseTransferProgress {
+  size_t activeIndex = 0;
+  int phase = 0;
+  int phaseSteps = 0;
+  int settleFrames = 0;
+  int completedBlocks = 0;
+  float peakSpeed = 0.0f;
+  float peakOverlap = 0.0f;
+  float peakPlanePenetration = 0.0f;
 };
 
 glm::vec3 absVec3(const glm::vec3& v) {
@@ -365,6 +390,279 @@ void collectDiagnostics(
   }
 }
 
+RigidBodyComponent* findRigidBodyByName(
+    const std::vector<RigidBodyComponent*>& rigidBodies,
+    std::string_view name) {
+  for (auto* rigidBody : rigidBodies) {
+    auto* owner = rigidBody ? rigidBody->getOwner() : nullptr;
+    if (owner && owner->get_name() == name) {
+      return rigidBody;
+    }
+  }
+  return nullptr;
+}
+
+int parseJengaBlockIndex(std::string_view name) {
+  constexpr std::string_view prefix = "JengaBlock_";
+  if (!name.starts_with(prefix)) {
+    return -1;
+  }
+  int value = 0;
+  for (size_t i = prefix.size(); i < name.size(); ++i) {
+    const char c = name[i];
+    if (c < '0' || c > '9') {
+      return -1;
+    }
+    value = value * 10 + (c - '0');
+  }
+  return value;
+}
+
+glm::vec3 clampVectorMagnitude(const glm::vec3& value, float maxMagnitude) {
+  const float lengthSq = glm::length2(value);
+  if (maxMagnitude <= 0.0f || lengthSq <= maxMagnitude * maxMagnitude) {
+    return value;
+  }
+  return value * (maxMagnitude / std::sqrt(lengthSq));
+}
+
+glm::vec3 horizontalLongAxis(const glm::quat& orientation) {
+  const glm::vec3 axis = orientation * glm::vec3(0.0f, 1.0f, 0.0f);
+  const glm::vec3 horizontal(axis.x, axis.y, 0.0f);
+  if (glm::length2(horizontal) <= 1e-6f) {
+    return glm::vec3(1.0f, 0.0f, 0.0f);
+  }
+  return glm::normalize(horizontal);
+}
+
+glm::vec3 piecewiseTransferTarget(const PiecewiseTransferBlock& block, int phase) {
+  switch (phase) {
+    case 0:
+      return block.extractWaypoint;
+    case 1:
+      return block.liftWaypoint;
+    case 2:
+      return block.travelWaypoint;
+    case 3:
+      return block.hoverWaypoint;
+    default:
+      return block.hoverWaypoint;
+  }
+}
+
+std::vector<PiecewiseTransferBlock> buildPiecewiseTransferPlan(
+    const std::vector<RigidBodyComponent*>& rigidBodies) {
+  std::unordered_map<int, glm::vec3> initialPositions;
+  std::unordered_map<int, glm::quat> initialOrientations;
+  initialPositions.reserve(rigidBodies.size());
+  initialOrientations.reserve(rigidBodies.size());
+  for (auto* rigidBody : rigidBodies) {
+    auto* owner = rigidBody ? rigidBody->getOwner() : nullptr;
+    if (!owner) {
+      continue;
+    }
+    const int blockIndex = parseJengaBlockIndex(owner->get_name());
+    if (blockIndex < 0) {
+      continue;
+    }
+    initialPositions[blockIndex] = rigidBody->getPosition();
+    initialOrientations[blockIndex] = rigidBody->getOrientation();
+  }
+
+  const glm::vec3 up(0.0f, 0.0f, 1.0f);
+  const glm::vec3 towerOffset(6.0f, 0.0f, 0.0f);
+  constexpr float kExtractDistance = 1.00f;
+  constexpr float kExtractLift = 0.10f;
+  constexpr float kCarryHeight = 5.85f;
+  constexpr float kHoverHeight = 0.42f;
+
+  std::vector<PiecewiseTransferBlock> plan;
+  plan.reserve(9);
+  constexpr std::array<int, 3> kSlotOrder = {0, 2, 1};
+
+  for (int targetLayer = 0; targetLayer < 3; ++targetLayer) {
+    const int sourceLayer = (targetLayer % 2 == 0) ? (6 - targetLayer) : (8 - targetLayer);
+    for (int slot : kSlotOrder) {
+      const int targetIndex = targetLayer * 3 + slot;
+      const int sourceIndex = sourceLayer * 3 + slot;
+
+      auto* rigidBody = findRigidBodyByName(
+          rigidBodies, std::format("JengaBlock_{}", sourceIndex));
+      const auto sourcePosIt = initialPositions.find(sourceIndex);
+      const auto targetPosIt = initialPositions.find(targetIndex);
+      const auto targetOriIt = initialOrientations.find(targetIndex);
+      if (!rigidBody || sourcePosIt == initialPositions.end() ||
+          targetPosIt == initialPositions.end() || targetOriIt == initialOrientations.end()) {
+        continue;
+      }
+
+      const glm::vec3 sourcePosition = sourcePosIt->second;
+      const glm::quat targetOrientation = targetOriIt->second;
+      const glm::vec3 targetPosition = targetPosIt->second + towerOffset;
+      const glm::vec3 longAxis = horizontalLongAxis(targetOrientation);
+
+      float extractSign = 0.0f;
+      const float radial = glm::dot(sourcePosition, longAxis);
+      if (std::abs(radial) > 0.25f) {
+        extractSign = radial > 0.0f ? 1.0f : -1.0f;
+      } else {
+        const float towardTarget = glm::dot(towerOffset, longAxis);
+        if (std::abs(towardTarget) > 0.25f) {
+          extractSign = towardTarget > 0.0f ? 1.0f : -1.0f;
+        } else {
+          extractSign = slot == 0 ? -1.0f : 1.0f;
+        }
+      }
+      const glm::vec3 extractDir = longAxis * extractSign;
+      const glm::vec3 extractWaypoint =
+          sourcePosition + extractDir * kExtractDistance + up * kExtractLift;
+      const glm::vec3 liftWaypoint(extractWaypoint.x, extractWaypoint.y, kCarryHeight);
+      const glm::vec3 travelWaypoint(targetPosition.x, targetPosition.y, kCarryHeight);
+
+      plan.push_back(PiecewiseTransferBlock{
+          .name = std::format("JengaBlock_{}", sourceIndex),
+          .rigidBody = rigidBody,
+          .targetOrientation = targetOrientation,
+          .extractWaypoint = extractWaypoint,
+          .liftWaypoint = liftWaypoint,
+          .travelWaypoint = travelWaypoint,
+          .targetPosition = targetPosition,
+          .hoverWaypoint = targetPosition + up * kHoverHeight,
+      });
+    }
+  }
+
+  return plan;
+}
+
+bool advancePiecewiseTransferIfReady(
+    PiecewiseTransferProgress& progress,
+    const std::vector<PiecewiseTransferBlock>& plan) {
+  if (progress.activeIndex >= plan.size()) {
+    return false;
+  }
+
+  const auto& block = plan[progress.activeIndex];
+  auto* rigidBody = block.rigidBody;
+  if (!rigidBody) {
+    ++progress.activeIndex;
+    progress.phase = 0;
+    progress.phaseSteps = 0;
+    progress.settleFrames = 0;
+    progress.completedBlocks = static_cast<int>(progress.activeIndex);
+    return progress.activeIndex < plan.size();
+  }
+
+  if (progress.phase < 4) {
+    const glm::vec3 target = piecewiseTransferTarget(block, progress.phase);
+    const float distance = glm::distance(rigidBody->getPosition(), target);
+    const float speed = glm::length(rigidBody->getVelocity());
+    const float phaseDistanceThreshold = progress.phase == 3 ? 0.18f : 0.12f;
+    const float phaseSpeedThreshold = progress.phase == 3 ? 0.80f : 0.42f;
+    const bool hoverTimeout = progress.phase == 3 && progress.phaseSteps > 240;
+
+    const bool reached =
+        hoverTimeout ||
+        (distance <= phaseDistanceThreshold &&
+         speed <= phaseSpeedThreshold);
+    if (reached) {
+      ++progress.phase;
+      progress.phaseSteps = 0;
+      if (progress.phase == 4) {
+        rigidBody->setCollisionEnabled(true);
+        rigidBody->wake();
+        rigidBody->setVelocity(glm::vec3(0.0f, 0.0f, -0.42f));
+        rigidBody->setAngularVelocity(glm::vec3(0.0f));
+      }
+    }
+    return true;
+  }
+
+  const float distance = glm::distance(rigidBody->getPosition(), block.targetPosition);
+  const float speed = glm::length(rigidBody->getVelocity());
+
+  constexpr float kSettleDistanceThreshold = 0.10f;
+  constexpr float kSettleSpeedThreshold = 0.14f;
+  constexpr int kPlaceSettleFrames = 20;
+
+  if ((distance <= kSettleDistanceThreshold && speed <= kSettleSpeedThreshold) ||
+      rigidBody->isSleeping()) {
+    ++progress.settleFrames;
+  } else {
+    progress.settleFrames = 0;
+  }
+
+  if (progress.settleFrames < kPlaceSettleFrames) {
+    return true;
+  }
+
+  ++progress.activeIndex;
+  progress.phase = 0;
+  progress.phaseSteps = 0;
+  progress.settleFrames = 0;
+  progress.completedBlocks = static_cast<int>(progress.activeIndex);
+  return progress.activeIndex < plan.size();
+}
+
+void drivePiecewiseTransferBlock(
+    physics::XPBDSolver& solver,
+    const PiecewiseTransferBlock& block,
+    int phase,
+    float physicsDt) {
+  auto* rigidBody = block.rigidBody;
+  if (!rigidBody) {
+    solver.dragBody = nullptr;
+    return;
+  }
+
+  solver.dragBody = rigidBody;
+  rigidBody->wake();
+  rigidBody->setCollisionEnabled(false);
+  rigidBody->setOrientation(block.targetOrientation);
+  const glm::vec3 gravityDir = solver.gravityDirection;
+  const glm::vec3 target = piecewiseTransferTarget(block, phase);
+  const glm::vec3 toTarget = target - rigidBody->getPosition();
+  const float targetDistance = glm::length(toTarget);
+  const float catchupBlend = glm::smoothstep(0.12f, 0.9f, targetDistance);
+  const float phaseScale =
+      phase == 0 ? 1.20f : (phase == 3 ? 0.72f : 0.90f);
+  const glm::vec3 currentVelocity = rigidBody->getVelocity();
+  const glm::vec3 desiredVelocity = toTarget * (6.4f * phaseScale);
+  const float verticalSpeed = glm::dot(desiredVelocity, gravityDir);
+  const glm::vec3 desiredVerticalVelocity = verticalSpeed * gravityDir;
+  const glm::vec3 desiredLateralVelocity = desiredVelocity - desiredVerticalVelocity;
+
+  const float lateralSpeedLimit = std::lerp(1.8f, 4.2f, catchupBlend) * phaseScale;
+  const float downwardSpeedLimit = std::lerp(1.3f, 3.4f, catchupBlend) * phaseScale;
+  const float upwardSpeedLimit = std::lerp(1.7f, 3.9f, catchupBlend) * phaseScale;
+  const glm::vec3 clampedDesiredVelocity =
+      clampVectorMagnitude(desiredLateralVelocity, lateralSpeedLimit) +
+      clampVectorMagnitude(
+          desiredVerticalVelocity,
+          verticalSpeed > 0.0f ? downwardSpeedLimit : upwardSpeedLimit);
+
+  const glm::vec3 desiredAcceleration =
+      (clampedDesiredVelocity - currentVelocity) / std::max(physicsDt, 1e-4f);
+  const float verticalAcceleration = glm::dot(desiredAcceleration, gravityDir);
+  const glm::vec3 desiredVerticalAcceleration = verticalAcceleration * gravityDir;
+  const glm::vec3 desiredLateralAcceleration =
+      desiredAcceleration - desiredVerticalAcceleration;
+
+  const float lateralAccelerationLimit = std::lerp(14.0f, 32.0f, catchupBlend) * phaseScale;
+  const float downwardAccelerationLimit = std::lerp(11.0f, 24.0f, catchupBlend) * phaseScale;
+  const float upwardAccelerationLimit = std::lerp(13.0f, 28.0f, catchupBlend) * phaseScale;
+  const glm::vec3 driveVelocity =
+      currentVelocity +
+      (clampVectorMagnitude(desiredLateralAcceleration, lateralAccelerationLimit) +
+       clampVectorMagnitude(
+           desiredVerticalAcceleration,
+           verticalAcceleration > 0.0f ? downwardAccelerationLimit : upwardAccelerationLimit)) *
+          physicsDt;
+
+  rigidBody->setVelocity(driveVelocity);
+  rigidBody->setAngularVelocity(rigidBody->getAngularVelocity() * 0.10f);
+}
+
 std::vector<ContactDumpEntry> collectContactDump(
     physics::XPBDSolver& solver,
     const std::vector<RigidBodyComponent*>& rigidBodies) {
@@ -402,39 +700,71 @@ std::vector<ContactDumpEntry> collectContactDump(
 } // namespace
 
 int main(int argc, char** argv) {
+  const bool testStackStability =
+      argc >= 2 && std::strcmp(argv[1], "--test-stack-stability") == 0;
+  const bool testPiecewiseTransfer =
+      argc >= 2 && std::strcmp(argv[1], "--test-piecewise-transfer") == 0;
+
   std::string scenePath = "testScene/jenga_tower.gltf";
   int steps = 180;
   int dumpStep = -1;
   int wakeStep = -1;
   std::string wakeBodyName = "JengaBlock_0";
   float wakeSpeed = 1.2f;
-  if (argc >= 2) {
-    scenePath = argv[1];
-  }
-  if (argc >= 3) {
-    steps = std::max(1, std::atoi(argv[2]));
-  }
-  if (argc >= 4) {
-    dumpStep = std::atoi(argv[3]);
-  }
-  if (argc >= 5) {
-    wakeStep = std::atoi(argv[4]);
-  }
-  if (argc >= 6) {
-    wakeBodyName = argv[5];
-  }
-  if (argc >= 7) {
-    wakeSpeed = static_cast<float>(std::atof(argv[6]));
-  }
   std::string removeBodyName;
   int removeStep = -1;
-  if (argc >= 8) {
-    removeBodyName = argv[7];
-  }
-  if (argc >= 9) {
-    removeStep = std::atoi(argv[8]);
+
+  if (testStackStability) {
+    scenePath = "testScene/jenga_tower.gltf";
+    steps = 360;
+    dumpStep = -1;
+    wakeStep = -1;
+    removeStep = -1;
+    removeBodyName.clear();
+    std::cout << "[--test-stack-stability] settled Jenga OBB overlap regression (no wake)\n";
+  } else if (testPiecewiseTransfer) {
+    scenePath = "testScene/jenga_tower.gltf";
+    steps = 5200;
+    dumpStep = -1;
+    wakeStep = -1;
+    removeStep = -1;
+    removeBodyName.clear();
+    std::cout << "[--test-piecewise-transfer] scripted drag rebuild of a second three-layer tower\n";
+  } else {
+    if (argc >= 2) {
+      scenePath = argv[1];
+    }
+    if (argc >= 3) {
+      steps = std::max(1, std::atoi(argv[2]));
+    }
+    if (argc >= 4) {
+      dumpStep = std::atoi(argv[3]);
+    }
+    if (argc >= 5) {
+      wakeStep = std::atoi(argv[4]);
+    }
+    if (argc >= 6) {
+      wakeBodyName = argv[5];
+    }
+    if (argc >= 7) {
+      wakeSpeed = static_cast<float>(std::atof(argv[6]));
+    }
+    if (argc >= 8) {
+      removeBodyName = argv[7];
+    }
+    if (argc >= 9) {
+      removeStep = std::atoi(argv[8]);
+    }
   }
   const glm::vec3 wakeVelocity(wakeSpeed, 0.0f, 0.0f);
+
+  float maxSettledBoxOverlap = 0.0f;
+  constexpr int kStackTestSettleAfterStep = 200;
+  constexpr float kStackTestMaxBoxOverlapM = 0.048f;
+  constexpr float kTransferTestPeakSpeedLimit = 6.5f;
+  constexpr float kTransferTestPeakOverlapLimitM = 0.02f;
+  constexpr float kTransferTestPeakPlanePenetrationLimitM = 0.02f;
+  constexpr float kTransferTestFinalPlacementToleranceM = 0.16f;
 
   sauce::CameraCreateInfo cameraInfo{
       .scrWidth = 1280.0f,
@@ -455,6 +785,29 @@ int main(int argc, char** argv) {
   solver.solverIterations = tuning.solverIterations;
   solver.rigidSubsteps = tuning.rigidSubsteps;
   solver.contactDebugEnabled = false;
+  if (testPiecewiseTransfer) {
+    solver.dragContactFrictionScale = 0.005f;
+  }
+
+  auto transferPlan = std::vector<PiecewiseTransferBlock>();
+  PiecewiseTransferProgress transferProgress;
+  if (testPiecewiseTransfer) {
+    transferPlan = buildPiecewiseTransferPlan(rigidBodies);
+    if (transferPlan.size() != 9) {
+      std::cerr << "FAIL: could not build scripted transfer plan from Jenga scene\n";
+      return 2;
+    }
+    for (const auto& block : transferPlan) {
+      if (!block.rigidBody) {
+        std::cerr << "FAIL: transfer plan contains missing rigid body\n";
+        return 2;
+      }
+      block.rigidBody->wake();
+      block.rigidBody->setVelocity(glm::vec3(0.0f));
+      block.rigidBody->setAngularVelocity(glm::vec3(0.0f));
+      block.rigidBody->clearAccumulatedForce();
+    }
+  }
 
   std::cout
       << "scene=" << scenePath
@@ -475,7 +828,18 @@ int main(int argc, char** argv) {
     float maxSpeed = 0.0f;
     collectDiagnostics(scene, overlapStats, planeStats, maxSpeed);
 
-    if (step == 0 || step <= 20 || (step % 10) == 0 || overlapStats.pairCount > 0) {
+    if (testStackStability && step >= kStackTestSettleAfterStep) {
+      maxSettledBoxOverlap = std::max(maxSettledBoxOverlap, overlapStats.maxDepth);
+    }
+    if (testPiecewiseTransfer) {
+      transferProgress.peakSpeed = std::max(transferProgress.peakSpeed, maxSpeed);
+      transferProgress.peakOverlap = std::max(transferProgress.peakOverlap, overlapStats.maxDepth);
+      transferProgress.peakPlanePenetration =
+          std::max(transferProgress.peakPlanePenetration, planeStats.maxDepth);
+    }
+
+    if (!testStackStability && !testPiecewiseTransfer &&
+        (step == 0 || step <= 20 || (step % 10) == 0 || overlapStats.pairCount > 0)) {
       std::cout
           << "step=" << step
           << " max_speed=" << maxSpeed
@@ -542,8 +906,83 @@ int main(int argc, char** argv) {
     }
 
     sauce::physics_demo::applyForces(scene);
+    if (testPiecewiseTransfer && transferProgress.activeIndex < transferPlan.size()) {
+      if (transferProgress.phase < 4) {
+        drivePiecewiseTransferBlock(
+            solver,
+            transferPlan[transferProgress.activeIndex],
+            transferProgress.phase,
+            tuning.physicsDt);
+      } else {
+        solver.dragBody = nullptr;
+      }
+    } else {
+      solver.dragBody = nullptr;
+    }
     solver.solvePositions(rigidBodies, constraints, tuning.physicsDt);
     sauce::physics_demo::syncRigidBodiesToTransforms(scene);
+
+    if (testPiecewiseTransfer) {
+      ++transferProgress.phaseSteps;
+      advancePiecewiseTransferIfReady(transferProgress, transferPlan);
+      if (transferProgress.completedBlocks == static_cast<int>(transferPlan.size())) {
+        break;
+      }
+    }
+  }
+
+  if (testStackStability) {
+    std::cout << "stack_stability_max_settled_box_overlap_m=" << maxSettledBoxOverlap
+              << " threshold_m=" << kStackTestMaxBoxOverlapM << "\n";
+    if (maxSettledBoxOverlap > kStackTestMaxBoxOverlapM) {
+      std::cerr << "FAIL: dynamic box-box OBB overlap exceeds regression threshold\n";
+      return 2;
+    }
+  }
+
+  if (testPiecewiseTransfer) {
+    float maxFinalPlacementError = 0.0f;
+    for (const auto& block : transferPlan) {
+      if (!block.rigidBody) {
+        continue;
+      }
+      maxFinalPlacementError = std::max(
+          maxFinalPlacementError,
+          glm::distance(block.rigidBody->getPosition(), block.targetPosition));
+    }
+
+    std::cout
+        << "piecewise_transfer_completed_blocks=" << transferProgress.completedBlocks
+        << " active_index=" << transferProgress.activeIndex
+        << " active_block="
+        << ((transferProgress.activeIndex < transferPlan.size()) ? transferPlan[transferProgress.activeIndex].name : std::string("-"))
+        << " phase=" << transferProgress.phase
+        << " peak_speed=" << transferProgress.peakSpeed
+        << " peak_box_overlap=" << transferProgress.peakOverlap
+        << " peak_plane_penetration=" << transferProgress.peakPlanePenetration
+        << " max_final_error=" << maxFinalPlacementError
+        << "\n";
+
+    if (transferProgress.completedBlocks != static_cast<int>(transferPlan.size())) {
+      std::cerr << "FAIL: scripted transfer did not complete\n";
+      return 2;
+    }
+    if (transferProgress.peakSpeed > kTransferTestPeakSpeedLimit) {
+      std::cerr << "FAIL: scripted transfer exceeded peak speed limit\n";
+      return 2;
+    }
+    if (transferProgress.peakOverlap > kTransferTestPeakOverlapLimitM) {
+      std::cerr << "FAIL: scripted transfer exceeded peak overlap limit\n";
+      return 2;
+    }
+    if (transferProgress.peakPlanePenetration > kTransferTestPeakPlanePenetrationLimitM) {
+      std::cerr << "FAIL: scripted transfer exceeded plane penetration limit\n";
+      return 2;
+    }
+    if (maxFinalPlacementError > kTransferTestFinalPlacementToleranceM) {
+      std::cerr << "FAIL: scripted transfer final placement error is too large\n";
+      return 2;
+    }
   }
 
   return 0;

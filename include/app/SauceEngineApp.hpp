@@ -82,6 +82,9 @@ private:
   glm::vec3 dragOffset = glm::vec3(0.0f);
   glm::vec3 dragTargetPosition = glm::vec3(0.0f);
   glm::vec3 dragSmoothedVelocity = glm::vec3(0.0f);
+  Entity* dragTraceEntity = nullptr;
+  int dragTraceStep = 0;
+  int dragTraceReleaseStepsRemaining = 0;
 
   std::unique_ptr<sauce::Instance> pInstance;
 
@@ -112,6 +115,7 @@ private:
   void beginDrag(double mouseX, double mouseY);
   void updateDrag(double mouseX, double mouseY);
   void endDrag();
+  void logDragTraceSnapshot(const char* timing, float physicsDt);
 
   void uploadMeshGPUResources();
   void setupSceneRenderer();

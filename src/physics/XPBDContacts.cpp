@@ -16,8 +16,10 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
+#include <map>
 #include <optional>
 #include <numeric>
+#include <tuple>
 #include <unordered_map>
 
 namespace physics {
@@ -25,6 +27,22 @@ namespace physics {
 namespace {
 
 constexpr float kContactDepthEpsilon = 1e-5f;
+
+std::pair<uintptr_t, uintptr_t> canonicalRigidPair(const sauce::RigidBodyComponent* a,
+                                                  const sauce::RigidBodyComponent* b) {
+  uintptr_t pa = reinterpret_cast<uintptr_t>(a);
+  uintptr_t pb = reinterpret_cast<uintptr_t>(b);
+  if (pa > pb) {
+    std::swap(pa, pb);
+  }
+  return {pa, pb};
+}
+
+std::tuple<int, int, int> quantizedWorldMid(const glm::vec3& mid) {
+  auto q = [](float x) { return static_cast<int>(std::lround(x * 1000.0f)); };
+  return {q(mid.x), q(mid.y), q(mid.z)};
+}
+
 struct CollisionBody;
 
 struct BoxShape {
@@ -457,6 +475,83 @@ float boxHalfExtent(const CollisionBody& body, int axisIndex) {
   return body.boxHalfExtents[axisIndex];
 }
 
+// Face axes only (no edge–edge tests). Used when the full SAT picks an edge–edge axis so we still
+// get a stable face normal instead of falling back to mesh sampling (which causes perpendicular
+// interpenetration artifacts on stacks).
+std::optional<BoxFaceSelection> selectBoxContactFaceAxisSAT(const CollisionBody& bodyA,
+                                                            const CollisionBody& bodyB) {
+  constexpr float kSatEpsilon = 1e-6f;
+  const float contactMargin = 0.5f * (bodyA.contactMargin + bodyB.contactMargin);
+
+  glm::mat3 rotation(0.0f);
+  glm::mat3 absRotation(0.0f);
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      rotation[i][j] = glm::dot(boxAxis(bodyA, i), boxAxis(bodyB, j));
+      absRotation[i][j] = std::abs(rotation[i][j]) + kSatEpsilon;
+    }
+  }
+
+  const glm::vec3 centerDeltaWorld = bodyB.boxCenter - bodyA.boxCenter;
+  const glm::vec3 centerDelta(
+      glm::dot(centerDeltaWorld, boxAxis(bodyA, 0)),
+      glm::dot(centerDeltaWorld, boxAxis(bodyA, 1)),
+      glm::dot(centerDeltaWorld, boxAxis(bodyA, 2)));
+
+  float minOverlap = std::numeric_limits<float>::infinity();
+  std::optional<BoxFaceSelection> bestAxis;
+
+  for (int i = 0; i < 3; ++i) {
+    const float radiusA = boxHalfExtent(bodyA, i);
+    const float radiusB =
+        boxHalfExtent(bodyB, 0) * absRotation[i][0] +
+        boxHalfExtent(bodyB, 1) * absRotation[i][1] +
+        boxHalfExtent(bodyB, 2) * absRotation[i][2];
+    const float overlap = radiusA + radiusB + contactMargin - std::abs(centerDelta[i]);
+    if (overlap < 0.0f) {
+      return std::nullopt;
+    }
+    if (overlap < minOverlap) {
+      minOverlap = overlap;
+      bestAxis = BoxFaceSelection{
+          .referenceIsA = true,
+          .axisIndex = i,
+          .referenceOutwardNormal = centerDelta[i] >= 0.0f ? boxAxis(bodyA, i) : -boxAxis(bodyA, i),
+          .penetrationDepth = overlap,
+          .edgeEdge = false,
+      };
+    }
+  }
+
+  for (int j = 0; j < 3; ++j) {
+    const float radiusA =
+        boxHalfExtent(bodyA, 0) * absRotation[0][j] +
+        boxHalfExtent(bodyA, 1) * absRotation[1][j] +
+        boxHalfExtent(bodyA, 2) * absRotation[2][j];
+    const float radiusB = boxHalfExtent(bodyB, j);
+    const float distance =
+        centerDelta.x * rotation[0][j] +
+        centerDelta.y * rotation[1][j] +
+        centerDelta.z * rotation[2][j];
+    const float overlap = radiusA + radiusB + contactMargin - std::abs(distance);
+    if (overlap < 0.0f) {
+      return std::nullopt;
+    }
+    if (overlap < minOverlap) {
+      minOverlap = overlap;
+      bestAxis = BoxFaceSelection{
+          .referenceIsA = false,
+          .axisIndex = j,
+          .referenceOutwardNormal = distance >= 0.0f ? -boxAxis(bodyB, j) : boxAxis(bodyB, j),
+          .penetrationDepth = overlap,
+          .edgeEdge = false,
+      };
+    }
+  }
+
+  return bestAxis;
+}
+
 std::optional<BoxFaceSelection> selectBoxContactAxisSAT(const CollisionBody& bodyA,
                                                         const CollisionBody& bodyB) {
   constexpr float kSatEpsilon = 1e-6f;
@@ -548,7 +643,8 @@ std::optional<BoxFaceSelection> selectBoxContactAxisSAT(const CollisionBody& bod
       if (overlap < 0.0f) {
         return std::nullopt;
       }
-      constexpr float kEdgeBias = 5e-4f;
+      // Prefer face separation when overlap is close to edge–edge (stacks stay face–contacted).
+      constexpr float kEdgeBias = 2.5e-3f;
       if (overlap + kEdgeBias < minOverlap) {
         minOverlap = overlap;
         bestAxis = BoxFaceSelection{
@@ -632,17 +728,25 @@ bool generateBoxBoxContacts(const CollisionBody& bodyA,
     return true;
   }
 
+  std::optional<BoxFaceSelection> faceAxis = contactAxis;
   if (contactAxis->edgeEdge) {
+    faceAxis = selectBoxContactFaceAxisSAT(bodyA, bodyB);
+    if (!faceAxis) {
+      return false;
+    }
+  }
+
+  if (faceAxis->edgeEdge) {
     return false;
   }
 
-  const bool referenceIsA = contactAxis->referenceIsA;
+  const bool referenceIsA = faceAxis->referenceIsA;
   const CollisionBody& referenceBody = referenceIsA ? bodyA : bodyB;
   const CollisionBody& incidentBody = referenceIsA ? bodyB : bodyA;
-  const glm::vec3 referenceOutwardNormal = contactAxis->referenceOutwardNormal;
+  const glm::vec3 referenceOutwardNormal = faceAxis->referenceOutwardNormal;
   const glm::vec3 contactNormal = referenceIsA ? -referenceOutwardNormal : referenceOutwardNormal;
   const glm::vec3 referenceFaceCenter =
-      referenceBody.boxCenter + referenceOutwardNormal * boxHalfExtent(referenceBody, contactAxis->axisIndex);
+      referenceBody.boxCenter + referenceOutwardNormal * boxHalfExtent(referenceBody, faceAxis->axisIndex);
 
   const glm::vec3 incidentSearchNormal = -referenceOutwardNormal;
   int incidentAxisIndex = 0;
@@ -664,8 +768,8 @@ bool generateBoxBoxContacts(const CollisionBody& bodyA,
       computeFaceCorners(incidentBody, incidentAxisIndex, incidentFaceNormal);
   std::vector<glm::vec3> clippedPolygon(incidentFaceCorners.begin(), incidentFaceCorners.end());
 
-  const int tangentAxis0 = (contactAxis->axisIndex + 1) % 3;
-  const int tangentAxis1 = (contactAxis->axisIndex + 2) % 3;
+  const int tangentAxis0 = (faceAxis->axisIndex + 1) % 3;
+  const int tangentAxis1 = (faceAxis->axisIndex + 2) % 3;
   const glm::vec3 tangent0 = boxAxis(referenceBody, tangentAxis0);
   const glm::vec3 tangent1 = boxAxis(referenceBody, tangentAxis1);
   const float extent0 = boxHalfExtent(referenceBody, tangentAxis0);
@@ -1111,7 +1215,7 @@ std::vector<XPBDSolver::CollisionContact> XPBDSolver::collectCollisionContacts(
 std::vector<std::unique_ptr<Constraint>> XPBDSolver::generateCollisionConstraints(
     const std::vector<sauce::RigidBodyComponent*>& rigidBodies) {
   std::vector<std::unique_ptr<Constraint>> constraints;
-  const auto contacts = collectCollisionContacts(rigidBodies);
+  auto contacts = collectCollisionContacts(rigidBodies);
   constraints.reserve(contacts.size());
 
   std::vector<bool> wasActiveBeforeWake(rigidBodies.size(), false);
@@ -1121,6 +1225,29 @@ std::vector<std::unique_ptr<Constraint>> XPBDSolver::generateCollisionConstraint
     wasActiveBeforeWake[i] = rb->isDynamic() ||
         (rb->canBeDynamic() && rb->getInvMass() <= 1e-8f && !rb->isSleeping());
   }
+
+  std::sort(contacts.begin(), contacts.end(), [&](const CollisionContact& a, const CollisionContact& b) {
+    auto* aA = rigidBodies[a.indexA];
+    auto* aB = rigidBodies[a.indexB];
+    auto* bA = rigidBodies[b.indexA];
+    auto* bB = rigidBodies[b.indexB];
+    if (!aA || !aB) {
+      return false;
+    }
+    if (!bA || !bB) {
+      return true;
+    }
+    const auto ka = canonicalRigidPair(aA, aB);
+    const auto kb = canonicalRigidPair(bA, bB);
+    if (ka != kb) {
+      return ka < kb;
+    }
+    const glm::vec3 midA = 0.5f * (a.pointA + a.pointB);
+    const glm::vec3 midB = 0.5f * (b.pointA + b.pointB);
+    return quantizedWorldMid(midA) < quantizedWorldMid(midB);
+  });
+
+  std::map<std::pair<uintptr_t, uintptr_t>, int> warmSlotForPair;
 
   for (const auto& contact : contacts) {
     if (contact.indexA >= rigidBodies.size() || contact.indexB >= rigidBodies.size()) {
@@ -1151,14 +1278,32 @@ std::vector<std::unique_ptr<Constraint>> XPBDSolver::generateCollisionConstraint
     const glm::quat invOrientationB = glm::inverse(bodyB->getOrientation());
     const glm::vec3 localOffsetA = invOrientationA * (contact.pointA - centerA);
     const glm::vec3 localOffsetB = invOrientationB * (contact.pointB - centerB);
-    constexpr float kCollisionCompliance = 1.2e-7f;
+    const glm::vec3 warmMid = 0.5f * (contact.pointA + contact.pointB);
+
+    const auto pairKey = canonicalRigidPair(bodyA, bodyB);
+    const int slot = warmSlotForPair[pairKey]++;
+    float warmLambda = 0.0f;
+    const auto warmIt = collisionLambdaWarmStart.find(pairKey);
+    if (warmIt != collisionLambdaWarmStart.end() &&
+        slot < static_cast<int>(warmIt->second.size())) {
+      warmLambda = warmIt->second[static_cast<size_t>(slot)];
+    }
+
+    float frictionCoefficient = kRigidContactStaticFrictionMu;
+    if (dragBody && (bodyA == dragBody || bodyB == dragBody)) {
+      frictionCoefficient *= std::clamp(dragContactFrictionScale, 0.0f, 1.0f);
+    }
+
     constraints.push_back(std::make_unique<CollisionConstraint>(
         contact.indexA,
         contact.indexB,
         contact.contactNormal,
         localOffsetA,
         localOffsetB,
-        kCollisionCompliance));
+        0.0f,
+        warmMid,
+        warmLambda,
+        frictionCoefficient));
   }
 
   return constraints;
