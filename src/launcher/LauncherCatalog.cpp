@@ -157,6 +157,18 @@ std::string buildCommandLinePreview(const AppOptions& options, const std::string
   if (!options.scene_file.empty()) {
     stream << " --input-file " << quoteIfNeeded(options.scene_file);
   }
+  if (!options.polyhaven_model_id.empty()) {
+    stream << " --polyhaven-model " << quoteIfNeeded(options.polyhaven_model_id);
+    if (!options.polyhaven_model_resolution.empty()) {
+      stream << " --polyhaven-model-res " << quoteIfNeeded(options.polyhaven_model_resolution);
+    }
+  }
+  if (!options.polyhaven_hdri_id.empty()) {
+    stream << " --polyhaven-hdri " << quoteIfNeeded(options.polyhaven_hdri_id);
+    if (!options.polyhaven_hdri_resolution.empty()) {
+      stream << " --polyhaven-hdri-res " << quoteIfNeeded(options.polyhaven_hdri_resolution);
+    }
+  }
 
   return stream.str();
 }

@@ -31,6 +31,12 @@ int main(int argc, const char *argv[]) {
     if (!ops.ibl_file.empty()) {
       mainApp.setIBLFile(ops.ibl_file);
     }
+    if (!ops.polyhaven_model_id.empty()) {
+      mainApp.setPolyHavenModelSelection(ops.polyhaven_model_id, ops.polyhaven_model_resolution);
+    }
+    if (!ops.polyhaven_hdri_id.empty()) {
+      mainApp.setPolyHavenHdriSelection(ops.polyhaven_hdri_id, ops.polyhaven_hdri_resolution);
+    }
     mainApp.run(ops.scr_width, ops.scr_height);
   } catch (std::exception& e) {
     std::cerr << e.what() << std::endl;

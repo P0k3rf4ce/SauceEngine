@@ -9,6 +9,8 @@
 #include <imgui.h>
 
 #include <cstdlib>
+#include <future>
+#include <optional>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -37,6 +39,7 @@
 #include <app/ui/components/TextColored.hpp>
 #include <app/ui/components/TextWrapped.hpp>
 #include <launcher/LauncherCatalog.hpp>
+#include <launcher/PolyHavenClient.hpp>
 
 #ifdef NDEBUG
 constexpr bool enableValidationLayers = false;
@@ -85,9 +88,13 @@ private:
 
   void buildExampleUI();
   void renderLauncherUI();
+  void pollLauncherBackgroundTasks();
   void updateLauncherPreview();
+  void refreshLauncherCacheState();
   bool launchFromLauncher();
+  bool finalizeLauncherLaunch(const std::string& resolvedScenePath, const std::string& resolvedIblPath);
   bool loadConfiguredScene();
+  bool resolveConfiguredRemoteAssets(std::string& errorMessage);
   void setCursorCapture(bool captured);
 
   void uploadMeshGPUResources();
@@ -100,24 +107,58 @@ public:
   void setCustomUIBuilder(std::function<void(sauce::ui::ImGuiComponentManager&)> builder);
   void setSceneFile(const std::string& path) { sceneFile = path; }
   void setIBLFile(const std::string& path) { iblFile = path; }
+  void setPolyHavenModelSelection(const std::string& id, const std::string& resolution) { polyHavenModelId = id; polyHavenModelResolution = resolution; }
+  void setPolyHavenHdriSelection(const std::string& id, const std::string& resolution) { polyHavenHdriId = id; polyHavenHdriResolution = resolution; }
   void setLauncherEnabled(bool enabled) { launcherEnabled = enabled; launcherActive = enabled; }
 
 private:
+  struct RemoteBrowserState {
+    std::vector<sauce::launcher::PolyHavenAssetSummary> assets;
+    std::string searchQuery;
+    std::string statusMessage;
+    std::optional<std::future<sauce::launcher::PolyHavenAssetListResult>> pendingLoad;
+    int selectedIndex = -1;
+    int selectedResolutionIndex = 0;
+    int selectedSortMode = 1;
+  };
+
+  struct PendingLaunchResult {
+    std::string scenePath;
+    std::string iblPath;
+    std::string errorMessage;
+  };
+
   struct LauncherSelectionState {
+    struct CacheState {
+      sauce::launcher::PolyHavenCacheSummary summary;
+      std::string statusMessage;
+      int pruneDays = 30;
+    };
+
     sauce::launcher::AssetCatalog catalog;
     int selectedLaunchTarget = 0;
     int selectedIblMap = 0;
     int selectedResolutionPreset = 0;
+    int selectedSceneTab = 0;
+    int selectedIblTab = 0;
     std::string scenePath;
     std::string iblPath;
     uint32_t launchWidth = AppOptions::DEFAULT_SCR_WIDTH;
     uint32_t launchHeight = AppOptions::DEFAULT_SCR_HEIGHT;
     std::string commandPreview;
     std::string statusMessage;
+    RemoteBrowserState remoteModels;
+    RemoteBrowserState remoteHdris;
+    CacheState cache;
+    std::optional<std::future<PendingLaunchResult>> pendingLaunch;
   };
 
   std::string sceneFile;
   std::string iblFile;
+  std::string polyHavenModelId;
+  std::string polyHavenModelResolution = "2k";
+  std::string polyHavenHdriId;
+  std::string polyHavenHdriResolution = "4k";
   bool launcherEnabled = false;
   bool launcherActive = false;
   LauncherSelectionState launcherState;

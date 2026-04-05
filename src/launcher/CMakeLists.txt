@@ -10,6 +10,12 @@ target_include_directories(launcherLib PRIVATE
 find_package(glfw3 CONFIG REQUIRED)
 target_link_libraries(launcherLib PRIVATE glfw)
 
+find_package(CURL REQUIRED)
+target_link_libraries(launcherLib PRIVATE CURL::libcurl)
+
+find_package(nlohmann_json CONFIG REQUIRED)
+target_link_libraries(launcherLib PRIVATE nlohmann_json::nlohmann_json)
+
 target_link_libraries(launcherLib
   PUBLIC
     Vulkan::Vulkan
@@ -17,4 +23,3 @@ target_link_libraries(launcherLib
 
 find_package(Boost REQUIRED COMPONENTS program_options)
 target_link_libraries(launcherLib PRIVATE Boost::program_options)
-

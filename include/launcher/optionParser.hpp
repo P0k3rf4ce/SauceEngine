@@ -18,6 +18,10 @@ struct AppOptions {
     double tickrate;
     std::string scene_file;
     std::string ibl_file;
+    std::string polyhaven_model_id;
+    std::string polyhaven_model_resolution;
+    std::string polyhaven_hdri_id;
+    std::string polyhaven_hdri_resolution;
     bool skip_launcher;
     bool help;
 
@@ -28,6 +32,10 @@ struct AppOptions {
           tickrate(DEFAULT_TICKRATE),
           scene_file(),
           ibl_file(),
+          polyhaven_model_id(),
+          polyhaven_model_resolution("2k"),
+          polyhaven_hdri_id(),
+          polyhaven_hdri_resolution("4k"),
           skip_launcher(false),
           help(false),
           desc("Allowed options") {}
