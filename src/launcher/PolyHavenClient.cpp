@@ -341,7 +341,7 @@ size_t directoryFileCount(const fs::path& root) {
 
 fs::file_time_type newestWriteTime(const fs::path& root) {
   std::error_code error;
-  auto newest = fs::file_time_type::min();
+  auto newest = (fs::file_time_type::min)();
   if (!fs::exists(root, error)) {
     return newest;
   }
@@ -349,7 +349,7 @@ fs::file_time_type newestWriteTime(const fs::path& root) {
   newest = fs::last_write_time(root, error);
   if (error) {
     error.clear();
-    newest = fs::file_time_type::min();
+    newest = (fs::file_time_type::min)();
   }
 
   for (fs::recursive_directory_iterator it(root, fs::directory_options::skip_permission_denied, error), end;
