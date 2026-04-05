@@ -2,6 +2,7 @@
   "name": "sauce-engine",
   "version": "0.1.0",
   "dependencies": [
+    "curl",
     "glfw3",
     "glm",
     "ktx",

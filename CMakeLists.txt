@@ -11,6 +11,7 @@ if(WIN32)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
+  add_compile_definitions(NOMINMAX)
 endif()
 
 set(EXEC_NAME SauceEngine)
@@ -196,4 +197,3 @@ target_link_libraries(${EXEC_NAME} PRIVATE launcherLib)
 if(APPLE)
     target_link_options(${EXEC_NAME} PRIVATE "LINKER:-no_warn_duplicate_libraries")
 endif()
-

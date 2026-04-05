@@ -8,7 +8,9 @@
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 
+#include <array>
 #include <cstdlib>
+#include <string>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -36,6 +38,7 @@
 #include <app/ui/components/Text.hpp>
 #include <app/ui/components/TextColored.hpp>
 #include <app/ui/components/TextWrapped.hpp>
+#include <launcher/AppLauncher.hpp>
 
 #ifdef NDEBUG
 constexpr bool enableValidationLayers = false;
@@ -47,13 +50,12 @@ namespace sauce {
 
 class SauceEngineApp {
 public:
-  SauceEngineApp(); // Constructor to initialize pImGuiComponentManager
+  SauceEngineApp();
   void run(const uint32_t width, const uint32_t height);
-
   ~SauceEngineApp();
 
 private:
-  GLFWwindow *window;
+  GLFWwindow* window = nullptr;
 
   std::chrono::steady_clock::time_point lastFrameTime = std::chrono::steady_clock::now();
   float deltaTime = 0.0f;
@@ -65,16 +67,13 @@ private:
   bool gravePressedLastFrame = false;
 
   std::unique_ptr<sauce::Instance> pInstance;
-
   std::unique_ptr<sauce::RenderSurface> pRenderSurface;
 
   sauce::PhysicalDevice physicalDevice = nullptr;
   sauce::LogicalDevice logicalDevice = nullptr;
 
   std::unique_ptr<sauce::Renderer> pRenderer;
-
   std::unique_ptr<sauce::Scene> pScene;
-
   std::unique_ptr<sauce::ImGuiRenderer> pImGuiRenderer;
 
   std::unique_ptr<sauce::ui::ImGuiComponentManager> pImGuiComponentManager;
@@ -87,6 +86,10 @@ private:
   static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn);
 
   void buildExampleUI();
+  bool finalizeLauncherLaunch(const sauce::launcher::LaunchRequest& request);
+  bool loadConfiguredScene();
+  bool resolveConfiguredRemoteAssets(std::string& errorMessage);
+  void setCursorCapture(bool captured);
 
   void uploadMeshGPUResources();
   void setupSceneRenderer();
@@ -98,13 +101,31 @@ public:
   void setCustomUIBuilder(std::function<void(sauce::ui::ImGuiComponentManager&)> builder);
   void setSceneFile(const std::string& path) { sceneFile = path; }
   void setIBLFile(const std::string& path) { iblFile = path; }
+  void setModelRotationDegrees(const std::array<float, 3>& degrees, bool explicitOverride = true) {
+    modelRotationDegrees = degrees;
+    modelRotationExplicit = explicitOverride;
+  }
+  void setPolyHavenModelSelection(const std::string& id, const std::string& resolution) { polyHavenModelId = id; polyHavenModelResolution = resolution; }
+  void setPolyHavenHdriSelection(const std::string& id, const std::string& resolution) { polyHavenHdriId = id; polyHavenHdriResolution = resolution; }
+  void setLauncherEnabled(bool enabled) { launcherEnabled = enabled; launcherActive = enabled; }
 
 private:
   std::string sceneFile;
   std::string iblFile;
-  uint32_t width;
-  uint32_t height;
+  std::array<float, 3> modelRotationDegrees{
+      static_cast<float>(AppOptions::DEFAULT_MODEL_ROTATE_X_DEGREES),
+      static_cast<float>(AppOptions::DEFAULT_MODEL_ROTATE_Y_DEGREES),
+      static_cast<float>(AppOptions::DEFAULT_MODEL_ROTATE_Z_DEGREES)};
+  bool modelRotationExplicit = false;
+  std::string polyHavenModelId;
+  std::string polyHavenModelResolution = "2k";
+  std::string polyHavenHdriId;
+  std::string polyHavenHdriResolution = "4k";
+  bool launcherEnabled = false;
+  bool launcherActive = false;
+  std::unique_ptr<sauce::launcher::AppLauncher> pLauncher;
+  uint32_t width = 0;
+  uint32_t height = 0;
 };
 
-}
-
+} // namespace sauce

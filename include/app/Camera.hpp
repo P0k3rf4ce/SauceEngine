@@ -107,6 +107,10 @@ public:
 
   void setMouseSensitivity(float sensitivity) { this->mouseSensitivity = sensitivity; }
   float getMouseSensitivity() const { return mouseSensitivity; }
+  void setScreenSize(float width, float height) {
+    scrWidth = width;
+    scrHeight = height;
+  }
 
   /**
    * Get view matrix from the current view vectors
