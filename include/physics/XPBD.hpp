@@ -5,7 +5,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
-#include <memory>
 #include <utility>
 #include <vector>
 
@@ -16,7 +15,7 @@ class RigidBodyComponent;
 namespace physics {
 
 struct ClothData;
-struct Constraint;
+struct CollisionConstraint;
 struct Vertex;
 
 struct XPBDSolver {
@@ -38,7 +37,6 @@ struct XPBDSolver {
   bool contactDebugEnabled = false;
 
   void solvePositions(std::vector<sauce::RigidBodyComponent*>& rigidBodies,
-                      std::vector<std::unique_ptr<Constraint>>& constraints,
                       float deltatime);
 
   // Cloth-only pipeline: external acceleration, substepped XPBD on particle arrays (rigid bodies
@@ -46,21 +44,19 @@ struct XPBDSolver {
   void solveCloth(ClothData& cloth, float deltatime,
                   const glm::vec3& externalAcceleration = glm::vec3(0.0f, -9.81f, 0.0f));
 
-  void projectConstraints(
-      std::vector<Vertex>& vertices,
-      std::vector<std::unique_ptr<Constraint>>& constraints,
-      float deltatime);
-
-  std::vector<std::unique_ptr<Constraint>> generateCollisionConstraints(
+  std::vector<CollisionConstraint> generateCollisionConstraints(
       const std::vector<sauce::RigidBodyComponent*>& rigidBodies);
 
-  void wakeUnsupportedBodies(
-      const std::vector<sauce::RigidBodyComponent*>& rigidBodies) const;
-
 private:
+  void projectConstraints(
+      std::vector<Vertex>& vertices,
+      std::vector<CollisionConstraint>& constraints,
+      float deltatime);
   void captureCollisionLambdaWarmStart(
       const std::vector<sauce::RigidBodyComponent*>& rigidBodies,
-      const std::vector<std::unique_ptr<Constraint>>& constraints);
+      const std::vector<CollisionConstraint>& constraints);
+  void wakeUnsupportedBodies(
+      const std::vector<sauce::RigidBodyComponent*>& rigidBodies) const;
 
   struct CollisionContact {
     uint32_t indexA = 0;

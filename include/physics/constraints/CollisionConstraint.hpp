@@ -1,6 +1,6 @@
 #pragma once
 
-#include <physics/constraints/Constraint.hpp>
+#include <physics/Vertex.hpp>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -9,33 +9,28 @@
 
 namespace physics {
 
-/// Static friction coefficient for rigid contacts (position projection + velocity impulses).
-/// >1 is common for game stacks (rough wood / high grip); keeps Jenga-style blocks from skating.
 inline constexpr float kRigidContactStaticFrictionMu = 1.35f;
+inline constexpr float kCollisionMassEpsilon = 1e-8f;
+inline constexpr float kCollisionPenetrationSlop = 1.0e-4f;
+inline constexpr float kNormalCorrectionRelax = 0.92f;
+inline constexpr float kTangentCorrectionRelax = 0.97f;
 
-namespace {
-constexpr float kCollisionMassEpsilon = 1e-8f;
-// Ignore penetration shallower than this (m) to stop GS + velocity fighting on noise.
-constexpr float kCollisionPenetrationSlop = 1.0e-4f;
-constexpr float kNormalCorrectionRelax = 0.92f;
-constexpr float kTangentCorrectionRelax = 0.97f;
-constexpr float kStaticFrictionCoefficient = kRigidContactStaticFrictionMu;
-}
-
-struct CollisionConstraint : public Constraint {
+struct CollisionConstraint {
   CollisionConstraint() = default;
 
   CollisionConstraint(uint32_t a, uint32_t b, glm::vec3 normal,
                       glm::vec3 offsetA, glm::vec3 offsetB, float comp = 0.0f,
                       glm::vec3 warmMid = glm::vec3(0.0f), float warmLambda = 0.0f,
                       float frictionCoeff = kRigidContactStaticFrictionMu)
-      : Constraint(comp), indexA(a), indexB(b), contactNormal(normal),
-        localOffsetA(offsetA), localOffsetB(offsetB), warmSortMid(warmMid),
-        frictionCoefficient(frictionCoeff), warmStartLambda(warmLambda) {}
+      : indexA(a), indexB(b), contactNormal(normal), localOffsetA(offsetA),
+        localOffsetB(offsetB), warmSortMid(warmMid),
+        frictionCoefficient(frictionCoeff), compliance(comp),
+        warmStartLambda(warmLambda) {}
 
-  void resetLambda() override { lambda = warmStartLambda; }
+  void resetLambda() { lambda = warmStartLambda; }
+  float accumulatedLambda() const { return lambda; }
 
-  void solve(std::vector<physics::Vertex>& vertices, float deltatime) override {
+  void solve(std::vector<physics::Vertex>& vertices, float deltatime) {
     if (indexA >= vertices.size() || indexB >= vertices.size()) return;
 
     physics::Vertex& va = vertices[indexA];
@@ -124,10 +119,12 @@ struct CollisionConstraint : public Constraint {
   glm::vec3 localOffsetB = glm::vec3(0.0f);
   /// World-space midpoint at constraint creation; stable sort key for warm-start matching.
   glm::vec3 warmSortMid = glm::vec3(0.0f);
-  float frictionCoefficient = kStaticFrictionCoefficient;
+  float frictionCoefficient = kRigidContactStaticFrictionMu;
+  float compliance = 0.0f;
 
 private:
   float warmStartLambda = 0.0f;
+  float lambda = 0.0f;
 
   static glm::mat3 worldInvInertiaTensor(const physics::Vertex& v) {
     const glm::mat3 rotation = glm::mat3_cast(v.orientation);
@@ -143,4 +140,4 @@ private:
   }
 };
 
-}
+} // namespace physics

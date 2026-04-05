@@ -1,7 +1,7 @@
 #include <physics/XPBD.hpp>
 #include <physics/Cloth.hpp>
 #include <physics/Vertex.hpp>
-#include <physics/constraints/Constraint.hpp>
+#include <physics/constraints/CollisionConstraint.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -112,7 +112,7 @@ void projectBend(std::vector<ClothParticle>& particles, BendConstraint& c, float
 
 void XPBDSolver::projectConstraints(
     std::vector<physics::Vertex>& vertices,
-    std::vector<std::unique_ptr<Constraint>>& constraints,
+    std::vector<CollisionConstraint>& constraints,
     float deltatime) {
   if (vertices.empty() || constraints.empty()) {
     return;
@@ -121,12 +121,12 @@ void XPBDSolver::projectConstraints(
   for (int iter = 0; iter < solverIterations; ++iter) {
     if (iter == 0) {
       for (auto& constraint : constraints) {
-        constraint->resetLambda();
+        constraint.resetLambda();
       }
     }
 
     for (auto& constraint : constraints) {
-      constraint->solve(vertices, deltatime);
+      constraint.solve(vertices, deltatime);
     }
   }
 }

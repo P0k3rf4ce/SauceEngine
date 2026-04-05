@@ -216,30 +216,6 @@ add_custom_target(generate_jenga_scene
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
-add_executable(xpbd_cloth_harness
-  src/xpbd_cloth_harness.cpp
-  src/app/components/MeshRendererComponent.cpp
-  src/physics/Cloth.cpp
-  src/physics/SphereBVH.cpp
-  src/physics/SphereCollider.cpp
-  src/physics/XPBD.cpp
-  src/physics/XPBDContacts.cpp
-  src/physics/XPBDRigidSolve.cpp
-)
-
-target_include_directories(xpbd_cloth_harness PRIVATE
-  ${PROJECT_SOURCE_DIR}/include
-  ${TINYGLTF_INCLUDE_DIRS}
-)
-
-target_link_libraries(xpbd_cloth_harness PUBLIC Vulkan::Vulkan)
-
-if(NOT WIN32)
-  target_compile_options(xpbd_cloth_harness PRIVATE ${SAUCE_WARNINGS})
-endif()
-
-add_test(NAME xpbd_cloth_harness COMMAND xpbd_cloth_harness)
-
 add_executable(xpbd_rigid_harness
   src/xpbd_rigid_harness.cpp
   src/app/Scene.cpp

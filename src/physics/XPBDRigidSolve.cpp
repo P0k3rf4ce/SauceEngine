@@ -1,7 +1,7 @@
 #include <physics/XPBD.hpp>
 #include <physics/Vertex.hpp>
 #include <physics/constraints/CollisionConstraint.hpp>
-#include <physics/constraints/Constraint.hpp>
+#include "RigidSolverShared.hpp"
 
 #include <app/Entity.hpp>
 #include <app/components/MeshRendererComponent.hpp>
@@ -22,9 +22,89 @@ namespace physics {
 
 namespace {
 
-struct RigidSolveBuffers {
+glm::vec3 clampMagnitude(const glm::vec3& value, float maxMagnitude);
+glm::vec3 angularVelocityFromSolvedOrientation(const glm::quat& previousOrientation,
+                                               const glm::quat& solvedOrientation,
+                                               float deltaTime);
+
+class RigidSubstep {
+public:
+  explicit RigidSubstep(const std::vector<sauce::RigidBodyComponent*>& rigidBodies) {
+    vertices.reserve(rigidBodies.size());
+    rigidBodiesState.reserve(rigidBodies.size());
+    previousCentersOfMass.reserve(rigidBodies.size());
+    previousOrientations.reserve(rigidBodies.size());
+  }
+
+  void begin(const std::vector<sauce::RigidBodyComponent*>& rigidBodies, float deltaTime) {
+    vertices.clear();
+    rigidBodiesState.clear();
+    previousCentersOfMass.clear();
+    previousOrientations.clear();
+
+    for (auto* rigidBody : rigidBodies) {
+      previousCentersOfMass.push_back(rigidBody->getWorldCenterOfMass());
+      previousOrientations.push_back(rigidBody->getOrientation());
+      rigidBody->update(deltaTime);
+      rigidBodiesState.push_back(rigidBody);
+      vertices.push_back({
+        rigidBody->getWorldCenterOfMass(),
+        glm::vec3(0.0f),
+        rigidBody->getInvMass(),
+        rigidBody->getOrientation(),
+        rigidBody->getAngularVelocity(),
+        rigidBody->getInvInertiaTensor(),
+      });
+    }
+  }
+
+  void syncMassProperties() {
+    for (size_t i = 0; i < rigidBodiesState.size(); ++i) {
+      auto* rigidBody = rigidBodiesState[i];
+      if (rigidBody && vertices[i].invMass != rigidBody->getInvMass()) {
+        vertices[i].invMass = rigidBody->getInvMass();
+        vertices[i].invInertiaTensor = rigidBody->getInvInertiaTensor();
+      }
+    }
+  }
+
+  void writeBack(float deltaTime) {
+    constexpr float kMaxProjectedLinearSpeed = 18.0f;
+    constexpr float kMaxProjectedAngularSpeed = 24.0f;
+    const size_t bodyCount = std::min(vertices.size(), rigidBodiesState.size());
+    for (size_t i = 0; i < bodyCount; ++i) {
+      auto* rigidBody = rigidBodiesState[i];
+      if (!rigidBody) {
+        continue;
+      }
+
+      const glm::quat solvedOrientation = glm::normalize(vertices[i].orientation);
+      const glm::vec3 solvedCenterOfMass = vertices[i].position;
+
+      rigidBody->setOrientation(solvedOrientation);
+      rigidBody->setWorldCenterOfMass(solvedCenterOfMass);
+
+      if (rigidBody->getInvMass() <= 1e-8f || deltaTime <= 0.0f) {
+        rigidBody->setVelocity(glm::vec3(0.0f));
+        rigidBody->setAngularVelocity(glm::vec3(0.0f));
+        continue;
+      }
+
+      if (i < previousCentersOfMass.size()) {
+        rigidBody->setVelocity(clampMagnitude(
+            (solvedCenterOfMass - previousCentersOfMass[i]) / deltaTime,
+            kMaxProjectedLinearSpeed));
+      }
+      if (i < previousOrientations.size()) {
+        rigidBody->setAngularVelocity(clampMagnitude(
+            angularVelocityFromSolvedOrientation(previousOrientations[i], solvedOrientation, deltaTime),
+            kMaxProjectedAngularSpeed));
+      }
+    }
+  }
+
   std::vector<physics::Vertex> vertices;
-  std::vector<sauce::RigidBodyComponent*> rigidBodies;
+  std::vector<sauce::RigidBodyComponent*> rigidBodiesState;
   std::vector<glm::vec3> previousCentersOfMass;
   std::vector<glm::quat> previousOrientations;
 };
@@ -35,57 +115,6 @@ glm::vec3 clampMagnitude(const glm::vec3& value, float maxMagnitude) {
     return value;
   }
   return value * (maxMagnitude / std::sqrt(lengthSq));
-}
-
-std::vector<sauce::RigidBodyComponent*> collectSimulatedRigidBodies(
-    const std::vector<sauce::RigidBodyComponent*>& rigidBodies) {
-  std::vector<sauce::RigidBodyComponent*> simulatedBodies;
-  simulatedBodies.reserve(rigidBodies.size());
-
-  for (auto* rigidBody : rigidBodies) {
-    if (!rigidBody) {
-      continue;
-    }
-
-    auto* owner = rigidBody->getOwner();
-    auto* meshRenderer = owner ? owner->getComponent<sauce::MeshRendererComponent>() : nullptr;
-    if (!meshRenderer || !meshRenderer->getMesh()) {
-      continue;
-    }
-
-    simulatedBodies.push_back(rigidBody);
-  }
-
-  return simulatedBodies;
-}
-
-void initializeRigidSolveBuffers(const std::vector<sauce::RigidBodyComponent*>& rigidBodies,
-                                 float deltaTime,
-                                 RigidSolveBuffers& buffers) {
-  buffers.vertices.clear();
-  buffers.rigidBodies.clear();
-  buffers.previousCentersOfMass.clear();
-  buffers.previousOrientations.clear();
-
-  buffers.vertices.reserve(rigidBodies.size());
-  buffers.rigidBodies.reserve(rigidBodies.size());
-  buffers.previousCentersOfMass.reserve(rigidBodies.size());
-  buffers.previousOrientations.reserve(rigidBodies.size());
-
-  for (auto* rigidBody : rigidBodies) {
-    buffers.previousCentersOfMass.push_back(rigidBody->getWorldCenterOfMass());
-    buffers.previousOrientations.push_back(rigidBody->getOrientation());
-    rigidBody->update(deltaTime);
-    buffers.rigidBodies.push_back(rigidBody);
-    buffers.vertices.push_back({
-      rigidBody->getWorldCenterOfMass(),
-      glm::vec3(0.0f),
-      rigidBody->getInvMass(),
-      rigidBody->getOrientation(),
-      rigidBody->getAngularVelocity(),
-      rigidBody->getInvInertiaTensor(),
-    });
-  }
 }
 
 glm::vec3 angularVelocityFromSolvedOrientation(const glm::quat& previousOrientation,
@@ -112,44 +141,6 @@ glm::vec3 angularVelocityFromSolvedOrientation(const glm::quat& previousOrientat
   return (angle / (deltaTime * sinHalfAngle)) * deltaImag;
 }
 
-void applyProjectedRigidState(const std::vector<physics::Vertex>& vertices,
-                              const std::vector<sauce::RigidBodyComponent*>& rigidBodies,
-                              const std::vector<glm::vec3>& previousCentersOfMass,
-                              const std::vector<glm::quat>& previousOrientations,
-                              float deltaTime) {
-  constexpr float kMaxProjectedLinearSpeed = 18.0f;
-  constexpr float kMaxProjectedAngularSpeed = 24.0f;
-  const size_t bodyCount = std::min(vertices.size(), rigidBodies.size());
-  for (size_t i = 0; i < bodyCount; ++i) {
-    auto* rigidBody = rigidBodies[i];
-    if (!rigidBody) {
-      continue;
-    }
-
-    const glm::quat solvedOrientation = glm::normalize(vertices[i].orientation);
-    const glm::vec3 solvedCenterOfMass = vertices[i].position;
-
-    rigidBody->setOrientation(solvedOrientation);
-    rigidBody->setWorldCenterOfMass(solvedCenterOfMass);
-
-    if (rigidBody->getInvMass() <= 1e-8f || deltaTime <= 0.0f) {
-      rigidBody->setVelocity(glm::vec3(0.0f));
-      rigidBody->setAngularVelocity(glm::vec3(0.0f));
-      continue;
-    }
-
-    if (i < previousCentersOfMass.size()) {
-      rigidBody->setVelocity(clampMagnitude(
-          (solvedCenterOfMass - previousCentersOfMass[i]) / deltaTime,
-          kMaxProjectedLinearSpeed));
-    }
-    if (i < previousOrientations.size()) {
-      rigidBody->setAngularVelocity(clampMagnitude(
-          angularVelocityFromSolvedOrientation(previousOrientations[i], solvedOrientation, deltaTime),
-          kMaxProjectedAngularSpeed));
-    }
-  }
-}
 
 glm::mat3 worldInvInertiaTensor(const sauce::RigidBodyComponent& rigidBody) {
   const glm::mat3 rotation = glm::mat3_cast(rigidBody.getOrientation());
@@ -185,26 +176,11 @@ void applyImpulse(sauce::RigidBodyComponent& rigidBody,
       rigidBody.getAngularVelocity() + worldInvInertia * glm::cross(offset, impulse));
 }
 
-std::pair<uintptr_t, uintptr_t> canonicalRigidPair(const sauce::RigidBodyComponent* a,
-                                                    const sauce::RigidBodyComponent* b) {
-  uintptr_t pa = reinterpret_cast<uintptr_t>(a);
-  uintptr_t pb = reinterpret_cast<uintptr_t>(b);
-  if (pa > pb) {
-    std::swap(pa, pb);
-  }
-  return {pa, pb};
-}
-
-std::tuple<int, int, int> quantizedWorldMid(const glm::vec3& mid) {
-  auto q = [](float x) { return static_cast<int>(std::lround(x * 1000.0f)); };
-  return {q(mid.x), q(mid.y), q(mid.z)};
-}
-
 } // namespace
 
 void XPBDSolver::captureCollisionLambdaWarmStart(
     const std::vector<sauce::RigidBodyComponent*>& rigidBodies,
-    const std::vector<std::unique_ptr<Constraint>>& constraints) {
+    const std::vector<CollisionConstraint>& constraints) {
   struct Row {
     std::pair<uintptr_t, uintptr_t> pairKey;
     std::tuple<int, int, int> midQ;
@@ -213,23 +189,19 @@ void XPBDSolver::captureCollisionLambdaWarmStart(
   std::vector<Row> rows;
   rows.reserve(constraints.size());
 
-  for (const auto& up : constraints) {
-    const auto* cc = dynamic_cast<const CollisionConstraint*>(up.get());
-    if (!cc) {
+  for (const auto& constraint : constraints) {
+    if (constraint.indexA >= rigidBodies.size() || constraint.indexB >= rigidBodies.size()) {
       continue;
     }
-    if (cc->indexA >= rigidBodies.size() || cc->indexB >= rigidBodies.size()) {
-      continue;
-    }
-    auto* ba = rigidBodies[cc->indexA];
-    auto* bb = rigidBodies[cc->indexB];
+    auto* ba = rigidBodies[constraint.indexA];
+    auto* bb = rigidBodies[constraint.indexB];
     if (!ba || !bb) {
       continue;
     }
     rows.push_back(Row{
-        canonicalRigidPair(ba, bb),
-        quantizedWorldMid(cc->warmSortMid),
-        cc->accumulatedLambda(),
+        detail::canonicalRigidPair(ba, bb),
+        detail::quantizedWorldMid(constraint.warmSortMid),
+        constraint.accumulatedLambda(),
     });
   }
 
@@ -353,47 +325,49 @@ void XPBDSolver::applyCollisionVelocityResponse(
 
 void XPBDSolver::solvePositions(
     std::vector<sauce::RigidBodyComponent*>& rigidBodies,
-    std::vector<std::unique_ptr<Constraint>>& constraints,
     float deltatime) {
   if (deltatime <= 0.0f) {
     return;
   }
 
-  auto simulatedBodies = collectSimulatedRigidBodies(rigidBodies);
+  std::vector<sauce::RigidBodyComponent*> simulatedBodies;
+  simulatedBodies.reserve(rigidBodies.size());
+  for (auto* rigidBody : rigidBodies) {
+    if (!rigidBody) {
+      continue;
+    }
+
+    auto* owner = rigidBody->getOwner();
+    auto* meshRenderer = owner ? owner->getComponent<sauce::MeshRendererComponent>() : nullptr;
+    if (!meshRenderer || !meshRenderer->getMesh()) {
+      continue;
+    }
+
+    simulatedBodies.push_back(rigidBody);
+  }
+
   if (simulatedBodies.empty()) {
-    constraints.clear();
     return;
   }
 
   const int substeps = std::max(1, rigidSubsteps);
   const float h = deltatime / static_cast<float>(substeps);
-  RigidSolveBuffers buffers;
+  RigidSubstep substepState(simulatedBodies);
+  std::vector<CollisionConstraint> collisionConstraints;
 
   for (int substep = 0; substep < substeps; ++substep) {
-    initializeRigidSolveBuffers(simulatedBodies, h, buffers);
-    constraints = generateCollisionConstraints(buffers.rigidBodies);
+    substepState.begin(simulatedBodies, h);
+    collisionConstraints = generateCollisionConstraints(substepState.rigidBodiesState);
+    substepState.syncMassProperties();
 
-    for (size_t i = 0; i < buffers.rigidBodies.size(); ++i) {
-      auto* rb = buffers.rigidBodies[i];
-      if (rb && buffers.vertices[i].invMass != rb->getInvMass()) {
-        buffers.vertices[i].invMass = rb->getInvMass();
-        buffers.vertices[i].invInertiaTensor = rb->getInvInertiaTensor();
-      }
-    }
-
-    projectConstraints(buffers.vertices, constraints, h);
-    applyProjectedRigidState(
-        buffers.vertices,
-        buffers.rigidBodies,
-        buffers.previousCentersOfMass,
-        buffers.previousOrientations,
-        h);
+    projectConstraints(substepState.vertices, collisionConstraints, h);
+    substepState.writeBack(h);
 
     const auto substepContacts = collectCollisionContacts(simulatedBodies);
     applyCollisionVelocityResponse(simulatedBodies, substepContacts, h);
   }
 
-  captureCollisionLambdaWarmStart(simulatedBodies, constraints);
+  captureCollisionLambdaWarmStart(simulatedBodies, collisionConstraints);
 
   constexpr float kSleepLinearThreshold = 0.05f;
   constexpr float kSleepAngularThreshold = 0.1f;

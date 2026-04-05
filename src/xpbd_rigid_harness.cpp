@@ -4,7 +4,6 @@
 #include <app/components/RigidBodyComponent.hpp>
 #include <app/components/TransformComponent.hpp>
 #include <physics/XPBD.hpp>
-#include <physics/constraints/Constraint.hpp>
 #include <physics/constraints/CollisionConstraint.hpp>
 
 #include <glm/glm.hpp>
@@ -19,7 +18,6 @@
 #include <cstring>
 #include <iostream>
 #include <limits>
-#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -670,24 +668,19 @@ std::vector<ContactDumpEntry> collectContactDump(
   std::vector<ContactDumpEntry> dump;
   dump.reserve(constraints.size());
 
-  for (const auto& constraint : constraints) {
-    const auto* collision = dynamic_cast<const physics::CollisionConstraint*>(constraint.get());
-    if (!collision) {
+  for (const auto& collision : constraints) {
+    if (collision.indexA >= rigidBodies.size() || collision.indexB >= rigidBodies.size()) {
       continue;
     }
 
-    if (collision->indexA >= rigidBodies.size() || collision->indexB >= rigidBodies.size()) {
-      continue;
-    }
-
-    auto* bodyA = rigidBodies[collision->indexA];
-    auto* bodyB = rigidBodies[collision->indexB];
+    auto* bodyA = rigidBodies[collision.indexA];
+    auto* bodyB = rigidBodies[collision.indexB];
     const auto* ownerA = bodyA ? bodyA->getOwner() : nullptr;
     const auto* ownerB = bodyB ? bodyB->getOwner() : nullptr;
     dump.push_back({
         ownerA ? ownerA->get_name() : "?",
         ownerB ? ownerB->get_name() : "?",
-        collision->contactNormal,
+        collision.contactNormal,
     });
   }
 
@@ -820,8 +813,6 @@ int main(int argc, char** argv) {
       << " wake_body=" << wakeBodyName
       << "\n";
 
-  auto constraints = std::vector<std::unique_ptr<physics::Constraint>>();
-
   for (int step = 0; step <= steps; ++step) {
     OverlapStats overlapStats;
     PlanePenetrationStats planeStats;
@@ -919,7 +910,7 @@ int main(int argc, char** argv) {
     } else {
       solver.dragBody = nullptr;
     }
-    solver.solvePositions(rigidBodies, constraints, tuning.physicsDt);
+    solver.solvePositions(rigidBodies, tuning.physicsDt);
     sauce::physics_demo::syncRigidBodiesToTransforms(scene);
 
     if (testPiecewiseTransfer) {

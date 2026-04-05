@@ -2,6 +2,7 @@
 #include <physics/SphereBVH.hpp>
 #include <physics/SphereCollider.hpp>
 #include <physics/constraints/CollisionConstraint.hpp>
+#include "RigidSolverShared.hpp"
 
 #include <app/Entity.hpp>
 #include <app/components/MeshRendererComponent.hpp>
@@ -27,21 +28,6 @@ namespace physics {
 namespace {
 
 constexpr float kContactDepthEpsilon = 1e-5f;
-
-std::pair<uintptr_t, uintptr_t> canonicalRigidPair(const sauce::RigidBodyComponent* a,
-                                                  const sauce::RigidBodyComponent* b) {
-  uintptr_t pa = reinterpret_cast<uintptr_t>(a);
-  uintptr_t pb = reinterpret_cast<uintptr_t>(b);
-  if (pa > pb) {
-    std::swap(pa, pb);
-  }
-  return {pa, pb};
-}
-
-std::tuple<int, int, int> quantizedWorldMid(const glm::vec3& mid) {
-  auto q = [](float x) { return static_cast<int>(std::lround(x * 1000.0f)); };
-  return {q(mid.x), q(mid.y), q(mid.z)};
-}
 
 struct CollisionBody;
 
@@ -80,6 +66,12 @@ struct CollisionBody {
   bool isPlane = false;
   glm::vec3 planePoint = glm::vec3(0.0f);
   glm::vec3 planeNormal = glm::vec3(0.0f, 0.0f, 1.0f);
+
+  glm::vec3 axis(int axisIndex) const;
+  float halfExtent(int axisIndex) const { return boxHalfExtents[axisIndex]; }
+  std::array<glm::vec3, 8> corners() const;
+  std::array<glm::vec3, 4> faceCorners(int normalAxisIndex, const glm::vec3& outwardNormal) const;
+  SphereCollider broadPhaseSphere() const;
 };
 
 class MeshCollisionCache {
@@ -208,25 +200,7 @@ public:
       return it->second;
     }
 
-    const auto& vertices = mesh->getVertices();
-    const auto& indices = mesh->getIndices();
-    if (vertices.empty() || indices.empty()) {
-      return contactRadii.emplace(mesh, 0.02f).first->second;
-    }
-
-    double edgeSum = 0.0;
-    size_t edgeCount = 0;
-    for (size_t i = 0; i + 2 < indices.size(); i += 3) {
-      const glm::vec3& p0 = vertices[indices[i + 0]].position;
-      const glm::vec3& p1 = vertices[indices[i + 1]].position;
-      const glm::vec3& p2 = vertices[indices[i + 2]].position;
-      edgeSum += glm::length(p1 - p0) + glm::length(p2 - p1) + glm::length(p0 - p2);
-      edgeCount += 3;
-    }
-
-    const float averageEdgeLength = edgeCount > 0
-        ? static_cast<float>(edgeSum / static_cast<double>(edgeCount))
-        : 0.02f;
+    const float averageEdgeLength = averageEdgeLengthFor(mesh, 0.02f);
     const float radius = std::clamp(averageEdgeLength * 0.16f, 0.006f, 0.06f);
     return contactRadii.emplace(mesh, radius).first->second;
   }
@@ -236,25 +210,7 @@ public:
       return 0.008f;
     }
 
-    const auto& vertices = mesh->getVertices();
-    const auto& indices = mesh->getIndices();
-    if (vertices.empty() || indices.empty()) {
-      return 0.008f;
-    }
-
-    double edgeSum = 0.0;
-    size_t edgeCount = 0;
-    for (size_t i = 0; i + 2 < indices.size(); i += 3) {
-      const glm::vec3& p0 = vertices[indices[i + 0]].position;
-      const glm::vec3& p1 = vertices[indices[i + 1]].position;
-      const glm::vec3& p2 = vertices[indices[i + 2]].position;
-      edgeSum += glm::length(p1 - p0) + glm::length(p2 - p1) + glm::length(p0 - p2);
-      edgeCount += 3;
-    }
-
-    const float averageEdgeLength = edgeCount > 0
-        ? static_cast<float>(edgeSum / static_cast<double>(edgeCount))
-        : 0.02f;
+    const float averageEdgeLength = averageEdgeLengthFor(mesh, 0.02f);
     return std::clamp(averageEdgeLength * 0.06f, 0.004f, 0.02f);
   }
 
@@ -325,6 +281,32 @@ public:
   }
 
 private:
+  float averageEdgeLengthFor(const sauce::modeling::Mesh* mesh, float fallback) const {
+    if (!mesh) {
+      return fallback;
+    }
+
+    const auto& vertices = mesh->getVertices();
+    const auto& indices = mesh->getIndices();
+    if (vertices.empty() || indices.empty()) {
+      return fallback;
+    }
+
+    double edgeSum = 0.0;
+    size_t edgeCount = 0;
+    for (size_t i = 0; i + 2 < indices.size(); i += 3) {
+      const glm::vec3& p0 = vertices[indices[i + 0]].position;
+      const glm::vec3& p1 = vertices[indices[i + 1]].position;
+      const glm::vec3& p2 = vertices[indices[i + 2]].position;
+      edgeSum += glm::length(p1 - p0) + glm::length(p2 - p1) + glm::length(p0 - p2);
+      edgeCount += 3;
+    }
+
+    return edgeCount > 0
+        ? static_cast<float>(edgeSum / static_cast<double>(edgeCount))
+        : fallback;
+  }
+
   std::unordered_map<const sauce::modeling::Mesh*, std::unique_ptr<SphereBVHNode>> bvhRoots;
   std::unordered_map<const sauce::modeling::Mesh*, float> contactRadii;
   std::unordered_map<const sauce::modeling::Mesh*, std::optional<BoxShape>> boxShapes;
@@ -353,6 +335,58 @@ SphereCollider transformSphere(const SphereCollider& localSphere, const sauce::R
   worldSphere.center = body.getPosition() + body.getOrientation() * scalePoint(localSphere.center, body.getScale());
   worldSphere.radius = localSphere.radius * maxScaleComponent(body.getScale());
   return worldSphere;
+}
+
+glm::vec3 CollisionBody::axis(int axisIndex) const {
+  switch (axisIndex) {
+    case 0: return glm::normalize(rigidBody->getOrientation() * glm::vec3(1.0f, 0.0f, 0.0f));
+    case 1: return glm::normalize(rigidBody->getOrientation() * glm::vec3(0.0f, 1.0f, 0.0f));
+    default: return glm::normalize(rigidBody->getOrientation() * glm::vec3(0.0f, 0.0f, 1.0f));
+  }
+}
+
+std::array<glm::vec3, 8> CollisionBody::corners() const {
+  std::array<glm::vec3, 8> result;
+  const glm::vec3 ex = rigidBody->getOrientation() * glm::vec3(boxHalfExtents.x, 0.0f, 0.0f);
+  const glm::vec3 ey = rigidBody->getOrientation() * glm::vec3(0.0f, boxHalfExtents.y, 0.0f);
+  const glm::vec3 ez = rigidBody->getOrientation() * glm::vec3(0.0f, 0.0f, boxHalfExtents.z);
+
+  size_t cornerIndex = 0;
+  for (int sx : {-1, 1}) {
+    for (int sy : {-1, 1}) {
+      for (int sz : {-1, 1}) {
+        result[cornerIndex++] =
+            boxCenter + static_cast<float>(sx) * ex + static_cast<float>(sy) * ey +
+            static_cast<float>(sz) * ez;
+      }
+    }
+  }
+  return result;
+}
+
+std::array<glm::vec3, 4> CollisionBody::faceCorners(
+    int normalAxisIndex,
+    const glm::vec3& outwardNormal) const {
+  const int tangentAxis0 = (normalAxisIndex + 1) % 3;
+  const int tangentAxis1 = (normalAxisIndex + 2) % 3;
+  const glm::vec3 tangent0 = axis(tangentAxis0);
+  const glm::vec3 tangent1 = axis(tangentAxis1);
+  const float extent0 = halfExtent(tangentAxis0);
+  const float extent1 = halfExtent(tangentAxis1);
+  const glm::vec3 faceCenter = boxCenter + outwardNormal * halfExtent(normalAxisIndex);
+
+  return {
+      faceCenter + tangent0 * extent0 + tangent1 * extent1,
+      faceCenter - tangent0 * extent0 + tangent1 * extent1,
+      faceCenter - tangent0 * extent0 - tangent1 * extent1,
+      faceCenter + tangent0 * extent0 - tangent1 * extent1,
+  };
+}
+
+SphereCollider CollisionBody::broadPhaseSphere() const {
+  SphereCollider broad = transformSphere(bvhRoot->sphere, *rigidBody);
+  broad.radius += broadPhasePadding;
+  return broad;
 }
 
 bool spheresOverlap(const SphereCollider& a, const SphereCollider& b) {
@@ -434,27 +468,6 @@ void gatherCandidateTriangles(const SphereBVHNode* node,
   gatherCandidateTriangles(node->right.get(), body, query, triangleIndices);
 }
 
-std::array<glm::vec3, 8> computeBoxCorners(const CollisionBody& body) {
-  std::array<glm::vec3, 8> corners;
-  const glm::vec3 ex = body.rigidBody->getOrientation() * glm::vec3(body.boxHalfExtents.x, 0.0f, 0.0f);
-  const glm::vec3 ey = body.rigidBody->getOrientation() * glm::vec3(0.0f, body.boxHalfExtents.y, 0.0f);
-  const glm::vec3 ez = body.rigidBody->getOrientation() * glm::vec3(0.0f, 0.0f, body.boxHalfExtents.z);
-
-  size_t index = 0;
-  for (int sx : {-1, 1}) {
-    for (int sy : {-1, 1}) {
-      for (int sz : {-1, 1}) {
-        corners[index++] = body.boxCenter +
-            static_cast<float>(sx) * ex +
-            static_cast<float>(sy) * ey +
-            static_cast<float>(sz) * ez;
-      }
-    }
-  }
-
-  return corners;
-}
-
 struct BoxFaceSelection {
   bool referenceIsA = true;
   int axisIndex = 0;
@@ -463,23 +476,9 @@ struct BoxFaceSelection {
   bool edgeEdge = false;
 };
 
-glm::vec3 boxAxis(const CollisionBody& body, int axisIndex) {
-  switch (axisIndex) {
-    case 0: return glm::normalize(body.rigidBody->getOrientation() * glm::vec3(1.0f, 0.0f, 0.0f));
-    case 1: return glm::normalize(body.rigidBody->getOrientation() * glm::vec3(0.0f, 1.0f, 0.0f));
-    default: return glm::normalize(body.rigidBody->getOrientation() * glm::vec3(0.0f, 0.0f, 1.0f));
-  }
-}
-
-float boxHalfExtent(const CollisionBody& body, int axisIndex) {
-  return body.boxHalfExtents[axisIndex];
-}
-
-// Face axes only (no edge–edge tests). Used when the full SAT picks an edge–edge axis so we still
-// get a stable face normal instead of falling back to mesh sampling (which causes perpendicular
-// interpenetration artifacts on stacks).
-std::optional<BoxFaceSelection> selectBoxContactFaceAxisSAT(const CollisionBody& bodyA,
-                                                            const CollisionBody& bodyB) {
+std::optional<BoxFaceSelection> selectBoxContactAxisSATImpl(const CollisionBody& bodyA,
+                                                            const CollisionBody& bodyB,
+                                                            bool includeEdgeEdge) {
   constexpr float kSatEpsilon = 1e-6f;
   const float contactMargin = 0.5f * (bodyA.contactMargin + bodyB.contactMargin);
 
@@ -487,26 +486,26 @@ std::optional<BoxFaceSelection> selectBoxContactFaceAxisSAT(const CollisionBody&
   glm::mat3 absRotation(0.0f);
   for (int i = 0; i < 3; ++i) {
     for (int j = 0; j < 3; ++j) {
-      rotation[i][j] = glm::dot(boxAxis(bodyA, i), boxAxis(bodyB, j));
+      rotation[i][j] = glm::dot(bodyA.axis(i), bodyB.axis(j));
       absRotation[i][j] = std::abs(rotation[i][j]) + kSatEpsilon;
     }
   }
 
   const glm::vec3 centerDeltaWorld = bodyB.boxCenter - bodyA.boxCenter;
   const glm::vec3 centerDelta(
-      glm::dot(centerDeltaWorld, boxAxis(bodyA, 0)),
-      glm::dot(centerDeltaWorld, boxAxis(bodyA, 1)),
-      glm::dot(centerDeltaWorld, boxAxis(bodyA, 2)));
+      glm::dot(centerDeltaWorld, bodyA.axis(0)),
+      glm::dot(centerDeltaWorld, bodyA.axis(1)),
+      glm::dot(centerDeltaWorld, bodyA.axis(2)));
 
   float minOverlap = std::numeric_limits<float>::infinity();
   std::optional<BoxFaceSelection> bestAxis;
 
   for (int i = 0; i < 3; ++i) {
-    const float radiusA = boxHalfExtent(bodyA, i);
+    const float radiusA = bodyA.halfExtent(i);
     const float radiusB =
-        boxHalfExtent(bodyB, 0) * absRotation[i][0] +
-        boxHalfExtent(bodyB, 1) * absRotation[i][1] +
-        boxHalfExtent(bodyB, 2) * absRotation[i][2];
+        bodyB.halfExtent(0) * absRotation[i][0] +
+        bodyB.halfExtent(1) * absRotation[i][1] +
+        bodyB.halfExtent(2) * absRotation[i][2];
     const float overlap = radiusA + radiusB + contactMargin - std::abs(centerDelta[i]);
     if (overlap < 0.0f) {
       return std::nullopt;
@@ -516,7 +515,7 @@ std::optional<BoxFaceSelection> selectBoxContactFaceAxisSAT(const CollisionBody&
       bestAxis = BoxFaceSelection{
           .referenceIsA = true,
           .axisIndex = i,
-          .referenceOutwardNormal = centerDelta[i] >= 0.0f ? boxAxis(bodyA, i) : -boxAxis(bodyA, i),
+          .referenceOutwardNormal = centerDelta[i] >= 0.0f ? bodyA.axis(i) : -bodyA.axis(i),
           .penetrationDepth = overlap,
           .edgeEdge = false,
       };
@@ -525,10 +524,10 @@ std::optional<BoxFaceSelection> selectBoxContactFaceAxisSAT(const CollisionBody&
 
   for (int j = 0; j < 3; ++j) {
     const float radiusA =
-        boxHalfExtent(bodyA, 0) * absRotation[0][j] +
-        boxHalfExtent(bodyA, 1) * absRotation[1][j] +
-        boxHalfExtent(bodyA, 2) * absRotation[2][j];
-    const float radiusB = boxHalfExtent(bodyB, j);
+        bodyA.halfExtent(0) * absRotation[0][j] +
+        bodyA.halfExtent(1) * absRotation[1][j] +
+        bodyA.halfExtent(2) * absRotation[2][j];
+    const float radiusB = bodyB.halfExtent(j);
     const float distance =
         centerDelta.x * rotation[0][j] +
         centerDelta.y * rotation[1][j] +
@@ -542,95 +541,25 @@ std::optional<BoxFaceSelection> selectBoxContactFaceAxisSAT(const CollisionBody&
       bestAxis = BoxFaceSelection{
           .referenceIsA = false,
           .axisIndex = j,
-          .referenceOutwardNormal = distance >= 0.0f ? -boxAxis(bodyB, j) : boxAxis(bodyB, j),
+          .referenceOutwardNormal = distance >= 0.0f ? -bodyB.axis(j) : bodyB.axis(j),
           .penetrationDepth = overlap,
           .edgeEdge = false,
       };
     }
   }
 
-  return bestAxis;
-}
-
-std::optional<BoxFaceSelection> selectBoxContactAxisSAT(const CollisionBody& bodyA,
-                                                        const CollisionBody& bodyB) {
-  constexpr float kSatEpsilon = 1e-6f;
-  const float contactMargin = 0.5f * (bodyA.contactMargin + bodyB.contactMargin);
-
-  glm::mat3 rotation(0.0f);
-  glm::mat3 absRotation(0.0f);
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 3; ++j) {
-      rotation[i][j] = glm::dot(boxAxis(bodyA, i), boxAxis(bodyB, j));
-      absRotation[i][j] = std::abs(rotation[i][j]) + kSatEpsilon;
-    }
-  }
-
-  const glm::vec3 centerDeltaWorld = bodyB.boxCenter - bodyA.boxCenter;
-  const glm::vec3 centerDelta(
-      glm::dot(centerDeltaWorld, boxAxis(bodyA, 0)),
-      glm::dot(centerDeltaWorld, boxAxis(bodyA, 1)),
-      glm::dot(centerDeltaWorld, boxAxis(bodyA, 2)));
-
-  float minOverlap = std::numeric_limits<float>::infinity();
-  std::optional<BoxFaceSelection> bestAxis;
-
-  for (int i = 0; i < 3; ++i) {
-    const float radiusA = boxHalfExtent(bodyA, i);
-    const float radiusB =
-        boxHalfExtent(bodyB, 0) * absRotation[i][0] +
-        boxHalfExtent(bodyB, 1) * absRotation[i][1] +
-        boxHalfExtent(bodyB, 2) * absRotation[i][2];
-    const float overlap = radiusA + radiusB + contactMargin - std::abs(centerDelta[i]);
-    if (overlap < 0.0f) {
-      return std::nullopt;
-    }
-    if (overlap < minOverlap) {
-      minOverlap = overlap;
-      bestAxis = BoxFaceSelection{
-          .referenceIsA = true,
-          .axisIndex = i,
-          .referenceOutwardNormal = centerDelta[i] >= 0.0f ? boxAxis(bodyA, i) : -boxAxis(bodyA, i),
-          .penetrationDepth = overlap,
-          .edgeEdge = false,
-      };
-    }
-  }
-
-  for (int j = 0; j < 3; ++j) {
-    const float radiusA =
-        boxHalfExtent(bodyA, 0) * absRotation[0][j] +
-        boxHalfExtent(bodyA, 1) * absRotation[1][j] +
-        boxHalfExtent(bodyA, 2) * absRotation[2][j];
-    const float radiusB = boxHalfExtent(bodyB, j);
-    const float distance =
-        centerDelta.x * rotation[0][j] +
-        centerDelta.y * rotation[1][j] +
-        centerDelta.z * rotation[2][j];
-    const float overlap = radiusA + radiusB + contactMargin - std::abs(distance);
-    if (overlap < 0.0f) {
-      return std::nullopt;
-    }
-    if (overlap < minOverlap) {
-      minOverlap = overlap;
-      bestAxis = BoxFaceSelection{
-          .referenceIsA = false,
-          .axisIndex = j,
-          .referenceOutwardNormal = distance >= 0.0f ? -boxAxis(bodyB, j) : boxAxis(bodyB, j),
-          .penetrationDepth = overlap,
-          .edgeEdge = false,
-      };
-    }
+  if (!includeEdgeEdge) {
+    return bestAxis;
   }
 
   for (int i = 0; i < 3; ++i) {
     for (int j = 0; j < 3; ++j) {
       const float radiusA =
-          boxHalfExtent(bodyA, (i + 1) % 3) * absRotation[(i + 2) % 3][j] +
-          boxHalfExtent(bodyA, (i + 2) % 3) * absRotation[(i + 1) % 3][j];
+          bodyA.halfExtent((i + 1) % 3) * absRotation[(i + 2) % 3][j] +
+          bodyA.halfExtent((i + 2) % 3) * absRotation[(i + 1) % 3][j];
       const float radiusB =
-          boxHalfExtent(bodyB, (j + 1) % 3) * absRotation[i][(j + 2) % 3] +
-          boxHalfExtent(bodyB, (j + 2) % 3) * absRotation[i][(j + 1) % 3];
+          bodyB.halfExtent((j + 1) % 3) * absRotation[i][(j + 2) % 3] +
+          bodyB.halfExtent((j + 2) % 3) * absRotation[i][(j + 1) % 3];
 
       if (radiusA + radiusB < kSatEpsilon) {
         continue;
@@ -643,7 +572,6 @@ std::optional<BoxFaceSelection> selectBoxContactAxisSAT(const CollisionBody& bod
       if (overlap < 0.0f) {
         return std::nullopt;
       }
-      // Prefer face separation when overlap is close to edge–edge (stacks stay face–contacted).
       constexpr float kEdgeBias = 2.5e-3f;
       if (overlap + kEdgeBias < minOverlap) {
         minOverlap = overlap;
@@ -661,24 +589,16 @@ std::optional<BoxFaceSelection> selectBoxContactAxisSAT(const CollisionBody& bod
   return bestAxis;
 }
 
-std::array<glm::vec3, 4> computeFaceCorners(const CollisionBody& body,
-                                            int normalAxisIndex,
-                                            const glm::vec3& outwardNormal) {
-  const int tangentAxis0 = (normalAxisIndex + 1) % 3;
-  const int tangentAxis1 = (normalAxisIndex + 2) % 3;
-  const glm::vec3 tangent0 = boxAxis(body, tangentAxis0);
-  const glm::vec3 tangent1 = boxAxis(body, tangentAxis1);
-  const float extent0 = boxHalfExtent(body, tangentAxis0);
-  const float extent1 = boxHalfExtent(body, tangentAxis1);
-  const float normalExtent = boxHalfExtent(body, normalAxisIndex);
-  const glm::vec3 faceCenter = body.boxCenter + outwardNormal * normalExtent;
+// Face axes only (no edge-edge tests). Used when the full SAT picks an edge-edge axis so we still
+// get a stable face normal instead of falling back to mesh sampling.
+std::optional<BoxFaceSelection> selectBoxContactFaceAxisSAT(const CollisionBody& bodyA,
+                                                            const CollisionBody& bodyB) {
+  return selectBoxContactAxisSATImpl(bodyA, bodyB, false);
+}
 
-  return {
-      faceCenter + tangent0 * extent0 + tangent1 * extent1,
-      faceCenter - tangent0 * extent0 + tangent1 * extent1,
-      faceCenter - tangent0 * extent0 - tangent1 * extent1,
-      faceCenter + tangent0 * extent0 - tangent1 * extent1,
-  };
+std::optional<BoxFaceSelection> selectBoxContactAxisSAT(const CollisionBody& bodyA,
+                                                        const CollisionBody& bodyB) {
+  return selectBoxContactAxisSATImpl(bodyA, bodyB, true);
 }
 
 std::vector<glm::vec3> clipPolygonAgainstPlane(const std::vector<glm::vec3>& polygon,
@@ -746,14 +666,14 @@ bool generateBoxBoxContacts(const CollisionBody& bodyA,
   const glm::vec3 referenceOutwardNormal = faceAxis->referenceOutwardNormal;
   const glm::vec3 contactNormal = referenceIsA ? -referenceOutwardNormal : referenceOutwardNormal;
   const glm::vec3 referenceFaceCenter =
-      referenceBody.boxCenter + referenceOutwardNormal * boxHalfExtent(referenceBody, faceAxis->axisIndex);
+      referenceBody.boxCenter + referenceOutwardNormal * referenceBody.halfExtent(faceAxis->axisIndex);
 
   const glm::vec3 incidentSearchNormal = -referenceOutwardNormal;
   int incidentAxisIndex = 0;
   float incidentAlignment = -std::numeric_limits<float>::infinity();
-  glm::vec3 incidentFaceNormal = boxAxis(incidentBody, 0);
+  glm::vec3 incidentFaceNormal = incidentBody.axis(0);
   for (int axisIndex = 0; axisIndex < 3; ++axisIndex) {
-    const glm::vec3 axis = boxAxis(incidentBody, axisIndex);
+    const glm::vec3 axis = incidentBody.axis(axisIndex);
     const float alignment = std::abs(glm::dot(axis, incidentSearchNormal));
     if (alignment <= incidentAlignment) {
       continue;
@@ -765,32 +685,19 @@ bool generateBoxBoxContacts(const CollisionBody& bodyA,
   }
 
   const auto incidentFaceCorners =
-      computeFaceCorners(incidentBody, incidentAxisIndex, incidentFaceNormal);
+      incidentBody.faceCorners(incidentAxisIndex, incidentFaceNormal);
   std::vector<glm::vec3> clippedPolygon(incidentFaceCorners.begin(), incidentFaceCorners.end());
 
   const int tangentAxis0 = (faceAxis->axisIndex + 1) % 3;
   const int tangentAxis1 = (faceAxis->axisIndex + 2) % 3;
-  const glm::vec3 tangent0 = boxAxis(referenceBody, tangentAxis0);
-  const glm::vec3 tangent1 = boxAxis(referenceBody, tangentAxis1);
-  const float extent0 = boxHalfExtent(referenceBody, tangentAxis0);
-  const float extent1 = boxHalfExtent(referenceBody, tangentAxis1);
-
-  clippedPolygon = clipPolygonAgainstPlane(
-      clippedPolygon,
-      referenceFaceCenter + tangent0 * extent0,
-      tangent0);
-  clippedPolygon = clipPolygonAgainstPlane(
-      clippedPolygon,
-      referenceFaceCenter - tangent0 * extent0,
-      -tangent0);
-  clippedPolygon = clipPolygonAgainstPlane(
-      clippedPolygon,
-      referenceFaceCenter + tangent1 * extent1,
-      tangent1);
-  clippedPolygon = clipPolygonAgainstPlane(
-      clippedPolygon,
-      referenceFaceCenter - tangent1 * extent1,
-      -tangent1);
+  const std::array<std::pair<glm::vec3, float>, 2> tangents = {{
+      {referenceBody.axis(tangentAxis0), referenceBody.halfExtent(tangentAxis0)},
+      {referenceBody.axis(tangentAxis1), referenceBody.halfExtent(tangentAxis1)},
+  }};
+  for (const auto& [tangent, extent] : tangents) {
+    clippedPolygon = clipPolygonAgainstPlane(clippedPolygon, referenceFaceCenter + tangent * extent, tangent);
+    clippedPolygon = clipPolygonAgainstPlane(clippedPolygon, referenceFaceCenter - tangent * extent, -tangent);
+  }
 
   const float combinedMargin = bodyA.contactMargin + bodyB.contactMargin;
   for (const glm::vec3& pointOnIncident : clippedPolygon) {
@@ -840,7 +747,7 @@ void generateBoxPlaneContacts(const CollisionBody& sampleBody,
     return;
   }
 
-  const auto sampleCorners = computeBoxCorners(sampleBody);
+  const auto sampleCorners = sampleBody.corners();
   for (const glm::vec3& worldCorner : sampleCorners) {
     const float signedDistance = glm::dot(worldCorner - targetBody.planePoint, targetBody.planeNormal);
     if (signedDistance > sampleBody.contactMargin) {
@@ -990,8 +897,8 @@ void reduceContacts(std::vector<MeshContact>& contacts, float minPenetrationDept
       if (glm::length2(contact.contactPoint - kept.contactPoint) < kMinContactSpacingSq) {
         tooClose = true;
         break;
-  }
-}
+      }
+    }
     if (!tooClose) {
       reduced.push_back(contact);
     }
@@ -1006,27 +913,26 @@ void reduceContacts(std::vector<MeshContact>& contacts, float minPenetrationDept
   contacts = std::move(reduced);
 }
 
-bool tryBuildCollisionBody(uint32_t index,
-                           sauce::RigidBodyComponent* rigidBody,
-                           CollisionBody& collisionBody) {
+std::optional<CollisionBody> buildCollisionBody(uint32_t index,
+                                                sauce::RigidBodyComponent* rigidBody) {
   if (!rigidBody || !rigidBody->isCollisionEnabled()) {
-    return false;
+    return std::nullopt;
   }
 
   auto* owner = rigidBody->getOwner();
   if (!owner) {
-    return false;
+    return std::nullopt;
   }
 
   auto* meshComp = owner->getComponent<sauce::MeshRendererComponent>();
   if (!meshComp || !meshComp->getMesh()) {
-    return false;
+    return std::nullopt;
   }
 
   const auto& mesh = meshComp->getMesh();
   const auto& vertices = mesh->getVertices();
   if (vertices.empty()) {
-    return false;
+    return std::nullopt;
   }
 
   const glm::vec3 bodyScale = rigidBody->getScale();
@@ -1037,7 +943,8 @@ bool tryBuildCollisionBody(uint32_t index,
         rigidBody->getPosition() + rigidBody->getOrientation() * scalePoint(vertex.position, bodyScale));
   }
 
-  const auto& sampleVertexIndices = MeshCollisionCache::instance().getSampleVertexIndices(mesh.get());
+  auto& cache = MeshCollisionCache::instance();
+  const auto& sampleVertexIndices = cache.getSampleVertexIndices(mesh.get());
   std::vector<glm::vec3> sampleWorldVertices;
   sampleWorldVertices.reserve(sampleVertexIndices.size());
   for (uint32_t sampleIndex : sampleVertexIndices) {
@@ -1049,8 +956,8 @@ bool tryBuildCollisionBody(uint32_t index,
     sampleWorldVertices = worldVertices;
   }
 
-  const auto boxShape = MeshCollisionCache::instance().getBoxShape(mesh.get());
-  const auto planeShape = MeshCollisionCache::instance().getPlaneShape(mesh.get());
+  const auto boxShape = cache.getBoxShape(mesh.get());
+  const auto planeShape = cache.getPlaneShape(mesh.get());
   const glm::vec3 scaleAbs = absScale(bodyScale);
   const glm::vec3 worldBoxCenter = boxShape
       ? rigidBody->getPosition() + rigidBody->getOrientation() * scalePoint(boxShape->localCenter, bodyScale)
@@ -1065,15 +972,15 @@ bool tryBuildCollisionBody(uint32_t index,
       ? glm::normalize(rigidBody->getOrientation() * planeShape->localNormal)
       : glm::vec3(0.0f, 0.0f, 1.0f);
 
-  collisionBody = CollisionBody{
+  return CollisionBody{
     index,
     rigidBody,
     mesh.get(),
-    MeshCollisionCache::instance().getBVHRoot(mesh.get()),
+    cache.getBVHRoot(mesh.get()),
     std::move(worldVertices),
     std::move(sampleWorldVertices),
-    MeshCollisionCache::instance().getBroadPhasePadding(mesh.get()) * maxScaleComponent(bodyScale),
-    MeshCollisionCache::instance().getContactMargin(mesh.get()) * minScaleComponent(bodyScale),
+    cache.getBroadPhasePadding(mesh.get()) * maxScaleComponent(bodyScale),
+    cache.getContactMargin(mesh.get()) * minScaleComponent(bodyScale),
     boxShape.has_value(),
     worldBoxCenter,
     worldBoxHalfExtents,
@@ -1081,56 +988,145 @@ bool tryBuildCollisionBody(uint32_t index,
     worldPlanePoint,
     worldPlaneNormal,
   };
-  return true;
 }
 
-void appendReducedContacts(const CollisionBody& sampleBody,
-                           const CollisionBody& targetBody,
-                           std::vector<MeshContact>& contacts) {
-  // Sleeping bodies still contribute collision geometry; only true statics opt out.
-  if (!sampleBody.rigidBody->canBeDynamic()) {
-    return;
+struct CollisionDebugCounters {
+  int noBvh = 0;
+  int broadFail = 0;
+  int narrowEmpty = 0;
+  int depthFilter = 0;
+  int accepted = 0;
+  int boxSatSep = 0;
+  int boxEdgeEdge = 0;
+  int boxFaceEmpty = 0;
+  int boxFaceOk = 0;
+
+  void print(size_t bodyCount, bool enabled) const {
+    if (!enabled) {
+      return;
+    }
+    std::fprintf(stderr, "[collision] bodies=%zu noBvh=%d broadFail=%d narrowEmpty=%d depthFilter=%d accepted=%d satSep=%d edgeEdge=%d faceEmpty=%d faceOk=%d\n",
+                 bodyCount, noBvh, broadFail, narrowEmpty, depthFilter, accepted,
+                 boxSatSep, boxEdgeEdge, boxFaceEmpty, boxFaceOk);
+  }
+};
+
+class PairContactBuilder {
+public:
+  PairContactBuilder(std::vector<MeshContact>& contacts, CollisionDebugCounters& debug)
+      : contacts(contacts), debug(debug) {}
+
+  void append(const CollisionBody& bodyA, const CollisionBody& bodyB) {
+    if (bodyA.isBox && bodyB.isBox) {
+      appendBoxPair(bodyA, bodyB);
+      return;
+    }
+    appendDirection(bodyA, bodyB, contacts);
+    appendDirection(bodyB, bodyA, contacts);
   }
 
-  std::vector<MeshContact> directionalContacts;
-  float minPenetrationDepth = 0.0005f;
-  if (sampleBody.isBox && targetBody.isPlane) {
-    generateBoxPlaneContacts(sampleBody, targetBody, directionalContacts);
-    minPenetrationDepth = kContactDepthEpsilon;
-  } else {
-    generateVertexContacts(sampleBody, targetBody, directionalContacts);
+private:
+  static void appendGeneratedContacts(const CollisionBody& sampleBody,
+                                      const CollisionBody& targetBody,
+                                      float minPenetrationDepth,
+                                      std::vector<MeshContact>& out,
+                                      auto&& generate) {
+    if (!sampleBody.rigidBody->canBeDynamic()) {
+      return;
+    }
+
+    std::vector<MeshContact> generated;
+    generate(sampleBody, targetBody, generated);
+    reduceContacts(generated, minPenetrationDepth);
+    out.insert(out.end(), generated.begin(), generated.end());
   }
-  reduceContacts(directionalContacts, minPenetrationDepth);
-  contacts.insert(contacts.end(), directionalContacts.begin(), directionalContacts.end());
-}
 
-int dbgBoxSatSep = 0, dbgBoxEdgeEdge = 0, dbgBoxFaceEmpty = 0, dbgBoxFaceOk = 0;
+  static void appendDirection(const CollisionBody& sampleBody,
+                              const CollisionBody& targetBody,
+                              std::vector<MeshContact>& out) {
+    if (sampleBody.isBox && targetBody.isPlane) {
+      appendGeneratedContacts(
+          sampleBody, targetBody, kContactDepthEpsilon, out, generateBoxPlaneContacts);
+      return;
+    }
+    appendGeneratedContacts(sampleBody, targetBody, 0.0005f, out, generateVertexContacts);
+  }
 
-void appendReducedBoxBoxContacts(const CollisionBody& bodyA,
-                                 const CollisionBody& bodyB,
-                                 std::vector<MeshContact>& contacts) {
-  std::vector<MeshContact> boxContacts;
-  const bool handledAnalytically = generateBoxBoxContacts(bodyA, bodyB, boxContacts);
-  if (handledAnalytically) {
-    if (boxContacts.empty()) {
-      ++dbgBoxSatSep;
+  void appendBoxPair(const CollisionBody& bodyA, const CollisionBody& bodyB) {
+    std::vector<MeshContact> boxContacts;
+    const bool handledAnalytically = generateBoxBoxContacts(bodyA, bodyB, boxContacts);
+    if (handledAnalytically) {
+      boxContacts.empty() ? ++debug.boxSatSep : ++debug.boxFaceOk;
     } else {
-      ++dbgBoxFaceOk;
+      ++debug.boxEdgeEdge;
+      appendGeneratedContacts(bodyA, bodyB, 0.0005f, boxContacts, generateVertexContacts);
+      appendGeneratedContacts(bodyB, bodyA, 0.0005f, boxContacts, generateVertexContacts);
     }
-  } else {
-    ++dbgBoxEdgeEdge;
-    appendReducedContacts(bodyA, bodyB, boxContacts);
-    appendReducedContacts(bodyB, bodyA, boxContacts);
-  }
-  const float boxMarginThreshold = -(bodyA.contactMargin + bodyB.contactMargin);
-  reduceContacts(boxContacts, boxMarginThreshold);
-  if (boxContacts.empty() && handledAnalytically) {
-    const auto axis = selectBoxContactAxisSAT(bodyA, bodyB);
-    if (axis && !axis->edgeEdge && axis->penetrationDepth > 1e-5f) {
-      ++dbgBoxFaceEmpty;
+
+    reduceContacts(boxContacts, -(bodyA.contactMargin + bodyB.contactMargin));
+    if (boxContacts.empty() && handledAnalytically) {
+      const auto axis = selectBoxContactAxisSAT(bodyA, bodyB);
+      if (axis && !axis->edgeEdge && axis->penetrationDepth > 1e-5f) {
+        ++debug.boxFaceEmpty;
+      }
     }
+    contacts.insert(contacts.end(), boxContacts.begin(), boxContacts.end());
   }
-  contacts.insert(contacts.end(), boxContacts.begin(), boxContacts.end());
+
+  std::vector<MeshContact>& contacts;
+  CollisionDebugCounters& debug;
+};
+
+struct SupportInfo {
+  sauce::RigidBodyComponent* rigidBody = nullptr;
+  glm::vec3 center = glm::vec3(0.0f);
+  float floorAltitude = 0.0f;
+  float ceilingAltitude = 0.0f;
+  float horizontalRadius = 0.0f;
+  bool isPlane = false;
+};
+
+SupportInfo buildSupportInfo(const CollisionBody& body, const glm::vec3& up) {
+  SupportInfo info;
+  info.rigidBody = body.rigidBody;
+  info.center = body.rigidBody->getWorldCenterOfMass();
+
+  if (body.isPlane) {
+    info.isPlane = true;
+    info.floorAltitude = glm::dot(body.planePoint, up);
+    info.ceilingAltitude = info.floorAltitude;
+    info.horizontalRadius = std::numeric_limits<float>::max();
+    return info;
+  }
+
+  if (body.isBox) {
+    float verticalExtent = 0.0f;
+    for (int axisIndex = 0; axisIndex < 3; ++axisIndex) {
+      verticalExtent += std::abs(glm::dot(body.axis(axisIndex), up)) * body.halfExtent(axisIndex);
+    }
+    const float altitude = glm::dot(body.boxCenter, up);
+    info.floorAltitude = altitude - verticalExtent;
+    info.ceilingAltitude = altitude + verticalExtent;
+    info.horizontalRadius = body.bvhRoot
+        ? transformSphere(body.bvhRoot->sphere, *body.rigidBody).radius
+        : glm::length(body.boxHalfExtents);
+    return info;
+  }
+
+  if (body.bvhRoot) {
+    const SphereCollider sphere = transformSphere(body.bvhRoot->sphere, *body.rigidBody);
+    const float altitude = glm::dot(sphere.center, up);
+    info.floorAltitude = altitude - sphere.radius;
+    info.ceilingAltitude = altitude + sphere.radius;
+    info.horizontalRadius = sphere.radius;
+    return info;
+  }
+
+  const float altitude = glm::dot(info.center, up);
+  info.floorAltitude = altitude;
+  info.ceilingAltitude = altitude;
+  info.horizontalRadius = 1.0f;
+  return info;
 }
 
 } // namespace
@@ -1143,53 +1139,45 @@ std::vector<XPBDSolver::CollisionContact> XPBDSolver::collectCollisionContacts(
   bodies.reserve(rigidBodies.size());
 
   for (uint32_t i = 0; i < static_cast<uint32_t>(rigidBodies.size()); ++i) {
-    CollisionBody body;
-    if (tryBuildCollisionBody(i, rigidBodies[i], body)) {
-      bodies.push_back(std::move(body));
+    if (auto body = buildCollisionBody(i, rigidBodies[i])) {
+      bodies.push_back(std::move(*body));
     }
   }
 
-  int dbgNoBvh = 0, dbgBroadFail = 0, dbgNarrowEmpty = 0, dbgDepthFilter = 0, dbgAccepted = 0;
+  CollisionDebugCounters debug;
   for (size_t i = 0; i < bodies.size(); ++i) {
     for (size_t j = i + 1; j < bodies.size(); ++j) {
       if (!bodies[i].bvhRoot || !bodies[j].bvhRoot) {
-        ++dbgNoBvh;
+        ++debug.noBvh;
         continue;
       }
 
-      SphereCollider broadA = transformSphere(bodies[i].bvhRoot->sphere, *bodies[i].rigidBody);
-      SphereCollider broadB = transformSphere(bodies[j].bvhRoot->sphere, *bodies[j].rigidBody);
-      broadA.radius += bodies[i].broadPhasePadding;
-      broadB.radius += bodies[j].broadPhasePadding;
+      const SphereCollider broadA = bodies[i].broadPhaseSphere();
+      const SphereCollider broadB = bodies[j].broadPhaseSphere();
       if (!spheresOverlap(broadA, broadB)) {
-        ++dbgBroadFail;
+        ++debug.broadFail;
         continue;
       }
 
       std::vector<MeshContact> contacts;
-      if (bodies[i].isBox && bodies[j].isBox) {
-        appendReducedBoxBoxContacts(bodies[i], bodies[j], contacts);
-      } else {
-        appendReducedContacts(bodies[i], bodies[j], contacts);
-        appendReducedContacts(bodies[j], bodies[i], contacts);
-      }
+      PairContactBuilder(contacts, debug).append(bodies[i], bodies[j]);
 
       if (contacts.empty()) {
-        ++dbgNarrowEmpty;
+        ++debug.narrowEmpty;
       }
 
       for (const auto& contact : contacts) {
         if (!contact.bodyA || !contact.bodyB) {
-          ++dbgDepthFilter;
+          ++debug.depthFilter;
           continue;
         }
         const float pairMargin = contact.bodyA->contactMargin + contact.bodyB->contactMargin;
         if (contact.depth < -pairMargin) {
-          ++dbgDepthFilter;
+          ++debug.depthFilter;
           continue;
         }
 
-        ++dbgAccepted;
+        ++debug.accepted;
         contactsOut.push_back({
             .indexA = contact.bodyA->index,
             .indexB = contact.bodyB->index,
@@ -1202,22 +1190,14 @@ std::vector<XPBDSolver::CollisionContact> XPBDSolver::collectCollisionContacts(
     }
   }
 
-  if (contactDebugEnabled) {
-    std::fprintf(stderr, "[collision] bodies=%zu noBvh=%d broadFail=%d narrowEmpty=%d depthFilter=%d accepted=%d satSep=%d edgeEdge=%d faceEmpty=%d faceOk=%d\n",
-                 bodies.size(), dbgNoBvh, dbgBroadFail, dbgNarrowEmpty, dbgDepthFilter, dbgAccepted,
-                 dbgBoxSatSep, dbgBoxEdgeEdge, dbgBoxFaceEmpty, dbgBoxFaceOk);
-    dbgBoxSatSep = 0; dbgBoxEdgeEdge = 0; dbgBoxFaceEmpty = 0; dbgBoxFaceOk = 0;
-  }
+  debug.print(bodies.size(), contactDebugEnabled);
 
   return contactsOut;
 }
 
-std::vector<std::unique_ptr<Constraint>> XPBDSolver::generateCollisionConstraints(
+std::vector<CollisionConstraint> XPBDSolver::generateCollisionConstraints(
     const std::vector<sauce::RigidBodyComponent*>& rigidBodies) {
-  std::vector<std::unique_ptr<Constraint>> constraints;
   auto contacts = collectCollisionContacts(rigidBodies);
-  constraints.reserve(contacts.size());
-
   std::vector<bool> wasActiveBeforeWake(rigidBodies.size(), false);
   for (size_t i = 0; i < rigidBodies.size(); ++i) {
     auto* rb = rigidBodies[i];
@@ -1226,87 +1206,129 @@ std::vector<std::unique_ptr<Constraint>> XPBDSolver::generateCollisionConstraint
         (rb->canBeDynamic() && rb->getInvMass() <= 1e-8f && !rb->isSleeping());
   }
 
+  struct ConstraintBuilder {
+    const std::vector<sauce::RigidBodyComponent*>& rigidBodies;
+    const std::vector<bool>& wasActiveBeforeWake;
+    const std::map<std::pair<uintptr_t, uintptr_t>, std::vector<float>>& collisionLambdaWarmStart;
+    const sauce::RigidBodyComponent* dragBody;
+    float dragContactFrictionScale;
+    std::map<std::pair<uintptr_t, uintptr_t>, int> warmSlotForPair;
+    std::vector<CollisionConstraint> constraints;
+
+    ConstraintBuilder(const std::vector<sauce::RigidBodyComponent*>& rigidBodies,
+                      const std::vector<bool>& wasActiveBeforeWake,
+                      const std::map<std::pair<uintptr_t, uintptr_t>, std::vector<float>>& collisionLambdaWarmStart,
+                      const sauce::RigidBodyComponent* dragBody,
+                      float dragContactFrictionScale,
+                      size_t reserveCount)
+        : rigidBodies(rigidBodies),
+          wasActiveBeforeWake(wasActiveBeforeWake),
+          collisionLambdaWarmStart(collisionLambdaWarmStart),
+          dragBody(dragBody),
+          dragContactFrictionScale(dragContactFrictionScale) {
+      constraints.reserve(reserveCount);
+    }
+
+    static bool lessThan(const CollisionContact& a,
+                         const CollisionContact& b,
+                         const std::vector<sauce::RigidBodyComponent*>& rigidBodies) {
+      auto* aA = rigidBodies[a.indexA];
+      auto* aB = rigidBodies[a.indexB];
+      auto* bA = rigidBodies[b.indexA];
+      auto* bB = rigidBodies[b.indexB];
+      if (!aA || !aB) {
+        return false;
+      }
+      if (!bA || !bB) {
+        return true;
+      }
+      const auto ka = detail::canonicalRigidPair(aA, aB);
+      const auto kb = detail::canonicalRigidPair(bA, bB);
+      if (ka != kb) {
+        return ka < kb;
+      }
+      return detail::quantizedWorldMid(0.5f * (a.pointA + a.pointB)) <
+             detail::quantizedWorldMid(0.5f * (b.pointA + b.pointB));
+    }
+
+    bool shouldWake(uint32_t wakerIdx, sauce::RigidBodyComponent* sleeper) const {
+      if (!sleeper->isSleeping() || !sleeper->canBeDynamic() || !wasActiveBeforeWake[wakerIdx]) {
+        return false;
+      }
+      auto* waker = rigidBodies[wakerIdx];
+      if (!waker) {
+        return false;
+      }
+      constexpr float kKinematicWakeSpeedSq = 0.1f;
+      return waker->isDynamic() || glm::length2(waker->getVelocity()) > kKinematicWakeSpeedSq;
+    }
+
+    float warmLambdaFor(sauce::RigidBodyComponent* bodyA, sauce::RigidBodyComponent* bodyB) {
+      const auto pairKey = detail::canonicalRigidPair(bodyA, bodyB);
+      const int slot = warmSlotForPair[pairKey]++;
+      const auto warmIt = collisionLambdaWarmStart.find(pairKey);
+      if (warmIt == collisionLambdaWarmStart.end() || slot >= static_cast<int>(warmIt->second.size())) {
+        return 0.0f;
+      }
+      return warmIt->second[static_cast<size_t>(slot)];
+    }
+
+    float frictionFor(sauce::RigidBodyComponent* bodyA, sauce::RigidBodyComponent* bodyB) const {
+      float frictionCoefficient = kRigidContactStaticFrictionMu;
+      if (dragBody && (bodyA == dragBody || bodyB == dragBody)) {
+        frictionCoefficient *= std::clamp(dragContactFrictionScale, 0.0f, 1.0f);
+      }
+      return frictionCoefficient;
+    }
+
+    void append(const CollisionContact& contact) {
+      if (contact.indexA >= rigidBodies.size() || contact.indexB >= rigidBodies.size()) {
+        return;
+      }
+
+      auto* bodyA = rigidBodies[contact.indexA];
+      auto* bodyB = rigidBodies[contact.indexB];
+      if (!bodyA || !bodyB) {
+        return;
+      }
+
+      if (shouldWake(contact.indexA, bodyB)) { bodyB->wake(); }
+      if (shouldWake(contact.indexB, bodyA)) { bodyA->wake(); }
+
+      const glm::vec3 centerA = bodyA->getWorldCenterOfMass();
+      const glm::vec3 centerB = bodyB->getWorldCenterOfMass();
+      const glm::vec3 localOffsetA = glm::inverse(bodyA->getOrientation()) * (contact.pointA - centerA);
+      const glm::vec3 localOffsetB = glm::inverse(bodyB->getOrientation()) * (contact.pointB - centerB);
+      const glm::vec3 warmMid = 0.5f * (contact.pointA + contact.pointB);
+
+      constraints.emplace_back(
+          contact.indexA,
+          contact.indexB,
+          contact.contactNormal,
+          localOffsetA,
+          localOffsetB,
+          0.0f,
+          warmMid,
+          warmLambdaFor(bodyA, bodyB),
+          frictionFor(bodyA, bodyB));
+    }
+  };
+
   std::sort(contacts.begin(), contacts.end(), [&](const CollisionContact& a, const CollisionContact& b) {
-    auto* aA = rigidBodies[a.indexA];
-    auto* aB = rigidBodies[a.indexB];
-    auto* bA = rigidBodies[b.indexA];
-    auto* bB = rigidBodies[b.indexB];
-    if (!aA || !aB) {
-      return false;
-    }
-    if (!bA || !bB) {
-      return true;
-    }
-    const auto ka = canonicalRigidPair(aA, aB);
-    const auto kb = canonicalRigidPair(bA, bB);
-    if (ka != kb) {
-      return ka < kb;
-    }
-    const glm::vec3 midA = 0.5f * (a.pointA + a.pointB);
-    const glm::vec3 midB = 0.5f * (b.pointA + b.pointB);
-    return quantizedWorldMid(midA) < quantizedWorldMid(midB);
+    return ConstraintBuilder::lessThan(a, b, rigidBodies);
   });
 
-  std::map<std::pair<uintptr_t, uintptr_t>, int> warmSlotForPair;
-
+  ConstraintBuilder builder(
+      rigidBodies,
+      wasActiveBeforeWake,
+      collisionLambdaWarmStart,
+      dragBody,
+      dragContactFrictionScale,
+      contacts.size());
   for (const auto& contact : contacts) {
-    if (contact.indexA >= rigidBodies.size() || contact.indexB >= rigidBodies.size()) {
-      continue;
-    }
-
-    auto* bodyA = rigidBodies[contact.indexA];
-    auto* bodyB = rigidBodies[contact.indexB];
-    if (!bodyA || !bodyB) {
-      continue;
-    }
-
-    auto shouldWake = [&](uint32_t wakerIdx, sauce::RigidBodyComponent* sleeper) -> bool {
-      if (!sleeper->isSleeping() || !sleeper->canBeDynamic()) return false;
-      if (!wasActiveBeforeWake[wakerIdx]) return false;
-      auto* waker = rigidBodies[wakerIdx];
-      if (!waker) return false;
-      if (waker->isDynamic()) return true;
-      constexpr float kKinematicWakeSpeedSq = 0.1f;
-      return glm::length2(waker->getVelocity()) > kKinematicWakeSpeedSq;
-    };
-    if (shouldWake(contact.indexA, bodyB)) { bodyB->wake(); }
-    if (shouldWake(contact.indexB, bodyA)) { bodyA->wake(); }
-
-    const glm::vec3 centerA = bodyA->getWorldCenterOfMass();
-    const glm::vec3 centerB = bodyB->getWorldCenterOfMass();
-    const glm::quat invOrientationA = glm::inverse(bodyA->getOrientation());
-    const glm::quat invOrientationB = glm::inverse(bodyB->getOrientation());
-    const glm::vec3 localOffsetA = invOrientationA * (contact.pointA - centerA);
-    const glm::vec3 localOffsetB = invOrientationB * (contact.pointB - centerB);
-    const glm::vec3 warmMid = 0.5f * (contact.pointA + contact.pointB);
-
-    const auto pairKey = canonicalRigidPair(bodyA, bodyB);
-    const int slot = warmSlotForPair[pairKey]++;
-    float warmLambda = 0.0f;
-    const auto warmIt = collisionLambdaWarmStart.find(pairKey);
-    if (warmIt != collisionLambdaWarmStart.end() &&
-        slot < static_cast<int>(warmIt->second.size())) {
-      warmLambda = warmIt->second[static_cast<size_t>(slot)];
-    }
-
-    float frictionCoefficient = kRigidContactStaticFrictionMu;
-    if (dragBody && (bodyA == dragBody || bodyB == dragBody)) {
-      frictionCoefficient *= std::clamp(dragContactFrictionScale, 0.0f, 1.0f);
-    }
-
-    constraints.push_back(std::make_unique<CollisionConstraint>(
-        contact.indexA,
-        contact.indexB,
-        contact.contactNormal,
-        localOffsetA,
-        localOffsetB,
-        0.0f,
-        warmMid,
-        warmLambda,
-        frictionCoefficient));
+    builder.append(contact);
   }
-
-  return constraints;
+  return builder.constraints;
 }
 
 void XPBDSolver::wakeUnsupportedBodies(
@@ -1315,60 +1337,14 @@ void XPBDSolver::wakeUnsupportedBodies(
 
   const glm::vec3 up = -gravityDirection;
 
-  struct SupportInfo {
-    sauce::RigidBodyComponent* rigidBody = nullptr;
-    glm::vec3 center = glm::vec3(0.0f);
-    float floorAltitude = 0.0f;
-    float ceilingAltitude = 0.0f;
-    float horizontalRadius = 0.0f;
-    bool isPlane = false;
-  };
-
   std::vector<SupportInfo> infos;
   infos.reserve(rigidBodies.size());
 
   for (uint32_t i = 0; i < static_cast<uint32_t>(rigidBodies.size()); ++i) {
-    CollisionBody body;
-    if (!tryBuildCollisionBody(i, rigidBodies[i], body)) continue;
-
-    SupportInfo info;
-    info.rigidBody = body.rigidBody;
-    info.center = body.rigidBody->getWorldCenterOfMass();
-
-    if (body.isPlane) {
-      info.isPlane = true;
-      info.floorAltitude = glm::dot(body.planePoint, up);
-      info.ceilingAltitude = info.floorAltitude;
-      info.horizontalRadius = std::numeric_limits<float>::max();
-    } else if (body.isBox) {
-      float verticalExtent = 0.0f;
-      for (int a = 0; a < 3; ++a) {
-        verticalExtent += std::abs(glm::dot(boxAxis(body, a), up)) * body.boxHalfExtents[a];
-      }
-      const float alt = glm::dot(body.boxCenter, up);
-      info.floorAltitude = alt - verticalExtent;
-      info.ceilingAltitude = alt + verticalExtent;
-      if (body.bvhRoot) {
-        info.horizontalRadius = transformSphere(body.bvhRoot->sphere, *body.rigidBody).radius;
-      } else {
-        info.horizontalRadius = glm::length(body.boxHalfExtents);
-      }
-    } else {
-      if (body.bvhRoot) {
-        SphereCollider sphere = transformSphere(body.bvhRoot->sphere, *body.rigidBody);
-        const float alt = glm::dot(sphere.center, up);
-        info.floorAltitude = alt - sphere.radius;
-        info.ceilingAltitude = alt + sphere.radius;
-        info.horizontalRadius = sphere.radius;
-      } else {
-        const float alt = glm::dot(info.center, up);
-        info.floorAltitude = alt;
-        info.ceilingAltitude = alt;
-        info.horizontalRadius = 1.0f;
-      }
+    auto body = buildCollisionBody(i, rigidBodies[i]);
+    if (body) {
+      infos.push_back(buildSupportInfo(*body, up));
     }
-
-    infos.push_back(info);
   }
 
   bool anyWoken = true;

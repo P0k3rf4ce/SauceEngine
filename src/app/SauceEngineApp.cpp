@@ -14,7 +14,6 @@
 #include <limits>
 
 #include <physics/XPBD.hpp>
-#include <physics/constraints/Constraint.hpp>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
@@ -710,7 +709,6 @@ void SauceEngineApp::mainLoop() {
 
       // Fixed physics step: dt = 1 / physicsTickRate (from -t / setPhysicsTickRate)
 
-      auto constraints = std::vector<std::unique_ptr<physics::Constraint>>();
       auto rigidBodies = collectRigidBodies();
       const size_t dynamicRigidBodyCount = static_cast<size_t>(std::count_if(
           rigidBodies.begin(),
@@ -854,7 +852,7 @@ void SauceEngineApp::mainLoop() {
           logDragTraceSnapshot("pre", physicsDt);
         }
 
-        pSolver->solvePositions(rigidBodies, constraints, physicsDt);
+        pSolver->solvePositions(rigidBodies, physicsDt);
         if (traceDragStep) {
           logDragTraceSnapshot("post", physicsDt);
           ++dragTraceStep;
