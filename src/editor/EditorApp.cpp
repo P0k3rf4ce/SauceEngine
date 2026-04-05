@@ -22,14 +22,54 @@
 #include <cmath>
 #include <cstring>
 #include <csignal>
-#ifndef _WIN32
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
+#if defined(_WIN32)
+  #define NOMINMAX
+  #include <windows.h>
+#elif defined(__APPLE__)
+  #include <mach-o/dyld.h>
+  #include <sys/wait.h>
+  #include <unistd.h>
+#else
+  #include <sys/wait.h>
+  #include <unistd.h>
 #endif
 #include <editor/zip_file.hpp>
 
 namespace sauce::editor {
+namespace {
+
+#if !defined(_WIN32) && !defined(_WIN64)
+std::filesystem::path getCurrentExecutablePath() {
+#if defined(__APPLE__)
+  uint32_t size = 0;
+  _NSGetExecutablePath(nullptr, &size);
+  std::string buffer(size, '\0');
+  if (_NSGetExecutablePath(buffer.data(), &size) != 0) {
+    return {};
+  }
+  return std::filesystem::weakly_canonical(std::filesystem::path(buffer.c_str()));
+#else
+  std::vector<char> buffer(4096, '\0');
+  const ssize_t length = readlink("/proc/self/exe", buffer.data(), buffer.size() - 1);
+  if (length <= 0) {
+    return {};
+  }
+  buffer[static_cast<size_t>(length)] = '\0';
+  return std::filesystem::weakly_canonical(std::filesystem::path(buffer.data()));
+#endif
+}
+
+std::filesystem::path getEngineExecutablePath() {
+  const std::filesystem::path editorPath = getCurrentExecutablePath();
+  if (editorPath.empty()) {
+    return {};
+  }
+
+  return editorPath.parent_path() / "SauceEngine";
+}
+#endif
+
+} // namespace
 
 static constexpr uint32_t EDITOR_WIDTH = 1920;
 static constexpr uint32_t EDITOR_HEIGHT = 1080;
@@ -222,7 +262,7 @@ void EditorApp::initVulkan() {
     .descriptorSetLayouts = { *pRenderer->getDescriptorSetLayout0() },
     .colorFormat = OffscreenFramebuffer::COLOR_FORMAT,
     .hasVertexInput = true,
-    .enableBlending = false,
+    .enableBlending = true,
     .enableCulling = true,
     .depthWrite = true,
     .hasPushConstants = true,
@@ -814,24 +854,24 @@ void EditorApp::mainLoop() {
       }
     }
 
+    #if !defined(_WIN32)
     // Check if play mode process has exited on its own
     if (playModeActive && playProcessPid > 0) {
-#ifndef _WIN32
-      int status;
-      pid_t result = waitpid(playProcessPid, &status, WNOHANG);
-      if (result != 0) {
-        // Process has exited
-        playProcessPid = -1;
-        playModeActive = false;
-        if (!playModeTempFile.empty()) {
-          std::error_code ec2;
-          std::filesystem::remove(playModeTempFile, ec2);
-          playModeTempFile.clear();
+        int status;
+        pid_t result = waitpid(playProcessPid, &status, WNOHANG);
+        if (result != 0) {
+          // Process has exited
+          playProcessPid = -1;
+          playModeActive = false;
+          if (!playModeTempFile.empty()) {
+            std::error_code ec2;
+            std::filesystem::remove(playModeTempFile, ec2);
+            playModeTempFile.clear();
+          }
+          setStatusMessage("Play mode ended");
         }
-        setStatusMessage("Play mode ended");
-      }
-#endif
     }
+    #endif
 
     // Upload mesh GPU resources for any newly imported models
     uploadMeshGPUResources();
@@ -1674,10 +1714,10 @@ void EditorApp::applySettings(const sauce::EditorSettings& s) {
       s.imguiScale, s.mouseSensitivity, s.cameraSpeed, s.fieldOfView);
 }
 
-void EditorApp::startPlayMode() {
-  if (playModeActive) return;
 
-  // Save scene to a temporary .glb file
+void EditorApp::startPlayMode() {
+  if (playModeActive || !pScene) return;
+
   namespace fs = std::filesystem;
   fs::path tempDir = fs::temp_directory_path() / "sauceengine_play";
   std::error_code ec;
@@ -1690,33 +1730,30 @@ void EditorApp::startPlayMode() {
 
   playModeTempFile = (tempDir / "play_scene.glb").string();
 
-  // Save original file path before saveToFile overwrites it
-  std::string originalPath = pScene->getCurrentFilePath();
-
+  const std::string originalPath = pScene->getCurrentFilePath();
   if (!pScene->saveToFile(playModeTempFile)) {
     setStatusMessage("Play: Failed to save scene");
     SAUCE_LOG("Play", "Failed to save scene to temp file");
     return;
   }
-
-  // Restore the original scene file path (saveToFile updates it)
   pScene->setCurrentFilePath(originalPath);
 
-  // Find the SauceEngine executable relative to the editor executable
-  fs::path engineExe = fs::current_path() / "build" / "SauceEngine";
-  if (!fs::exists(engineExe)) {
-    // Try alongside the current executable
-    engineExe = "SauceEngine";
+#if defined(_WIN32)
+  setStatusMessage("Play mode is not implemented on Windows yet.");
+  return;
+#else
+  const std::filesystem::path engineExe = getEngineExecutablePath();
+  if (engineExe.empty() || !std::filesystem::exists(engineExe)) {
+    setStatusMessage("Play: Could not locate SauceEngine executable");
+    SAUCE_LOG("Play", "Could not locate SauceEngine executable");
+    return;
   }
 
   SAUCE_LOG("Play", "Starting play mode: {} {}", engineExe.string(), playModeTempFile);
 
-#ifndef _WIN32
   pid_t pid = fork();
   if (pid == 0) {
-    // Child process - exec SauceEngine with the temp scene file
-    execlp(engineExe.c_str(), engineExe.c_str(), playModeTempFile.c_str(), nullptr);
-    // If exec fails
+    execl(engineExe.c_str(), engineExe.c_str(), playModeTempFile.c_str(), nullptr);
     _exit(1);
   } else if (pid > 0) {
     playProcessPid = pid;
@@ -1727,45 +1764,51 @@ void EditorApp::startPlayMode() {
     setStatusMessage("Play: Failed to launch engine");
     SAUCE_LOG("Play", "fork() failed");
   }
-#else
-  setStatusMessage("Play: Not supported on Windows yet");
-  SAUCE_LOG("Play", "Play mode not implemented for Windows");
 #endif
 }
 
 void EditorApp::stopPlayMode() {
   if (!playModeActive) return;
 
-#ifndef _WIN32
+#if defined(_WIN32)
+  playModeActive = false;
+  playProcessPid = nullptr;
+  if (!playModeTempFile.empty()) {
+    std::error_code ec2;
+    std::filesystem::remove(playModeTempFile, ec2);
+    playModeTempFile.clear();
+  }
+  setStatusMessage("Play mode stopped");
+  return;
+#else
   if (playProcessPid > 0) {
     SAUCE_LOG("Play", "Stopping SauceEngine (PID {})", playProcessPid);
     kill(playProcessPid, SIGTERM);
 
-    // Wait briefly for clean exit, then force kill
-    int status;
-    pid_t result = waitpid(playProcessPid, &status, WNOHANG);
-    if (result == 0) {
-      // Process still running, give it a moment
-      usleep(100000); // 100ms
-      result = waitpid(playProcessPid, &status, WNOHANG);
-      if (result == 0) {
-        kill(playProcessPid, SIGKILL);
-        waitpid(playProcessPid, &status, 0);
-      }
-    }
-    playProcessPid = -1;
-  }
-#endif
+    int tries = 0;
+    pid_t result;
+    do {
+      result = waitpid(playProcessPid, nullptr, WNOHANG);
+      if (result == 0) usleep(100000);
+    } while (result == 0 && ++tries < 50);
 
-  // Clean up temp file
-  if (!playModeTempFile.empty()) {
-    std::error_code ec;
-    std::filesystem::remove(playModeTempFile, ec);
-    playModeTempFile.clear();
+    if (result == 0) {
+      kill(playProcessPid, SIGKILL);
+      waitpid(playProcessPid, nullptr, 0);
+    }
+
+    playProcessPid = -1;
   }
 
   playModeActive = false;
+  if (!playModeTempFile.empty()) {
+    std::error_code ec2;
+    std::filesystem::remove(playModeTempFile, ec2);
+    playModeTempFile.clear();
+  }
   setStatusMessage("Play mode stopped");
+#endif
 }
+
 
 } // namespace sauce::editor

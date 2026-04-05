@@ -40,8 +40,13 @@
 #include <memory>
 #include <chrono>
 #include <filesystem>
-#ifndef _WIN32
-#include <sys/types.h>
+#if defined(_WIN32)
+  #ifndef NOMINMAX
+  #define NOMINMAX
+  #endif
+  #include <windows.h>
+#else
+  #include <sys/types.h>
 #endif
 
 namespace sauce {
@@ -212,11 +217,11 @@ private:
 
   // Play mode state
   bool playModeActive = false;
-#ifndef _WIN32
-  pid_t playProcessPid = -1;
-#else
-  int playProcessPid = -1;
-#endif
+  #if defined(_WIN32)
+      HANDLE playProcessPid = nullptr;
+  #else
+      pid_t playProcessPid = -1;
+  #endif
   std::string playModeTempFile;
 
   sauce::SettingsManager settingsManager;

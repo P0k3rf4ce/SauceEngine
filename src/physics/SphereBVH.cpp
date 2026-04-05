@@ -134,15 +134,6 @@ namespace {
     }
 }
 
-// SphereBVHNode
-bool SphereBVHNode::checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const {
-    if (!this->sphere.checkCollision(collider, info)) {
-        return false;
-    }
-
-    return this->left->sphere.checkCollision(collider, info) 
-        || this->right->sphere.checkCollision(collider, info);
-}
 
 static constexpr size_t MAX_MANIFOLD_CONTACTS = 4;
 
@@ -247,7 +238,7 @@ bool SphereBVHNode::isLeaf() const {
     return left == nullptr && right == nullptr;
 }
 
-bool SphereBVHNode::checkCollision(const Collider& collider, std::vector<ContactInfo>& info) {
+bool SphereBVHNode::checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const {
     const auto* otherSphere = dynamic_cast<const SphereCollider*>(&collider);
     if (!otherSphere) return false;
 
@@ -269,7 +260,7 @@ std::unique_ptr<SphereBVHNode> SphereBVHNode::fromMesh(sauce::modeling::Mesh& me
     const auto &indices = mesh.getIndices();
 
     if (indices.empty() || vertices.empty()) {
-        return;
+        return nullptr;
     }
 
     std::vector<TriangleInfo> triangles;
@@ -293,11 +284,6 @@ std::unique_ptr<SphereBVHNode> SphereBVHNode::fromMesh(sauce::modeling::Mesh& me
     return buildNode(triangles, 0, triangles.size());
 }
 
-bool SphereBVHNode::isLeaf() const {
-    return left == nullptr && right == nullptr;
-}
-
-
 
 // SphereBVH
 SphereBVH SphereBVH::fromScene(const sauce::Scene& scene) {
@@ -305,15 +291,17 @@ SphereBVH SphereBVH::fromScene(const sauce::Scene& scene) {
     // make BVH for every mesh
     std::vector<std::unique_ptr<SphereBVHNode>> spheres;
     auto &entities = scene.getEntities();
-    for (auto entity: entities) {
+    for (auto& entity : entities) {
         auto mesh_renderer = entity.getComponent<sauce::MeshRendererComponent>();
         if (mesh_renderer != nullptr) {
             spheres.push_back(SphereBVHNode::fromMesh(*mesh_renderer->getMesh()));
         }
     }
+
     
     // Combine every BVH into a large one or the scene
-    return SphereBVH(buildBVH(spheres, 0, entities.size()));
+    return SphereBVH(buildBVH(spheres, 0, static_cast<int>(spheres.size())));
+
 }
 
 bool SphereBVH::checkCollision(const Collider& collider, std::vector<ContactInfo>& info) const {
@@ -331,28 +319,8 @@ bool SphereBVH::checkCollision(const Collider& collider, std::vector<ContactInfo
     return hit;
 }
 
-const SphereBVHNode *SphereBVH::getRoot() const {
-    return this->root.get();
+SphereBVHNode *SphereBVH::getRoot() const {
+    return root.get();
 }
 
-};
-
-    glm::vec3 extent = centroidMax - centroidMin;
-    int axis = 0; 
-    if (extent.y > extent.x) axis = 1;
-    if (extent.z > extent[axis]) axis = 2;
-
-    size_t mid = start + count / 2;
-    std::nth_element(triangles.begin() + start,
-                     triangles.begin() + mid,
-                     triangles.begin() + end,
-                     [axis](const TriangleInfo &a, const TriangleInfo &b) {
-                         return a.centroid[axis] < b.centroid[axis];
-                     });
-
-    node->left = buildRecursive(triangles, start, mid);
-    node->right = buildRecursive(triangles, mid, end);
-
-    return node;
-}
 };

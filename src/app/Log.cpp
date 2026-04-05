@@ -8,26 +8,20 @@ bool Log::palantirMode = true;
 bool Log::initialized = false;
 
 void Log::init(const std::string& filepath) {
-#ifdef NDEBUG
-  (void)filepath;
-#else
   std::lock_guard lock(logMutex);
   if (initialized) return;
 
   logFile.open(filepath, std::ios::out | std::ios::trunc);
   initialized = logFile.is_open();
-#endif
 }
 
 void Log::shutdown() {
-#ifndef NDEBUG
   std::lock_guard lock(logMutex);
   if (logFile.is_open()) {
     logFile.flush();
     logFile.close();
   }
   initialized = false;
-#endif
 }
 
 void Log::setPalantirMode(bool enabled) {

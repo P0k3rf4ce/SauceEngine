@@ -1,78 +1,80 @@
 #pragma once
 
-#include <app/components/MeshRendererComponent.hpp>
-#include <app/components/RigidBodyComponent.hpp>
+#include <glm/glm.hpp>
 
-#include <physics/Vertex.hpp>
-#include <physics/constraints/Constraint.hpp>
-
-#include <memory>
+#include <cstddef>
+#include <cstdint>
+#include <map>
+#include <utility>
 #include <vector>
+
+namespace sauce {
+class RigidBodyComponent;
+}
 
 namespace physics {
 
+struct ClothData;
+struct CollisionConstraint;
+struct Vertex;
+
 struct XPBDSolver {
+  // Gauss-Seidel iterations per rigid-body solve pass
+  int solverIterations = 20;
+  int rigidSubsteps = 4;
 
-  // Number of Gauss-Seidel iterations per substep (default 10)
-  // we can probably hook up imgui to this at some point for tuning
-  int solverIterations = 10;
+  // XPBD substeps for cloth (prediction + constraint projection each substep)
+  int clothSubsteps = 4;
 
-  void solvePositions(std::vector<sauce::RigidBodyComponent>& rigidBodies, std::vector<std::unique_ptr<Constraint>>& constraints, float deltatime) {
-	  /*
-	   * adapted from https://matthias-research.github.io/pages/publications/posBasedDyn.pdf
-	   */
-	  glm::vec3 velocity;
-	  float w;
-	  std::vector<physics::Vertex> centers; // centers of mass for all rigid bodies
+  // Normalized gravity direction for support-loss detection (default: -Z)
+  glm::vec3 gravityDirection = glm::vec3(0.0f, 0.0f, -1.0f);
 
-	  centers.reserve(rigidBodies.size());
-	  for (auto& r : rigidBodies) {
-		  /* get vertices of r */
-		  auto o = r.getOwner();
-		  auto m = o->getComponent<sauce::MeshRendererComponent>();
-		  /* skip rigid bodies with no mesh, we cannot generate their constraints */
-		  if (m == nullptr)
-			  continue;
-		  auto v=m->getMesh()->getVertices();
+  // Dragging keeps the selected body dynamic, but its contacts can use a reduced friction
+  // coefficient so blocks can be extracted without turning the full tower into a low-friction pile.
+  const sauce::RigidBodyComponent* dragBody = nullptr;
+  float dragContactFrictionScale = 0.02f;
 
-		  /* do physics */
-		  w=r.getInvMass();
-		  velocity=r.getVelocity() + deltatime*(w*r.getExternalForces());
-		  /*
-		   * you could damp velocities here
-		   */
-		  r.setPosition(r.getPosition() + velocity*deltatime);
-		  auto constraints=generateCollisionConstraints(rigidBodies);
+  bool contactDebugEnabled = false;
 
-		  centers.push_back({r.getCenterOfMass(), glm::vec3(0.f,0.f,0.f), r.getInvMass()});
-	  }
+  void solvePositions(std::vector<sauce::RigidBodyComponent*>& rigidBodies,
+                      float deltatime);
 
-	  for (int i=0; i<solverIterations; i++) {
-		  projectConstraints(centers, constraints, deltatime);
-	  }
-  }
+  // Cloth-only pipeline: external acceleration, substepped XPBD on particle arrays (rigid bodies
+  // untouched). Lambdas reset at the start of each substep.
+  void solveCloth(ClothData& cloth, float deltatime,
+                  const glm::vec3& externalAcceleration = glm::vec3(0.0f, -9.81f, 0.0f));
 
+  std::vector<CollisionConstraint> generateCollisionConstraints(
+      const std::vector<sauce::RigidBodyComponent*>& rigidBodies);
+
+private:
   void projectConstraints(
-      std::vector<physics::Vertex>& vertices,
-      std::vector<std::unique_ptr<Constraint>>& constraints,
-      float deltatime
-  ) {
-    if (vertices.empty() || constraints.empty()) return;
+      std::vector<Vertex>& vertices,
+      std::vector<CollisionConstraint>& constraints,
+      float deltatime);
+  void captureCollisionLambdaWarmStart(
+      const std::vector<sauce::RigidBodyComponent*>& rigidBodies,
+      const std::vector<CollisionConstraint>& constraints);
+  void wakeUnsupportedBodies(
+      const std::vector<sauce::RigidBodyComponent*>& rigidBodies) const;
 
-    for (int iter = 0; iter < solverIterations; ++iter) {
-      if (iter == 0) {
-        for (auto& c : constraints) {
-          c->resetLambda();
-        }
-      }
+  struct CollisionContact {
+    uint32_t indexA = 0;
+    uint32_t indexB = 0;
+    glm::vec3 pointA = glm::vec3(0.0f);
+    glm::vec3 pointB = glm::vec3(0.0f);
+    glm::vec3 contactNormal = glm::vec3(0.0f, 1.0f, 0.0f);
+    float penetrationDepth = 0.0f;
+  };
 
-      for (auto& c : constraints) {
-        c->solve(vertices, deltatime);
-      }
-    }
-  }
+  std::vector<CollisionContact> collectCollisionContacts(
+      const std::vector<sauce::RigidBodyComponent*>& rigidBodies) const;
+  void applyCollisionVelocityResponse(
+      const std::vector<sauce::RigidBodyComponent*>& rigidBodies,
+      const std::vector<CollisionContact>& contacts,
+      float deltatime) const;
 
-  std::vector<Constraint> generateCollisionConstraints(std::vector<sauce::RigidBodyComponent>& rigidBodies);
+  std::map<std::pair<uintptr_t, uintptr_t>, std::vector<float>> collisionLambdaWarmStart;
 };
 
-}
+} // namespace physics

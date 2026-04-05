@@ -13,6 +13,27 @@ namespace sauce {
 class Entity {
 public:
 	Entity(const std::string& name) : name(name) {}
+	Entity(Entity&& other) noexcept
+		: name(std::move(other.name)),
+		  active(other.active),
+		  components(std::move(other.components)) {
+		rebindComponentOwners();
+	}
+
+	Entity& operator=(Entity&& other) noexcept {
+		if (this == &other) {
+			return *this;
+		}
+
+		name = std::move(other.name);
+		active = other.active;
+		components = std::move(other.components);
+		rebindComponentOwners();
+		return *this;
+	}
+
+	Entity(const Entity&) = delete;
+	Entity& operator=(const Entity&) = delete;
 
 	std::string get_name() const { return name; }
 	void set_name(const std::string& newName) { name = newName; }
@@ -138,6 +159,14 @@ public:
   }
 
 private:
+	void rebindComponentOwners() {
+		for (auto& component : components) {
+			if (component) {
+				component->setOwner(this);
+			}
+		}
+	}
+
 	std::string name;
 	bool active = true;
 	std::vector<std::unique_ptr<Component>> components;

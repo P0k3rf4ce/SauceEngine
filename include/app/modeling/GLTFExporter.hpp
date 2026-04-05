@@ -39,6 +39,7 @@ private:
 
     // Deduplication maps (keyed on raw pointer from shared_ptr)
     std::unordered_map<const Mesh*, int> meshMap;
+    std::unordered_map<std::string, int> meshGroupMap;
     std::unordered_map<const Material*, int> materialMap;
     std::unordered_map<const Texture*, int> textureMap;
     std::unordered_map<const Texture*, int> imageMap;
