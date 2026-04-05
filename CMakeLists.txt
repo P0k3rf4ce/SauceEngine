@@ -196,4 +196,3 @@ target_link_libraries(${EXEC_NAME} PRIVATE launcherLib)
 if(APPLE)
     target_link_options(${EXEC_NAME} PRIVATE "LINKER:-no_warn_duplicate_libraries")
 endif()
-

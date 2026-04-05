@@ -18,10 +18,19 @@ struct AppOptions {
     double tickrate;
     std::string scene_file;
     std::string ibl_file;
+    bool skip_launcher;
     bool help;
 
     AppOptions(int argc, const char *argv[]);
-    AppOptions(): scr_width(DEFAULT_SCR_WIDTH), scr_height(DEFAULT_SCR_HEIGHT), tickrate(DEFAULT_TICKRATE), scene_file(), ibl_file(), help(false) {}
+    AppOptions()
+        : scr_width(DEFAULT_SCR_WIDTH),
+          scr_height(DEFAULT_SCR_HEIGHT),
+          tickrate(DEFAULT_TICKRATE),
+          scene_file(),
+          ibl_file(),
+          skip_launcher(false),
+          help(false),
+          desc("Allowed options") {}
 
     boost::program_options::options_description getHelpMessage() const;
 

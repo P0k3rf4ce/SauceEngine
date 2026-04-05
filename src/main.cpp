@@ -23,6 +23,8 @@ int main(int argc, const char *argv[]) {
 
   sauce::SauceEngineApp mainApp;
   try {
+    const bool shouldShowLauncher = argc <= 1 && !ops.skip_launcher;
+    mainApp.setLauncherEnabled(shouldShowLauncher);
     if (!ops.scene_file.empty()) {
       mainApp.setSceneFile(ops.scene_file);
     }

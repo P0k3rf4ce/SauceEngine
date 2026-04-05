@@ -36,6 +36,7 @@
 #include <app/ui/components/Text.hpp>
 #include <app/ui/components/TextColored.hpp>
 #include <app/ui/components/TextWrapped.hpp>
+#include <launcher/LauncherCatalog.hpp>
 
 #ifdef NDEBUG
 constexpr bool enableValidationLayers = false;
@@ -47,13 +48,12 @@ namespace sauce {
 
 class SauceEngineApp {
 public:
-  SauceEngineApp(); // Constructor to initialize pImGuiComponentManager
+  SauceEngineApp();
   void run(const uint32_t width, const uint32_t height);
-
   ~SauceEngineApp();
 
 private:
-  GLFWwindow *window;
+  GLFWwindow* window = nullptr;
 
   std::chrono::steady_clock::time_point lastFrameTime = std::chrono::steady_clock::now();
   float deltaTime = 0.0f;
@@ -65,16 +65,13 @@ private:
   bool gravePressedLastFrame = false;
 
   std::unique_ptr<sauce::Instance> pInstance;
-
   std::unique_ptr<sauce::RenderSurface> pRenderSurface;
 
   sauce::PhysicalDevice physicalDevice = nullptr;
   sauce::LogicalDevice logicalDevice = nullptr;
 
   std::unique_ptr<sauce::Renderer> pRenderer;
-
   std::unique_ptr<sauce::Scene> pScene;
-
   std::unique_ptr<sauce::ImGuiRenderer> pImGuiRenderer;
 
   std::unique_ptr<sauce::ui::ImGuiComponentManager> pImGuiComponentManager;
@@ -87,6 +84,11 @@ private:
   static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn);
 
   void buildExampleUI();
+  void renderLauncherUI();
+  void updateLauncherPreview();
+  bool launchFromLauncher();
+  bool loadConfiguredScene();
+  void setCursorCapture(bool captured);
 
   void uploadMeshGPUResources();
   void setupSceneRenderer();
@@ -98,13 +100,29 @@ public:
   void setCustomUIBuilder(std::function<void(sauce::ui::ImGuiComponentManager&)> builder);
   void setSceneFile(const std::string& path) { sceneFile = path; }
   void setIBLFile(const std::string& path) { iblFile = path; }
+  void setLauncherEnabled(bool enabled) { launcherEnabled = enabled; launcherActive = enabled; }
 
 private:
+  struct LauncherSelectionState {
+    sauce::launcher::AssetCatalog catalog;
+    int selectedLaunchTarget = 0;
+    int selectedIblMap = 0;
+    int selectedResolutionPreset = 0;
+    std::string scenePath;
+    std::string iblPath;
+    uint32_t launchWidth = AppOptions::DEFAULT_SCR_WIDTH;
+    uint32_t launchHeight = AppOptions::DEFAULT_SCR_HEIGHT;
+    std::string commandPreview;
+    std::string statusMessage;
+  };
+
   std::string sceneFile;
   std::string iblFile;
-  uint32_t width;
-  uint32_t height;
+  bool launcherEnabled = false;
+  bool launcherActive = false;
+  LauncherSelectionState launcherState;
+  uint32_t width = 0;
+  uint32_t height = 0;
 };
 
-}
-
+} // namespace sauce

@@ -13,7 +13,7 @@ AppOptions::AppOptions(int argc, char const **argv): desc("Allowed options") {
 
     desc.add_options()
     ("help", "produce help message")
-    ("skip-launcher", "start the engine immediately")
+    ("skip-launcher", po::bool_switch(&(this->skip_launcher)), "start the engine immediately")
     ("width,w", po::value<unsigned int>(&(this->scr_width))->default_value(DEFAULT_SCR_WIDTH), "screen width")
     ("height,h", po::value<unsigned int>(&(this->scr_height))->default_value(DEFAULT_SCR_HEIGHT), "screen height")
     ("tickrate,t", po::value<double>(&(this->tickrate))->default_value(DEFAULT_TICKRATE), "animation tickrate")
