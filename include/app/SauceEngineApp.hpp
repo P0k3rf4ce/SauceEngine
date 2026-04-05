@@ -8,9 +8,9 @@
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 
+#include <array>
 #include <cstdlib>
-#include <future>
-#include <optional>
+#include <string>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -38,8 +38,7 @@
 #include <app/ui/components/Text.hpp>
 #include <app/ui/components/TextColored.hpp>
 #include <app/ui/components/TextWrapped.hpp>
-#include <launcher/LauncherCatalog.hpp>
-#include <launcher/PolyHavenClient.hpp>
+#include <launcher/AppLauncher.hpp>
 
 #ifdef NDEBUG
 constexpr bool enableValidationLayers = false;
@@ -87,12 +86,7 @@ private:
   static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn);
 
   void buildExampleUI();
-  void renderLauncherUI();
-  void pollLauncherBackgroundTasks();
-  void updateLauncherPreview();
-  void refreshLauncherCacheState();
-  bool launchFromLauncher();
-  bool finalizeLauncherLaunch(const std::string& resolvedScenePath, const std::string& resolvedIblPath);
+  bool finalizeLauncherLaunch(const sauce::launcher::LaunchRequest& request);
   bool loadConfiguredScene();
   bool resolveConfiguredRemoteAssets(std::string& errorMessage);
   void setCursorCapture(bool captured);
@@ -107,61 +101,29 @@ public:
   void setCustomUIBuilder(std::function<void(sauce::ui::ImGuiComponentManager&)> builder);
   void setSceneFile(const std::string& path) { sceneFile = path; }
   void setIBLFile(const std::string& path) { iblFile = path; }
+  void setModelRotationDegrees(const std::array<float, 3>& degrees, bool explicitOverride = true) {
+    modelRotationDegrees = degrees;
+    modelRotationExplicit = explicitOverride;
+  }
   void setPolyHavenModelSelection(const std::string& id, const std::string& resolution) { polyHavenModelId = id; polyHavenModelResolution = resolution; }
   void setPolyHavenHdriSelection(const std::string& id, const std::string& resolution) { polyHavenHdriId = id; polyHavenHdriResolution = resolution; }
   void setLauncherEnabled(bool enabled) { launcherEnabled = enabled; launcherActive = enabled; }
 
 private:
-  struct RemoteBrowserState {
-    std::vector<sauce::launcher::PolyHavenAssetSummary> assets;
-    std::string searchQuery;
-    std::string statusMessage;
-    std::optional<std::future<sauce::launcher::PolyHavenAssetListResult>> pendingLoad;
-    int selectedIndex = -1;
-    int selectedResolutionIndex = 0;
-    int selectedSortMode = 1;
-  };
-
-  struct PendingLaunchResult {
-    std::string scenePath;
-    std::string iblPath;
-    std::string errorMessage;
-  };
-
-  struct LauncherSelectionState {
-    struct CacheState {
-      sauce::launcher::PolyHavenCacheSummary summary;
-      std::string statusMessage;
-      int pruneDays = 30;
-    };
-
-    sauce::launcher::AssetCatalog catalog;
-    int selectedLaunchTarget = 0;
-    int selectedIblMap = 0;
-    int selectedResolutionPreset = 0;
-    int selectedSceneTab = 0;
-    int selectedIblTab = 0;
-    std::string scenePath;
-    std::string iblPath;
-    uint32_t launchWidth = AppOptions::DEFAULT_SCR_WIDTH;
-    uint32_t launchHeight = AppOptions::DEFAULT_SCR_HEIGHT;
-    std::string commandPreview;
-    std::string statusMessage;
-    RemoteBrowserState remoteModels;
-    RemoteBrowserState remoteHdris;
-    CacheState cache;
-    std::optional<std::future<PendingLaunchResult>> pendingLaunch;
-  };
-
   std::string sceneFile;
   std::string iblFile;
+  std::array<float, 3> modelRotationDegrees{
+      static_cast<float>(AppOptions::DEFAULT_MODEL_ROTATE_X_DEGREES),
+      static_cast<float>(AppOptions::DEFAULT_MODEL_ROTATE_Y_DEGREES),
+      static_cast<float>(AppOptions::DEFAULT_MODEL_ROTATE_Z_DEGREES)};
+  bool modelRotationExplicit = false;
   std::string polyHavenModelId;
   std::string polyHavenModelResolution = "2k";
   std::string polyHavenHdriId;
   std::string polyHavenHdriResolution = "4k";
   bool launcherEnabled = false;
   bool launcherActive = false;
-  LauncherSelectionState launcherState;
+  std::unique_ptr<sauce::launcher::AppLauncher> pLauncher;
   uint32_t width = 0;
   uint32_t height = 0;
 };

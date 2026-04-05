@@ -151,6 +151,15 @@ std::string buildCommandLinePreview(const AppOptions& options, const std::string
   if (std::abs(options.tickrate - AppOptions::DEFAULT_TICKRATE) > 0.001) {
     stream << " --tickrate " << options.tickrate;
   }
+  if (std::abs(options.model_rotate_x_degrees - AppOptions::DEFAULT_MODEL_ROTATE_X_DEGREES) > 0.001) {
+    stream << " --model-rotate-x " << options.model_rotate_x_degrees;
+  }
+  if (std::abs(options.model_rotate_y_degrees - AppOptions::DEFAULT_MODEL_ROTATE_Y_DEGREES) > 0.001) {
+    stream << " --model-rotate-y " << options.model_rotate_y_degrees;
+  }
+  if (std::abs(options.model_rotate_z_degrees - AppOptions::DEFAULT_MODEL_ROTATE_Z_DEGREES) > 0.001) {
+    stream << " --model-rotate-z " << options.model_rotate_z_degrees;
+  }
   if (!options.ibl_file.empty()) {
     stream << " --ibl " << quoteIfNeeded(options.ibl_file);
   }

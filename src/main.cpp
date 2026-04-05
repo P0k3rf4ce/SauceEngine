@@ -31,6 +31,11 @@ int main(int argc, const char *argv[]) {
     if (!ops.ibl_file.empty()) {
       mainApp.setIBLFile(ops.ibl_file);
     }
+    mainApp.setModelRotationDegrees(
+        {static_cast<float>(ops.model_rotate_x_degrees),
+         static_cast<float>(ops.model_rotate_y_degrees),
+         static_cast<float>(ops.model_rotate_z_degrees)},
+        ops.model_rotation_provided);
     if (!ops.polyhaven_model_id.empty()) {
       mainApp.setPolyHavenModelSelection(ops.polyhaven_model_id, ops.polyhaven_model_resolution);
     }
