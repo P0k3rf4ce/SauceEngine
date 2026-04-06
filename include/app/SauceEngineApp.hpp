@@ -56,13 +56,15 @@ private:
   GLFWwindow *window;
 
   std::chrono::steady_clock::time_point lastFrameTime = std::chrono::steady_clock::now();
-  float deltaTime = 0.0f;
+  double deltaFrame = 0.0f;
+  double deltaUpdate = 0.0;
 
   float lastX = 0.0f;
   float lastY = 0.0f;
   bool firstMouse = true;
   bool cursorCaptured = true;
   bool gravePressedLastFrame = false;
+  bool spacePressedLastFrame = false;
 
   std::unique_ptr<sauce::Instance> pInstance;
 
@@ -74,6 +76,7 @@ private:
   std::unique_ptr<sauce::Renderer> pRenderer;
 
   std::unique_ptr<sauce::Scene> pScene;
+  std::unique_ptr<physics::XPBDSolver> pSolver;
 
   std::unique_ptr<sauce::ImGuiRenderer> pImGuiRenderer;
 
@@ -89,8 +92,11 @@ private:
   void buildExampleUI();
 
   void uploadMeshGPUResources();
+  void frameLoadedSceneCamera();
   void setupSceneRenderer();
+  void setupXPBDSolver();
   void syncRigidBodiesToTransforms();
+  void applyClothImpulse();
   void recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t imageIndex);
 
 public:

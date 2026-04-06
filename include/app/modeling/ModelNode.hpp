@@ -1,6 +1,7 @@
 #pragma once
 
 #include "app/modeling/Transform.hpp"
+#include "app/modeling/ClothInfo.hpp"
 #include "app/modeling/Mesh.hpp"
 #include "app/modeling/Material.hpp"
 #include "app/modeling/PropertyValue.hpp"
@@ -56,6 +57,10 @@ public:
     void setLightInfo(const LightInfo& info) { lightInfo = info; }
     bool hasLight() const { return lightInfo.has_value(); }
 
+    const std::optional<ClothInfo>& getClothInfo() const { return clothInfo; }
+    void setClothInfo(const ClothInfo& info) { clothInfo = info; }
+    bool hasCloth() const { return clothInfo.has_value(); }
+
     // Metadata access (for GLTF extensions)
     const std::unordered_map<std::string, PropertyValue>& getMetadata() const { return metadata; }
     void setMetadata(const std::string& key, const PropertyValue& value);
@@ -71,6 +76,7 @@ private:
     std::vector<std::shared_ptr<ModelNode>> children;
     std::vector<MeshMaterialPair> meshMaterialPairs;
     std::optional<LightInfo> lightInfo;
+    std::optional<ClothInfo> clothInfo;
     std::unordered_map<std::string, PropertyValue> metadata;
 };
 

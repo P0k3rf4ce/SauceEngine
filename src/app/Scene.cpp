@@ -2,6 +2,7 @@
 #include "app/modeling/GLTFLoader.hpp"
 #include "app/modeling/GLTFExporter.hpp"
 #include "app/components/TransformComponent.hpp"
+#include "app/components/ClothComponent.hpp"
 #include "app/components/MeshRendererComponent.hpp"
 #include "app/components/RigidBodyComponent.hpp"
 #include "app/components/PointLightComponent.hpp"
@@ -142,6 +143,25 @@ void Scene::loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
 		else
 			invmass=RigidBodyComponent::meshInvMass(pair.mesh);
 		entity.getComponents<RigidBodyComponent>().back()->setInvMass(invmass);
+    }
+
+    if (node->hasCloth()) {
+        const auto& meshMaterialPairs = node->getMeshMaterialPairs();
+        if (meshMaterialPairs.size() == 1 && meshMaterialPairs[0].mesh) {
+            entity.addComponent<ClothComponent>(
+                meshMaterialPairs[0].mesh,
+                node->getClothInfo()->settings);
+            auto* clothComponent = entity.getComponent<ClothComponent>();
+            auto* meshRenderer = entity.getComponent<MeshRendererComponent>();
+            if (clothComponent && meshRenderer && clothComponent->getRuntimeMesh()) {
+                meshRenderer->setMesh(clothComponent->getRuntimeMesh());
+            }
+        } else {
+            std::cerr << "Scene::loadGLTFNodeHierarchy: Skipping cloth import for node '"
+                      << entityName
+                      << "' because cloth import currently expects exactly one mesh primitive."
+                      << std::endl;
+        }
     }
 
     if (node->hasLight()) {

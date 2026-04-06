@@ -135,6 +135,7 @@ std::shared_ptr<ModelNode> GLTFLoader::processNode(const tinygltf::Model& gltfMo
     }
 
     applyNodeLight(gltfNode, node);
+    applyNodeCloth(gltfNode, node);
 
     // Process children
     processNodeChildren(gltfModel, gltfNode, node);
@@ -556,6 +557,67 @@ void GLTFLoader::applyNodeLight(const tinygltf::Node& gltfNode, std::shared_ptr<
     if (lightIndex < 0 || lightIndex >= static_cast<int>(parsedLights.size())) return;
 
     node->setLightInfo(parsedLights[lightIndex]);
+}
+
+void GLTFLoader::applyNodeCloth(const tinygltf::Node& gltfNode, std::shared_ptr<ModelNode> node) {
+    auto extIt = gltfNode.extensions.find("SAUCE_cloth");
+    if (extIt == gltfNode.extensions.end()) {
+        return;
+    }
+
+    const auto& extValue = extIt->second;
+    ClothInfo clothInfo;
+
+    if (extValue.Has("defaultInvMass") && extValue.Get("defaultInvMass").IsNumber()) {
+        clothInfo.settings.defaultInvMass =
+            static_cast<float>(extValue.Get("defaultInvMass").GetNumberAsDouble());
+    }
+
+    if (extValue.Has("stretchCompliance") && extValue.Get("stretchCompliance").IsNumber()) {
+        clothInfo.settings.stretchCompliance =
+            static_cast<float>(extValue.Get("stretchCompliance").GetNumberAsDouble());
+    }
+
+    if (extValue.Has("bendCompliance") && extValue.Get("bendCompliance").IsNumber()) {
+        clothInfo.settings.bendCompliance =
+            static_cast<float>(extValue.Get("bendCompliance").GetNumberAsDouble());
+    }
+
+    if (extValue.Has("damping") && extValue.Get("damping").IsNumber()) {
+        clothInfo.settings.damping =
+            static_cast<float>(extValue.Get("damping").GetNumberAsDouble());
+    }
+
+    if (extValue.Has("gravityScale") && extValue.Get("gravityScale").IsNumber()) {
+        clothInfo.settings.gravityScale =
+            static_cast<float>(extValue.Get("gravityScale").GetNumberAsDouble());
+    }
+
+    if (extValue.Has("solverSubsteps") && extValue.Get("solverSubsteps").IsInt()) {
+        clothInfo.settings.solverSubsteps = extValue.Get("solverSubsteps").GetNumberAsInt();
+    } else if (extValue.Has("solverSubsteps") && extValue.Get("solverSubsteps").IsNumber()) {
+        clothInfo.settings.solverSubsteps =
+            static_cast<int>(extValue.Get("solverSubsteps").GetNumberAsDouble());
+    }
+
+    if (extValue.Has("pinnedParticleIndices") && extValue.Get("pinnedParticleIndices").IsArray()) {
+        const auto& pinnedIndices = extValue.Get("pinnedParticleIndices");
+        clothInfo.settings.pinnedParticleIndices.reserve(pinnedIndices.ArrayLen());
+        for (size_t i = 0; i < pinnedIndices.ArrayLen(); ++i) {
+            const auto& value = pinnedIndices.Get(static_cast<int>(i));
+            if (!value.IsInt() && !value.IsNumber()) {
+                continue;
+            }
+
+            const int particleIndex = value.GetNumberAsInt();
+            if (particleIndex >= 0) {
+                clothInfo.settings.pinnedParticleIndices.push_back(
+                    static_cast<uint32_t>(particleIndex));
+            }
+        }
+    }
+
+    node->setClothInfo(clothInfo);
 }
 
 } // namespace modeling

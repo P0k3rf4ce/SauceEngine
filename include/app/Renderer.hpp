@@ -24,6 +24,7 @@
 #include <app/SwapChain.hpp>
 
 #include <app/IBLGenerator.hpp>
+#include <app/modeling/Material.hpp>
 #include <cstring>
 
 namespace sauce {
@@ -141,6 +142,11 @@ public:
     };
     pSkyboxPipeline = std::make_unique<sauce::GraphicsPipeline>(skyboxPipelineConfig);
 
+    sauce::GraphicsPipelineConfig doubleSidedPipelineConfig = mainPipelineConfig;
+    doubleSidedPipelineConfig.enableCulling = false;
+    pDoubleSidedPipeline =
+        std::make_unique<sauce::GraphicsPipeline>(doubleSidedPipelineConfig);
+
     sauce::GraphicsPipelineConfig postProcessPipelineConfig {
       .physicalDevice = createInfo.physicalDevice,
       .logicalDevice = createInfo.logicalDevice,
@@ -218,6 +224,7 @@ public:
   const vk::raii::Image& getDepthImage() const { return depthImage; }
   const vk::raii::ImageView& getDepthImageView() const { return depthImageView; }
   const GraphicsPipeline& getPipeline() const { return *pPipeline; }
+  const GraphicsPipeline& getDoubleSidedPipeline() const { return *pDoubleSidedPipeline; }
   const vk::raii::Buffer& getCurrentUniformBuffer() const { return uniformBuffers[frameIndex]; }
   const vk::raii::DescriptorPool& getDescriptorPool() const { return descriptorPool; }
   const vk::raii::ImageView& getDefaultImageView() const { return defaultImageView; }
@@ -1024,6 +1031,7 @@ private:
 
   std::unique_ptr<sauce::GraphicsPipeline> pPipeline;
   std::unique_ptr<sauce::GraphicsPipeline> pSkyboxPipeline;
+  std::unique_ptr<sauce::GraphicsPipeline> pDoubleSidedPipeline;
   std::unique_ptr<sauce::GraphicsPipeline> pPostProcessPipeline;
 
   vk::raii::DescriptorSetLayout descriptorSetLayout0 = nullptr;

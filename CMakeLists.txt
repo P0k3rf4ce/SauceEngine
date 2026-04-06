@@ -3,8 +3,11 @@ cmake_minimum_required(VERSION 3.30)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(SauceEngine)
+
+enable_testing()
 
 if(WIN32)
   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
@@ -13,62 +16,54 @@ if(WIN32)
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 endif()
 
+# ── Common sources (shared across multiple targets) ──────────────────
+
+file(GLOB_RECURSE APP_SOURCES CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/src/app/*.cpp"
+)
+
+file(GLOB_RECURSE PHYSICS_SOURCES CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/src/physics/*.cpp"
+)
+
+# Modeling-only subset (for lightweight targets like modeltest)
+file(GLOB_RECURSE MODELING_SOURCES CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/src/app/modeling/*.cpp"
+)
+
+# ── Dependencies ─────────────────────────────────────────────────────
+
+find_package(Vulkan REQUIRED)
+find_package(Boost REQUIRED COMPONENTS program_options)
+find_package(glfw3 CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
+find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
+
+# ── Compiler warnings (non-Windows) ─────────────────────────────────
+
+set(SAUCE_WARNINGS -Wall -Wpedantic -Wextra -Wreorder-init-list -g -O2)
+
+# ── SauceEngine (main executable) ────────────────────────────────────
+
 set(EXEC_NAME SauceEngine)
 add_executable(${EXEC_NAME} src/main.cpp)
 
-if (!WIN32) 
-  target_compile_options(${EXEC_NAME} PUBLIC -Wall -Wpedantic -Wextra -Wreorder-init-list -g -O2)
+target_sources(${EXEC_NAME} PRIVATE ${APP_SOURCES} ${PHYSICS_SOURCES})
+
+target_include_directories(${EXEC_NAME} PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${TINYGLTF_INCLUDE_DIRS}
+)
+
+target_link_libraries(${EXEC_NAME}
+    PUBLIC  Vulkan::Vulkan Boost::program_options
+    PRIVATE glfw imgui::imgui nlohmann_json::nlohmann_json launcherLib
+)
+
+if(NOT WIN32)
+    target_compile_options(${EXEC_NAME} PUBLIC ${SAUCE_WARNINGS})
 endif()
-
-find_package(Vulkan REQUIRED)
-target_link_libraries(${EXEC_NAME} PUBLIC Vulkan::Vulkan)
-
-find_package(Boost REQUIRED COMPONENTS program_options)
-target_link_libraries(${EXEC_NAME} PUBLIC Boost::program_options)
-
-find_package(glfw3 CONFIG REQUIRED)
-target_link_libraries(${EXEC_NAME} PRIVATE glfw)
-
-find_package(imgui CONFIG REQUIRED)
-target_link_libraries(${EXEC_NAME} PRIVATE imgui::imgui)
-
-find_package(nlohmann_json CONFIG REQUIRED)
-target_link_libraries(${EXEC_NAME} PRIVATE nlohmann_json::nlohmann_json)
-
-find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
-target_include_directories(${EXEC_NAME} PRIVATE ${TINYGLTF_INCLUDE_DIRS})
-
-target_include_directories(SauceEngine PRIVATE
-  ${PROJECT_SOURCE_DIR}/include
-)
-
-file(GLOB_RECURSE UI_COMPONENT_SOURCES
-  "${PROJECT_SOURCE_DIR}/src/app/ui/*.cpp" 
-) 
-
-target_sources(${EXEC_NAME} PRIVATE
-  src/app/modeling/Transform.cpp
-  src/app/modeling/Texture.cpp
-  src/app/modeling/TextureCache.cpp
-  src/app/modeling/Material.cpp
-  src/app/modeling/Mesh.cpp
-  src/app/modeling/ModelNode.cpp
-  src/app/modeling/Model.cpp
-  src/app/modeling/GLTFLoader.cpp
-  src/app/modeling/GLTFExporter.cpp
-  src/app/components/TransformComponent.cpp
-  src/app/components/RigidBodyComponent.cpp
-  src/app/components/MeshRendererComponent.cpp
-  src/app/components/PointLightComponent.cpp
-  src/app/components/SpotLightComponent.cpp
-  src/app/components/DirectionalLightComponent.cpp
-  src/app/Scene.cpp
-  src/app/ImGuiRenderer.cpp
-  src/app/SauceEngineApp.cpp
-  src/app/IBLGenerator.cpp
-  src/app/ui/ImGuiComponentManager.cpp
-  ${UI_COMPONENT_SOURCES}
-)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/shaders)
 # add_dependencies(${EXEC_NAME} shaders)  # Requires slangc; pre-compiled .spv files used instead
@@ -78,58 +73,55 @@ add_custom_command(TARGET ${EXEC_NAME} POST_BUILD
     ${PROJECT_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:${EXEC_NAME}>/shaders
 )
 
-# Model test executable
-add_executable(modeltest src/modeltest.cpp)
-target_include_directories(modeltest PRIVATE ${PROJECT_SOURCE_DIR}/include)
-target_include_directories(modeltest PRIVATE ${TINYGLTF_INCLUDE_DIRS})
-
-if (!WIN32)
-  target_compile_options(modeltest PUBLIC -Wall -Wpedantic -Wextra -Wreorder-init-list -g -O2)
+if(APPLE)
+    target_link_options(${EXEC_NAME} PRIVATE "LINKER:-no_warn_duplicate_libraries")
 endif()
 
+# ── modeltest ────────────────────────────────────────────────────────
+
+add_executable(modeltest src/modeltest.cpp)
+
 target_sources(modeltest PRIVATE
-  src/app/modeling/Transform.cpp
-  src/app/modeling/Texture.cpp
-  src/app/modeling/TextureCache.cpp
-  src/app/modeling/Material.cpp
-  src/app/modeling/Mesh.cpp
-  src/app/modeling/ModelNode.cpp
-  src/app/modeling/Model.cpp
-  src/app/modeling/GLTFLoader.cpp
+    src/app/components/MeshRendererComponent.cpp
+    ${MODELING_SOURCES}
 )
 
-# We need Vulkan headers (but won't initialize Vulkan)
+target_include_directories(modeltest PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${TINYGLTF_INCLUDE_DIRS}
+)
+
 target_link_libraries(modeltest PUBLIC Vulkan::Vulkan)
 
-# ModelViewer executable
+if(NOT WIN32)
+    target_compile_options(modeltest PUBLIC ${SAUCE_WARNINGS})
+endif()
+
+# ── modelviewer ──────────────────────────────────────────────────────
+
 add_executable(modelviewer src/modelviewer.cpp)
+
+target_sources(modelviewer PRIVATE
+    src/app/ModelViewerRenderer.cpp
+    src/app/ImGuiRenderer.cpp
+    src/app/components/MeshRendererComponent.cpp
+    src/app/components/RigidBodyComponent.cpp
+    ${MODELING_SOURCES}
+)
 
 target_include_directories(modelviewer PRIVATE
     ${PROJECT_SOURCE_DIR}/include
     ${TINYGLTF_INCLUDE_DIRS}
 )
 
-if (!WIN32)
-    target_compile_options(modelviewer PUBLIC -Wall -Wpedantic -Wextra -Wreorder-init-list -g -O2)
-endif()
-
-target_sources(modelviewer PRIVATE
-    src/app/ModelViewerRenderer.cpp
-    src/app/modeling/Transform.cpp
-    src/app/modeling/Texture.cpp
-    src/app/modeling/TextureCache.cpp
-    src/app/modeling/Material.cpp
-    src/app/modeling/Mesh.cpp
-    src/app/modeling/ModelNode.cpp
-    src/app/modeling/Model.cpp
-    src/app/modeling/GLTFLoader.cpp
-    src/app/ImGuiRenderer.cpp
-    src/app/components/RigidBodyComponent.cpp
+target_link_libraries(modelviewer
+    PUBLIC  Vulkan::Vulkan
+    PRIVATE glfw imgui::imgui
 )
 
-target_link_libraries(modelviewer PUBLIC Vulkan::Vulkan)
-target_link_libraries(modelviewer PRIVATE glfw)
-target_link_libraries(modelviewer PRIVATE imgui::imgui)
+if(NOT WIN32)
+    target_compile_options(modelviewer PUBLIC ${SAUCE_WARNINGS})
+endif()
 
 add_dependencies(modelviewer shaders)
 
@@ -138,62 +130,86 @@ add_custom_command(TARGET modelviewer POST_BUILD
     ${PROJECT_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:modelviewer>/shaders
 )
 
-# SauceEditor executable
-if (NOT WIN32)
-add_executable(sauceeditor src/editor/main.cpp)
+# ── xpbd_cloth_harness ───────────────────────────────────────────────
+
+add_executable(xpbd_cloth_harness
+    src/xpbd_cloth_harness.cpp
+    src/app/components/ClothComponent.cpp
+    src/app/components/MeshRendererComponent.cpp
+    src/app/components/TransformComponent.cpp
+    src/app/modeling/Mesh.cpp
+    src/app/modeling/Transform.cpp
+    src/physics/Cloth.cpp
+    src/physics/SphereCollider.cpp
+    src/physics/XPBD.cpp
+)
+
+target_include_directories(xpbd_cloth_harness PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${TINYGLTF_INCLUDE_DIRS}
+)
+
+target_link_libraries(xpbd_cloth_harness PUBLIC Vulkan::Vulkan)
+
+if(NOT WIN32)
+    target_compile_options(xpbd_cloth_harness PUBLIC ${SAUCE_WARNINGS})
+endif()
+
+add_test(NAME xpbd_cloth_harness COMMAND xpbd_cloth_harness)
+
+add_executable(cloth_scene_smoke src/cloth_scene_smoke.cpp)
+
+target_sources(cloth_scene_smoke PRIVATE ${APP_SOURCES} ${PHYSICS_SOURCES})
+
+target_include_directories(cloth_scene_smoke PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${TINYGLTF_INCLUDE_DIRS}
+)
+
+target_link_libraries(cloth_scene_smoke
+    PUBLIC  Vulkan::Vulkan
+    PRIVATE glfw imgui::imgui nlohmann_json::nlohmann_json
+)
+
+if(NOT WIN32)
+    target_compile_options(cloth_scene_smoke PUBLIC ${SAUCE_WARNINGS})
+endif()
+
+add_test(NAME cloth_scene_smoke COMMAND cloth_scene_smoke)
+
+# ── SauceEditor ──────────────────────────────────────────────────────
+
+file(GLOB_RECURSE EDITOR_SOURCES CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/src/editor/*.cpp"
+)
+
+add_executable(sauceeditor ${EDITOR_SOURCES})
+
+target_sources(sauceeditor PRIVATE
+    ${APP_SOURCES}
+    ${PHYSICS_SOURCES}
+    src/app/Log.cpp
+    src/app/Settings.cpp
+)
 
 target_include_directories(sauceeditor PRIVATE
     ${PROJECT_SOURCE_DIR}/include
     ${TINYGLTF_INCLUDE_DIRS}
 )
 
-if (!WIN32)
-    target_compile_options(sauceeditor PUBLIC -Wall -Wpedantic -Wextra -Wreorder-init-list -g -O2)
+target_link_libraries(sauceeditor
+    PUBLIC  Vulkan::Vulkan
+    PRIVATE glfw imgui::imgui nlohmann_json::nlohmann_json
+)
+
+if(NOT WIN32)
+    target_compile_options(sauceeditor PUBLIC ${SAUCE_WARNINGS})
 endif()
 
-file(GLOB_RECURSE EDITOR_SOURCES
-    "${PROJECT_SOURCE_DIR}/src/editor/*.cpp"
-)
-
-target_sources(sauceeditor PRIVATE
-    ${EDITOR_SOURCES}
-    src/app/modeling/Transform.cpp
-    src/app/modeling/Texture.cpp
-    src/app/modeling/TextureCache.cpp
-    src/app/modeling/Material.cpp
-    src/app/modeling/Mesh.cpp
-    src/app/modeling/ModelNode.cpp
-    src/app/modeling/Model.cpp
-    src/app/modeling/GLTFLoader.cpp
-    src/app/modeling/GLTFExporter.cpp
-    src/app/components/TransformComponent.cpp
-    src/app/components/RigidBodyComponent.cpp
-    src/app/components/MeshRendererComponent.cpp
-    src/app/components/PointLightComponent.cpp
-    src/app/components/SpotLightComponent.cpp
-    src/app/components/DirectionalLightComponent.cpp
-    src/app/Scene.cpp
-    src/app/ImGuiRenderer.cpp
-    src/app/Log.cpp
-    src/app/Settings.cpp
-)
-
-target_link_libraries(sauceeditor PUBLIC Vulkan::Vulkan)
-target_link_libraries(sauceeditor PRIVATE glfw)
-target_link_libraries(sauceeditor PRIVATE imgui::imgui)
-target_link_libraries(sauceeditor PRIVATE nlohmann_json::nlohmann_json)
-
-# Editor only needs GLSL shaders, not the Slang ones
 if(TARGET editorGridVert)
-  add_dependencies(sauceeditor editorGridVert editorGridFrag editorUnlitVert editorUnlitFrag)
+    add_dependencies(sauceeditor editorGridVert editorGridFrag editorUnlitVert editorUnlitFrag)
 endif()
-endif()
+
+# ── Launcher ─────────────────────────────────────────────────────────
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src/launcher)
-
-target_link_libraries(${EXEC_NAME} PRIVATE launcherLib)
-
-if(APPLE)
-    target_link_options(${EXEC_NAME} PRIVATE "LINKER:-no_warn_duplicate_libraries")
-endif()
-

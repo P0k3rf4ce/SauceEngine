@@ -61,6 +61,10 @@ public:
     return this->pos;
   }
 
+  glm::vec3 getFront() const {
+    return this->front;
+  }
+
   /**
    * Sets camera to look at target from position
    */
@@ -68,8 +72,8 @@ public:
     pos = position;
     worldUp = upVec;
     glm::vec3 direction = glm::normalize(target - position);
-    yaw = glm::degrees(atan2(direction.z, direction.x));
-    pitch = glm::degrees(asin(direction.y));
+    yaw = glm::degrees(atan2(direction.x, direction.y));
+    pitch = glm::degrees(asin(direction.z));
     updateView();
   }
 
