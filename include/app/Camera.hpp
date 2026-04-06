@@ -73,7 +73,7 @@ public:
     worldUp = upVec;
     glm::vec3 direction = glm::normalize(target - position);
     yaw = glm::degrees(atan2(direction.x, direction.y));
-    pitch = glm::degrees(asin(direction.z));
+    pitch = glm::degrees(asin(glm::clamp(direction.z, -1.0f, 1.0f)));
     updateView();
   }
 
@@ -211,4 +211,3 @@ private:
 };
 
 }
-

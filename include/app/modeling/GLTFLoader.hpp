@@ -2,9 +2,11 @@
 
 #include "app/modeling/Model.hpp"
 #include "app/modeling/TextureCache.hpp"
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <memory>
+#include <unordered_map>
 
 // Forward declaration to avoid including tinygltf in header
 namespace tinygltf {
@@ -49,6 +51,8 @@ public:
 private:
     LoadOptions options;
     TextureCache textureCache;
+    std::unordered_map<uint64_t, std::shared_ptr<Mesh>> primitiveCache;
+    std::unordered_map<int, std::shared_ptr<Material>> materialCache;
 
     // Internal GLTF data during loading
     std::string baseDirectory;
@@ -66,6 +70,8 @@ private:
 
     // Mesh processing
     std::shared_ptr<Mesh> processPrimitive(const tinygltf::Model& gltfModel,
+                                           int meshIndex,
+                                           int primitiveIndex,
                                            const tinygltf::Primitive& primitive);
     void extractVertexAttribute(const tinygltf::Model& gltfModel,
                                 const tinygltf::Primitive& primitive,

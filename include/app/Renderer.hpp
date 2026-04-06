@@ -123,8 +123,9 @@ public:
       .descriptorSetLayouts = { *descriptorSetLayout0, *descriptorSetLayout1, *modeling::Material::getDescriptorSetLayout() },
       .colorFormat = pSwapChain->getSurfaceFormat().format,
       .shaderPath = "shaders/shader_pbr.spv",
+      .enableBlending = true,
       .hasPushConstants = true,
-      .pushConstantSize = 68, // sizeof(ScenePushConstants): mat4 (64) + uint32 (4)
+      .pushConstantSize = sizeof(ScenePushConstants),
     };
     pPipeline = std::make_unique<sauce::GraphicsPipeline>(mainPipelineConfig);
 
@@ -696,10 +697,6 @@ public:
     commandBuffers[frameIndex].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pPipeline->getLayout(), 1, *environmentDescriptorSets[0], nullptr);
     commandBuffers[frameIndex].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pPipeline->getLayout(), 2, *defaultMaterialDescriptorSets[0], nullptr);
 
-    struct ScenePushConstants {
-      glm::mat4 model;
-      uint32_t lightCount;
-    };
     ScenePushConstants pushData {
       .model = glm::mat4(1.0f),
       .lightCount = 0

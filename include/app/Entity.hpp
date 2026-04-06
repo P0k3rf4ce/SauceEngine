@@ -13,10 +13,6 @@ namespace sauce {
 class Entity {
 public:
 	Entity(const std::string& name) : name(name) {}
-
-	Entity(const Entity&) = delete;
-	Entity& operator=(const Entity&) = delete;
-
 	Entity(Entity&& other) noexcept
 		: name(std::move(other.name)),
 		  active(other.active),
@@ -35,6 +31,9 @@ public:
 		rebindComponentOwners();
 		return *this;
 	}
+
+	Entity(const Entity&) = delete;
+	Entity& operator=(const Entity&) = delete;
 
 	std::string get_name() const { return name; }
 	void set_name(const std::string& newName) { name = newName; }

@@ -38,5 +38,12 @@ struct UniformBufferObject {
   alignas(16) glm::vec3 cameraPos;
 };
 
-}
+struct ScenePushConstants {
+  alignas(16) glm::mat4 model{1.0f};
+  uint32_t lightCount{0};
+  uint32_t _pad0{0};
+  uint32_t _pad1{0};
+  uint32_t _pad2{0};
+};
 
+}

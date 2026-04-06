@@ -20,6 +20,8 @@ GLTFLoader::GLTFLoader(const LoadOptions& options)
 }
 
 std::vector<std::shared_ptr<Model>> GLTFLoader::loadModels(const std::string& filePath) {
+    primitiveCache.clear();
+    materialCache.clear();
     tinygltf::Model gltfModel;
     if (!loadGltfFile(filePath, gltfModel)) {
         return {};
@@ -37,6 +39,8 @@ std::vector<std::shared_ptr<Model>> GLTFLoader::loadModels(const std::string& fi
 }
 
 std::shared_ptr<Model> GLTFLoader::loadModel(const std::string& filePath, size_t sceneIndex) {
+    primitiveCache.clear();
+    materialCache.clear();
     tinygltf::Model gltfModel;
     if (!loadGltfFile(filePath, gltfModel)) {
         return nullptr;
@@ -117,8 +121,12 @@ std::shared_ptr<ModelNode> GLTFLoader::processNode(const tinygltf::Model& gltfMo
     if (gltfNode.mesh >= 0 && gltfNode.mesh < static_cast<int>(gltfModel.meshes.size())) {
         const auto& gltfMesh = gltfModel.meshes[gltfNode.mesh];
 
-        for (const auto& primitive : gltfMesh.primitives) {
-            auto mesh = processPrimitive(gltfModel, primitive);
+        for (size_t primitiveIndex = 0; primitiveIndex < gltfMesh.primitives.size(); ++primitiveIndex) {
+            const auto& primitive = gltfMesh.primitives[primitiveIndex];
+            auto mesh = processPrimitive(gltfModel,
+                                         gltfNode.mesh,
+                                         static_cast<int>(primitiveIndex),
+                                         primitive);
             if (mesh) {
                 // Get material
                 std::shared_ptr<Material> material;
@@ -197,7 +205,17 @@ Transform GLTFLoader::extractTransform(const tinygltf::Node& gltfNode) {
 }
 
 std::shared_ptr<Mesh> GLTFLoader::processPrimitive(const tinygltf::Model& gltfModel,
+                                                     int meshIndex,
+                                                     int primitiveIndex,
                                                      const tinygltf::Primitive& primitive) {
+    const uint64_t cacheKey =
+        (static_cast<uint64_t>(static_cast<uint32_t>(meshIndex)) << 32) |
+        static_cast<uint32_t>(primitiveIndex);
+    auto cacheIt = primitiveCache.find(cacheKey);
+    if (cacheIt != primitiveCache.end()) {
+        return cacheIt->second;
+    }
+
     // Only support triangles for now
     if (primitive.mode != TINYGLTF_MODE_TRIANGLES) {
         return nullptr;
@@ -257,6 +275,7 @@ std::shared_ptr<Mesh> GLTFLoader::processPrimitive(const tinygltf::Model& gltfMo
         return nullptr;
     }
 
+    primitiveCache.emplace(cacheKey, mesh);
     return mesh;
 }
 
@@ -353,6 +372,11 @@ std::shared_ptr<Material> GLTFLoader::processMaterial(const tinygltf::Model& glt
         return nullptr;
     }
 
+    auto cacheIt = materialCache.find(materialIndex);
+    if (cacheIt != materialCache.end()) {
+        return cacheIt->second;
+    }
+
     const auto& gltfMaterial = gltfModel.materials[materialIndex];
     auto material = std::make_shared<Material>(gltfMaterial.name);
 
@@ -435,6 +459,7 @@ std::shared_ptr<Material> GLTFLoader::processMaterial(const tinygltf::Model& glt
     props.alphaCutoff = static_cast<float>(gltfMaterial.alphaCutoff);
     props.doubleSided = gltfMaterial.doubleSided;
 
+    materialCache.emplace(materialIndex, material);
     return material;
 }
 

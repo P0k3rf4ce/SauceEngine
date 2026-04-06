@@ -264,7 +264,7 @@ void EditorApp::initVulkan() {
     .descriptorSetLayouts = { *pRenderer->getDescriptorSetLayout0() },
     .colorFormat = OffscreenFramebuffer::COLOR_FORMAT,
     .hasVertexInput = true,
-    .enableBlending = false,
+    .enableBlending = true,
     .enableCulling = true,
     .depthWrite = true,
     .hasPushConstants = true,
@@ -856,7 +856,7 @@ void EditorApp::mainLoop() {
       }
     }
 
-    #if !defined(_WIN32)
+    #if !defined(_WIN32) && !defined(_WIN64)
     // Check if play mode process has exited on its own
     if (playModeActive && playProcessPid > 0) {
       int status;
@@ -869,8 +869,8 @@ void EditorApp::mainLoop() {
           std::error_code ec2;
           std::filesystem::remove(playModeTempFile, ec2);
           playModeTempFile.clear();
-          }
-          setStatusMessage("Play mode ended");
+        }
+        setStatusMessage("Play mode ended");
       }
     }
     #endif
@@ -1718,9 +1718,9 @@ void EditorApp::applySettings(const sauce::EditorSettings& s) {
 
 
 void EditorApp::startPlayMode() {
-  if (playModeActive) return;
+  if (playModeActive || !pScene) return;
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(_WIN64)
   setStatusMessage("Play mode is not implemented on Windows yet.");
   return;
 #else
@@ -1772,7 +1772,7 @@ void EditorApp::startPlayMode() {
 void EditorApp::stopPlayMode() {
   if (!playModeActive) return;
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(_WIN64)
   playModeActive = false;
   playProcessPid = nullptr;
   if (!playModeTempFile.empty()) {
@@ -1801,6 +1801,7 @@ void EditorApp::stopPlayMode() {
 
     playProcessPid = -1;
   }
+
 #endif
 
   if (!playModeTempFile.empty()) {

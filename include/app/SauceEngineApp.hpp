@@ -9,7 +9,7 @@
 #include <imgui.h>
 
 #include <cstdlib>
-
+#include <vector>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -45,6 +45,8 @@ constexpr bool enableValidationLayers = true;
 
 namespace sauce {
 
+class RigidBodyComponent;
+
 class SauceEngineApp {
 public:
   SauceEngineApp(); // Constructor to initialize pImGuiComponentManager
@@ -64,7 +66,26 @@ private:
   bool firstMouse = true;
   bool cursorCaptured = true;
   bool gravePressedLastFrame = false;
+  bool demoTriggerPressedLastFrame = false;
   bool spacePressedLastFrame = false;
+  bool cameraCollisionEnabled = false;
+  bool dropDemoActive = false;
+  bool defaultSceneSpinEnabled = false;
+  bool defaultSceneSpinActive = false;
+  std::string defaultSceneSpinEntityName;
+  glm::vec3 defaultSceneSpinAngularVelocity = glm::vec3(1.35f, 1.9f, 0.65f);
+  float cameraCollisionRadius = 0.35f;
+  float cameraCollisionCooldown = 0.0f;
+
+  Entity* draggedEntity = nullptr;
+  glm::vec3 dragPlaneNormal = glm::vec3(0.0f);
+  glm::vec3 dragPlanePoint = glm::vec3(0.0f);
+  glm::vec3 dragOffset = glm::vec3(0.0f);
+  glm::vec3 dragTargetPosition = glm::vec3(0.0f);
+  glm::vec3 dragSmoothedVelocity = glm::vec3(0.0f);
+  Entity* dragTraceEntity = nullptr;
+  int dragTraceStep = 0;
+  int dragTraceReleaseStepsRemaining = 0;
 
   std::unique_ptr<sauce::Instance> pInstance;
 
@@ -88,14 +109,31 @@ private:
   void mainLoop();
   void processInput(float deltaTime);
   static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn);
+  static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 
   void buildExampleUI();
+
+  void beginDrag(double mouseX, double mouseY);
+  void updateDrag(double mouseX, double mouseY);
+  void endDrag();
+  void logDragTraceSnapshot(const char* timing, float physicsDt);
 
   void uploadMeshGPUResources();
   void frameLoadedSceneCamera();
   void setupSceneRenderer();
   void setupXPBDSolver();
+  void setupDefaultSceneSpin();
+  void updateDefaultSceneSpin(float deltaTime);
+  void frameCameraToScene();
+  bool isPhysicsDemoScene() const;
+  Entity* findDefaultSceneSpinEntity();
+  RigidBodyComponent* ensureEntityRigidBody(Entity& entity);
+  void configureRigidBodyFromEntity(Entity& entity, RigidBodyComponent& rigidBody);
+  void applyCameraCollisionPush(const glm::vec3& previousCameraPosition, float deltaTime);
+  void startDropDemo();
+  void updateDropDemoForces();
   void syncRigidBodiesToTransforms();
+  std::vector<RigidBodyComponent*> collectRigidBodies();
   void applyClothImpulse();
   void recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t imageIndex);
 
@@ -103,14 +141,16 @@ public:
   sauce::ui::ImGuiComponentManager& getImGuiManager() { return *pImGuiComponentManager; }
   void setCustomUIBuilder(std::function<void(sauce::ui::ImGuiComponentManager&)> builder);
   void setSceneFile(const std::string& path) { sceneFile = path; }
+  void setCameraCollisionEnabled(bool enabled) { cameraCollisionEnabled = enabled; }
   void setIBLFile(const std::string& path) { iblFile = path; }
+  void setPhysicsTickRate(double hz);
 
 private:
   std::string sceneFile;
   std::string iblFile;
+  double physicsTickRate = 128.0;
   uint32_t width;
   uint32_t height;
 };
 
 }
-

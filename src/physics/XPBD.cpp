@@ -1,19 +1,9 @@
 #include <physics/XPBD.hpp>
 #include <physics/Cloth.hpp>
-#include <physics/SphereCollider.hpp>
-#include <physics/ContactInfo.hpp>
 #include <physics/Vertex.hpp>
-#include <physics/constraints/Constraint.hpp>
 #include <physics/constraints/CollisionConstraint.hpp>
 
 #include <app/ClothSettings.hpp>
-#include <app/Entity.hpp>
-#include <app/components/MeshRendererComponent.hpp>
-#include <app/components/RigidBodyComponent.hpp>
-
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/norm.hpp>
-
 #include <algorithm>
 #include <cmath>
 
@@ -162,43 +152,9 @@ void projectBend(std::vector<ClothParticle>& particles, BendConstraint& c, float
 
 } // namespace
 
-void XPBDSolver::solvePositions(
-    std::vector<sauce::RigidBodyComponent>& rigidBodies,
-    std::vector<std::unique_ptr<Constraint>>& constraints,
-    float deltatime) {
-  /*
-   * adapted from https://matthias-research.github.io/pages/publications/posBasedDyn.pdf
-   */
-  glm::vec3 velocity;
-  float w = 0.0f;
-  std::vector<physics::Vertex> centers;
-
-  centers.reserve(rigidBodies.size());
-  for (auto& rigidBody : rigidBodies) {
-    auto* owner = rigidBody.getOwner();
-    auto* meshRenderer = owner ? owner->getComponent<sauce::MeshRendererComponent>() : nullptr;
-    if (!meshRenderer || !meshRenderer->getMesh()) {
-      continue;
-    }
-
-    w = rigidBody.getInvMass();
-    velocity = rigidBody.getVelocity() + deltatime * (w * rigidBody.getExternalForces());
-    rigidBody.setPosition(rigidBody.getPosition() + velocity * deltatime);
-
-    centers.push_back({
-        rigidBody.getCenterOfMass(),
-        glm::vec3(0.0f),
-        rigidBody.getInvMass(),
-    });
-  }
-
-  constraints = generateCollisionConstraints(rigidBodies);
-  projectConstraints(centers, constraints, deltatime);
-}
-
 void XPBDSolver::projectConstraints(
     std::vector<physics::Vertex>& vertices,
-    std::vector<std::unique_ptr<Constraint>>& constraints,
+    std::vector<CollisionConstraint>& constraints,
     float deltatime) {
   if (vertices.empty() || constraints.empty()) {
     return;
@@ -207,82 +163,14 @@ void XPBDSolver::projectConstraints(
   for (int iter = 0; iter < solverIterations; ++iter) {
     if (iter == 0) {
       for (auto& constraint : constraints) {
-        constraint->resetLambda();
+        constraint.resetLambda();
       }
     }
 
     for (auto& constraint : constraints) {
-      constraint->solve(vertices, deltatime);
+      constraint.solve(vertices, deltatime);
     }
   }
-}
-
-std::vector<std::unique_ptr<Constraint>> XPBDSolver::generateCollisionConstraints(
-    std::vector<sauce::RigidBodyComponent>& rigidBodies
-) {
-    std::vector<std::unique_ptr<Constraint>> constraints;
-
-    // Build a bounding sphere for each rigid body from its mesh vertices.
-    struct BodySphere {
-        uint32_t index;
-        SphereCollider sphere;
-    };
-
-    std::vector<BodySphere> bodies;
-    bodies.reserve(rigidBodies.size());
-
-    for (uint32_t i = 0; i < static_cast<uint32_t>(rigidBodies.size()); ++i) {
-        auto& rb = rigidBodies[i];
-
-        auto* owner = rb.getOwner();
-        if (!owner) continue;
-
-        auto* meshComp = owner->getComponent<sauce::MeshRendererComponent>();
-        if (!meshComp || !meshComp->getMesh()) continue;
-
-        const auto& verts = meshComp->getMesh()->getVertices();
-        if (verts.empty()) continue;
-
-        glm::vec3 center = rb.getPosition();
-
-        float maxRadiusSq = 0.0f;
-        for (const auto& v : verts) {
-            float dSq = glm::length2(v.position - center);
-            if (dSq > maxRadiusSq) {
-                maxRadiusSq = dSq;
-            }
-        }
-
-        SphereCollider sphere;
-        sphere.center = center;
-        sphere.radius = std::sqrt(maxRadiusSq);
-
-        bodies.push_back({ i, sphere });
-    }
-
-    // Pairwise collision detection using SphereCollider::checkCollision.
-    // For every contact produced, emit a CollisionConstraint.
-    for (size_t i = 0; i < bodies.size(); ++i) {
-        for (size_t j = i + 1; j < bodies.size(); ++j) {
-            std::vector<ContactInfo> contacts;
-
-            if (!bodies[i].sphere.checkCollision(bodies[j].sphere, contacts)) {
-                continue;
-            }
-
-            for (const auto& c : contacts) {
-                constraints.push_back(std::make_unique<CollisionConstraint>(
-                    bodies[i].index,
-                    bodies[j].index,
-                    c.contactNormal,
-                    c.depth,
-                    0.0f // zero compliance = perfectly rigid contact
-                ));
-            }
-        }
-    }
-
-    return constraints;
 }
 
 void XPBDSolver::solveCloth(

@@ -20,6 +20,7 @@
 //   Binding  5: ConstantBuffer<MaterialData>    (Fragment)          — PBR material properties
 //
 // Push Constants:
+//   float4x4 model
 //   uint lightCount — number of active lights in the SSBO
 //
 // Notes:
