@@ -1721,9 +1721,67 @@ void EditorApp::startPlayMode() {
   if (playModeActive) return;
 
 #if defined(_WIN32)
-  setStatusMessage("Play mode is not implemented on Windows yet.");
+{
+  namespace fs = std::filesystem;
+  // Locate SauceEngine.exe next to the editor executable
+  wchar_t exePathBuf[MAX_PATH] = {};
+  GetModuleFileNameW(nullptr, exePathBuf, MAX_PATH);
+  fs::path engineExe = fs::path(exePathBuf).parent_path() / "SauceEngine.exe";
+
+  if (!fs::exists(engineExe)) {
+    setStatusMessage("Play: Could not locate SauceEngine.exe");
+    SAUCE_LOG("Play", "Could not locate SauceEngine.exe at {}", engineExe.string());
+    return;
+  }
+
+  fs::path tempDir = fs::temp_directory_path() / "sauceengine_play";
+  std::error_code ec;
+  fs::create_directories(tempDir, ec);
+  if (ec) {
+    setStatusMessage("Play: Failed to create temp directory");
+    return;
+  }
+
+  playModeTempFile = (tempDir / "play_scene.gltf").string();
+
+  const std::string originalPath = pScene->getCurrentFilePath();
+  if (!pScene->saveToFile(playModeTempFile)) {
+    setStatusMessage("Play: Failed to save scene");
+    return;
+  }
+  pScene->setCurrentFilePath(originalPath);
+
+  // Build command line: SauceEngine.exe "path/to/play_scene.gltf"
+  std::wstring cmdLine = L"\"" + engineExe.wstring() + L"\" \"" +
+                         fs::path(playModeTempFile).wstring() + L"\"";
+
+  STARTUPINFOW si = {};
+  si.cb = sizeof(si);
+  PROCESS_INFORMATION pi = {};
+
+  if (!CreateProcessW(
+        nullptr,
+        cmdLine.data(),
+        nullptr, nullptr,
+        FALSE,
+        0,
+        nullptr, nullptr,
+        &si, &pi))
+  {
+    setStatusMessage("Play: Failed to launch SauceEngine");
+    SAUCE_LOG("Play", "CreateProcess failed with error {}", GetLastError());
+    return;
+  }
+
+  CloseHandle(pi.hThread);          // We only need the process handle
+  playProcessPid = pi.hProcess;     // HANDLE stored in playProcessPid
+  playModeActive = true;
+  setStatusMessage("Play mode started");
+  SAUCE_LOG("Play", "SauceEngine launched (Windows)");
   return;
+}
 #else
+
   namespace fs = std::filesystem;
   fs::path tempDir = fs::temp_directory_path() / "sauceengine_play";
   std::error_code ec;
@@ -1734,7 +1792,7 @@ void EditorApp::startPlayMode() {
     return;
   }
 
-  playModeTempFile = (tempDir / "play_scene.glb").string();
+  playModeTempFile = (tempDir / "play_scene.gltf").string();
 
   const std::string originalPath = pScene->getCurrentFilePath();
   if (!pScene->saveToFile(playModeTempFile)) {
