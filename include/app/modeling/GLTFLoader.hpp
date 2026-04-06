@@ -98,6 +98,7 @@ private:
     // KHR_lights_punctual
     void parseLightsExtension(const tinygltf::Model& gltfModel);
     void applyNodeLight(const tinygltf::Node& gltfNode, std::shared_ptr<ModelNode> node);
+    void applyNodeCloth(const tinygltf::Node& gltfNode, std::shared_ptr<ModelNode> node);
 
     std::vector<LightInfo> parsedLights; // populated by parseLightsExtension
 

@@ -67,6 +67,7 @@ private:
   bool cursorCaptured = true;
   bool gravePressedLastFrame = false;
   bool demoTriggerPressedLastFrame = false;
+  bool spacePressedLastFrame = false;
   bool cameraCollisionEnabled = false;
   bool dropDemoActive = false;
   bool defaultSceneSpinEnabled = false;
@@ -118,6 +119,7 @@ private:
   void logDragTraceSnapshot(const char* timing, float physicsDt);
 
   void uploadMeshGPUResources();
+  void frameLoadedSceneCamera();
   void setupSceneRenderer();
   void setupXPBDSolver();
   void setupDefaultSceneSpin();
@@ -132,6 +134,7 @@ private:
   void updateDropDemoForces();
   void syncRigidBodiesToTransforms();
   std::vector<RigidBodyComponent*> collectRigidBodies();
+  void applyClothImpulse();
   void recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t imageIndex);
 
 public:

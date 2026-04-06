@@ -9,6 +9,7 @@
 #include <vector>
 
 namespace sauce {
+struct ClothSettings;
 class RigidBodyComponent;
 }
 
@@ -22,9 +23,6 @@ struct XPBDSolver {
   // Gauss-Seidel iterations per rigid-body solve pass
   int solverIterations = 20;
   int rigidSubsteps = 4;
-
-  // XPBD substeps for cloth (prediction + constraint projection each substep)
-  int clothSubsteps = 4;
 
   // Normalized gravity direction for support-loss detection (default: -Z)
   glm::vec3 gravityDirection = glm::vec3(0.0f, 0.0f, -1.0f);
@@ -41,8 +39,10 @@ struct XPBDSolver {
 
   // Cloth-only pipeline: external acceleration, substepped XPBD on particle arrays (rigid bodies
   // untouched). Lambdas reset at the start of each substep.
-  void solveCloth(ClothData& cloth, float deltatime,
-                  const glm::vec3& externalAcceleration = glm::vec3(0.0f, -9.81f, 0.0f));
+  void solveCloth(ClothData& cloth,
+                  const sauce::ClothSettings& settings,
+                  float deltatime,
+                  const glm::vec3& externalAcceleration = glm::vec3(0.0f, 0.0f, -9.81f));
 
   std::vector<CollisionConstraint> generateCollisionConstraints(
       const std::vector<sauce::RigidBodyComponent*>& rigidBodies);

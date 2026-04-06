@@ -22,14 +22,16 @@
 #include <cmath>
 #include <cstring>
 #include <csignal>
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(_WIN64)
   #define NOMINMAX
   #include <windows.h>
 #elif defined(__APPLE__)
   #include <mach-o/dyld.h>
+  #include <sys/types.h>
   #include <sys/wait.h>
   #include <unistd.h>
 #else
+  #include <sys/types.h>
   #include <sys/wait.h>
   #include <unistd.h>
 #endif
@@ -854,22 +856,22 @@ void EditorApp::mainLoop() {
       }
     }
 
-    #if !defined(_WIN32)
+    #if !defined(_WIN32) && !defined(_WIN64)
     // Check if play mode process has exited on its own
     if (playModeActive && playProcessPid > 0) {
-        int status;
-        pid_t result = waitpid(playProcessPid, &status, WNOHANG);
-        if (result != 0) {
-          // Process has exited
-          playProcessPid = -1;
-          playModeActive = false;
-          if (!playModeTempFile.empty()) {
-            std::error_code ec2;
-            std::filesystem::remove(playModeTempFile, ec2);
-            playModeTempFile.clear();
-          }
-          setStatusMessage("Play mode ended");
+      int status;
+      pid_t result = waitpid(playProcessPid, &status, WNOHANG);
+      if (result != 0) {
+        // Process has exited
+        playProcessPid = -1;
+        playModeActive = false;
+        if (!playModeTempFile.empty()) {
+          std::error_code ec2;
+          std::filesystem::remove(playModeTempFile, ec2);
+          playModeTempFile.clear();
         }
+        setStatusMessage("Play mode ended");
+      }
     }
     #endif
 
@@ -1718,6 +1720,10 @@ void EditorApp::applySettings(const sauce::EditorSettings& s) {
 void EditorApp::startPlayMode() {
   if (playModeActive || !pScene) return;
 
+#if defined(_WIN32) || defined(_WIN64)
+  setStatusMessage("Play mode is not implemented on Windows yet.");
+  return;
+#else
   namespace fs = std::filesystem;
   fs::path tempDir = fs::temp_directory_path() / "sauceengine_play";
   std::error_code ec;
@@ -1738,12 +1744,8 @@ void EditorApp::startPlayMode() {
   }
   pScene->setCurrentFilePath(originalPath);
 
-#if defined(_WIN32)
-  setStatusMessage("Play mode is not implemented on Windows yet.");
-  return;
-#else
-  const std::filesystem::path engineExe = getEngineExecutablePath();
-  if (engineExe.empty() || !std::filesystem::exists(engineExe)) {
+  const fs::path engineExe = getEngineExecutablePath();
+  if (engineExe.empty() || !fs::exists(engineExe)) {
     setStatusMessage("Play: Could not locate SauceEngine executable");
     SAUCE_LOG("Play", "Could not locate SauceEngine executable");
     return;
@@ -1770,12 +1772,12 @@ void EditorApp::startPlayMode() {
 void EditorApp::stopPlayMode() {
   if (!playModeActive) return;
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(_WIN64)
   playModeActive = false;
   playProcessPid = nullptr;
   if (!playModeTempFile.empty()) {
-    std::error_code ec2;
-    std::filesystem::remove(playModeTempFile, ec2);
+    std::error_code ec;
+    std::filesystem::remove(playModeTempFile, ec);
     playModeTempFile.clear();
   }
   setStatusMessage("Play mode stopped");
@@ -1800,14 +1802,16 @@ void EditorApp::stopPlayMode() {
     playProcessPid = -1;
   }
 
-  playModeActive = false;
+#endif
+
   if (!playModeTempFile.empty()) {
-    std::error_code ec2;
-    std::filesystem::remove(playModeTempFile, ec2);
+    std::error_code ec;
+    std::filesystem::remove(playModeTempFile, ec);
     playModeTempFile.clear();
   }
+
+  playModeActive = false;
   setStatusMessage("Play mode stopped");
-#endif
 }
 
 

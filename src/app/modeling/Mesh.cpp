@@ -6,10 +6,57 @@
 
 namespace sauce {
 namespace modeling {
+namespace {
+
+bool uploadVertexData(
+    const std::vector<sauce::Vertex>& vertices,
+    const sauce::LogicalDevice& logicalDevice,
+    vk::raii::PhysicalDevice& physicalDevice,
+    vk::raii::CommandPool& commandPool,
+    vk::raii::Queue& queue,
+    vk::raii::Buffer& destinationBuffer) {
+    if (vertices.empty()) {
+        return false;
+    }
+
+    const vk::DeviceSize vertexBufferSize =
+        sizeof(sauce::Vertex) * vertices.size();
+
+    vk::raii::Buffer stagingVertexBuffer(nullptr);
+    vk::raii::DeviceMemory stagingVertexBufferMemory(nullptr);
+    sauce::BufferUtils::createBuffer(
+        physicalDevice,
+        logicalDevice,
+        vertexBufferSize,
+        vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible |
+            vk::MemoryPropertyFlagBits::eHostCoherent,
+        stagingVertexBuffer,
+        stagingVertexBufferMemory);
+
+    void* data = stagingVertexBufferMemory.mapMemory(0, vertexBufferSize);
+    std::memcpy(data, vertices.data(), static_cast<size_t>(vertexBufferSize));
+    stagingVertexBufferMemory.unmapMemory();
+
+    sauce::BufferUtils::copyBuffer(
+        logicalDevice,
+        commandPool,
+        queue,
+        stagingVertexBuffer,
+        destinationBuffer,
+        vertexBufferSize);
+    return true;
+}
+
+} // namespace
 
 Mesh::Mesh(const std::vector<sauce::Vertex>& vertices, const std::vector<uint32_t>& indices)
     : vertices(vertices)
     , indices(indices) {
+}
+
+Mesh::~Mesh() {
+    releaseVertexBuffer();
 }
 
 bool Mesh::isValid() const {
@@ -45,21 +92,46 @@ bool Mesh::hasMetadata(const std::string& key) const {
 }
 
 void Mesh::initVulkanResources(const sauce::LogicalDevice& logicalDevice, vk::raii::PhysicalDevice& physicalDevice, vk::raii::CommandPool& commandPool, vk::raii::Queue& queue) {
-    vk::DeviceSize vertexBufferSize = sizeof(vertices[0]) * vertices.size();
+    const vk::DeviceSize currentVertexBufferSize = sizeof(vertices[0]) * vertices.size();
 
-    vk::raii::Buffer stagingVertexBuffer(nullptr);
-    vk::raii::DeviceMemory stagingVertexBufferMemory(nullptr);
-    sauce::BufferUtils::createBuffer(physicalDevice, logicalDevice, vertexBufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingVertexBuffer, stagingVertexBufferMemory);
-
-    void* data = stagingVertexBufferMemory.mapMemory(0, vertexBufferSize);
-    memcpy(data, vertices.data(), (size_t)vertexBufferSize);
-    stagingVertexBufferMemory.unmapMemory();
-
+    releaseVertexBuffer();
+    vertexBufferSizeBytes = currentVertexBufferSize;
     vertexBuffer = std::make_unique<vk::raii::Buffer>(nullptr);
     vertexBufferMemory = std::make_unique<vk::raii::DeviceMemory>(nullptr);
-    sauce::BufferUtils::createBuffer(physicalDevice, logicalDevice, vertexBufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, *vertexBuffer, *vertexBufferMemory);
+    if (dynamicVertexBuffer) {
+        sauce::BufferUtils::createBuffer(
+            physicalDevice,
+            logicalDevice,
+            vertexBufferSizeBytes,
+            vk::BufferUsageFlagBits::eVertexBuffer,
+            vk::MemoryPropertyFlagBits::eHostVisible |
+                vk::MemoryPropertyFlagBits::eHostCoherent,
+            *vertexBuffer,
+            *vertexBufferMemory);
+        mappedVertexData = vertexBufferMemory->mapMemory(0, vertexBufferSizeBytes);
+        std::memcpy(
+            mappedVertexData,
+            vertices.data(),
+            static_cast<size_t>(vertexBufferSizeBytes));
+    } else {
+        sauce::BufferUtils::createBuffer(
+            physicalDevice,
+            logicalDevice,
+            vertexBufferSizeBytes,
+            vk::BufferUsageFlagBits::eTransferDst |
+                vk::BufferUsageFlagBits::eVertexBuffer,
+            vk::MemoryPropertyFlagBits::eDeviceLocal,
+            *vertexBuffer,
+            *vertexBufferMemory);
 
-    sauce::BufferUtils::copyBuffer(logicalDevice, commandPool, queue, stagingVertexBuffer, *vertexBuffer, vertexBufferSize);
+        uploadVertexData(
+            vertices,
+            logicalDevice,
+            physicalDevice,
+            commandPool,
+            queue,
+            *vertexBuffer);
+    }
 
     vk::DeviceSize indexBufferSize = sizeof(indices[0]) * indices.size();
 
@@ -67,7 +139,7 @@ void Mesh::initVulkanResources(const sauce::LogicalDevice& logicalDevice, vk::ra
     vk::raii::DeviceMemory stagingIndexBufferMemory(nullptr);
     sauce::BufferUtils::createBuffer(physicalDevice, logicalDevice, indexBufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingIndexBuffer, stagingIndexBufferMemory);
 
-    data = stagingIndexBufferMemory.mapMemory(0, indexBufferSize);
+    void* data = stagingIndexBufferMemory.mapMemory(0, indexBufferSize);
     memcpy(data, indices.data(), (size_t)indexBufferSize);
     stagingIndexBufferMemory.unmapMemory();
 
@@ -76,6 +148,64 @@ void Mesh::initVulkanResources(const sauce::LogicalDevice& logicalDevice, vk::ra
     sauce::BufferUtils::createBuffer(physicalDevice, logicalDevice, indexBufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, *indexBuffer, *indexBufferMemory);
 
     sauce::BufferUtils::copyBuffer(logicalDevice, commandPool, queue, stagingIndexBuffer, *indexBuffer, indexBufferSize);
+}
+
+bool Mesh::updateVertexBuffer(
+    const sauce::LogicalDevice& logicalDevice,
+    vk::raii::PhysicalDevice& physicalDevice,
+    vk::raii::CommandPool& commandPool,
+    vk::raii::Queue& queue) {
+    if (vertices.empty()) {
+        return false;
+    }
+
+    const vk::DeviceSize currentVertexBufferSize =
+        sizeof(vertices[0]) * vertices.size();
+    if (!vertexBuffer || !vertexBufferMemory ||
+        currentVertexBufferSize != vertexBufferSizeBytes) {
+        releaseVertexBuffer();
+        vertexBufferSizeBytes = currentVertexBufferSize;
+        vertexBuffer = std::make_unique<vk::raii::Buffer>(nullptr);
+        vertexBufferMemory = std::make_unique<vk::raii::DeviceMemory>(nullptr);
+        if (dynamicVertexBuffer) {
+            sauce::BufferUtils::createBuffer(
+                physicalDevice,
+                logicalDevice,
+                vertexBufferSizeBytes,
+                vk::BufferUsageFlagBits::eVertexBuffer,
+                vk::MemoryPropertyFlagBits::eHostVisible |
+                    vk::MemoryPropertyFlagBits::eHostCoherent,
+                *vertexBuffer,
+                *vertexBufferMemory);
+            mappedVertexData = vertexBufferMemory->mapMemory(0, vertexBufferSizeBytes);
+        } else {
+            sauce::BufferUtils::createBuffer(
+                physicalDevice,
+                logicalDevice,
+                vertexBufferSizeBytes,
+                vk::BufferUsageFlagBits::eTransferDst |
+                    vk::BufferUsageFlagBits::eVertexBuffer,
+                vk::MemoryPropertyFlagBits::eDeviceLocal,
+                *vertexBuffer,
+                *vertexBufferMemory);
+        }
+    }
+
+    if (dynamicVertexBuffer && mappedVertexData) {
+        std::memcpy(
+            mappedVertexData,
+            vertices.data(),
+            static_cast<size_t>(currentVertexBufferSize));
+        return true;
+    }
+
+    return uploadVertexData(
+        vertices,
+        logicalDevice,
+        physicalDevice,
+        commandPool,
+        queue,
+        *vertexBuffer);
 }
 
 void Mesh::bind(vk::raii::CommandBuffer& commandBuffer) {
@@ -219,6 +349,16 @@ void Mesh::generateTangents() {
 
         vertices[i].tangent = glm::vec4(tangent, handedness);
     }
+}
+
+void Mesh::releaseVertexBuffer() {
+    if (mappedVertexData && vertexBufferMemory) {
+        vertexBufferMemory->unmapMemory();
+    }
+    mappedVertexData = nullptr;
+    vertexBufferMemory.reset();
+    vertexBuffer.reset();
+    vertexBufferSizeBytes = 0;
 }
 
 } // namespace modeling

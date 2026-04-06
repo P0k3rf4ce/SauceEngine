@@ -216,6 +216,51 @@ add_custom_target(generate_jenga_scene
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
+add_executable(xpbd_cloth_harness
+  src/xpbd_cloth_harness.cpp
+  src/app/components/ClothComponent.cpp
+  src/app/components/MeshRendererComponent.cpp
+  src/app/components/TransformComponent.cpp
+  src/app/modeling/Mesh.cpp
+  src/app/modeling/Transform.cpp
+  src/physics/Cloth.cpp
+  src/physics/SphereCollider.cpp
+  src/physics/XPBD.cpp
+)
+
+target_include_directories(xpbd_cloth_harness PRIVATE
+  ${PROJECT_SOURCE_DIR}/include
+  ${TINYGLTF_INCLUDE_DIRS}
+)
+
+target_link_libraries(xpbd_cloth_harness PUBLIC Vulkan::Vulkan)
+
+if(NOT WIN32)
+  target_compile_options(xpbd_cloth_harness PRIVATE ${SAUCE_WARNINGS})
+endif()
+
+add_test(NAME xpbd_cloth_harness COMMAND xpbd_cloth_harness)
+
+add_executable(cloth_scene_smoke src/cloth_scene_smoke.cpp)
+
+target_sources(cloth_scene_smoke PRIVATE ${APP_SOURCES} ${PHYSICS_SOURCES})
+
+target_include_directories(cloth_scene_smoke PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${TINYGLTF_INCLUDE_DIRS}
+)
+
+target_link_libraries(cloth_scene_smoke
+    PUBLIC  Vulkan::Vulkan
+    PRIVATE glfw imgui::imgui nlohmann_json::nlohmann_json
+)
+
+if(NOT WIN32)
+  target_compile_options(cloth_scene_smoke PRIVATE ${SAUCE_WARNINGS})
+endif()
+
+add_test(NAME cloth_scene_smoke COMMAND cloth_scene_smoke)
+
 add_executable(xpbd_rigid_harness
   src/xpbd_rigid_harness.cpp
   src/app/Scene.cpp
@@ -258,10 +303,9 @@ add_test(NAME xpbd_stack_stability COMMAND xpbd_rigid_harness --test-stack-stabi
 add_test(NAME xpbd_piecewise_transfer COMMAND xpbd_rigid_harness --test-piecewise-transfer
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
-add_executable(sauceeditor src/editor/main.cpp)
+add_executable(sauceeditor ${EDITOR_SOURCES})
 
 target_sources(sauceeditor PRIVATE
-  ${EDITOR_SOURCES}
   ${APP_SOURCES}
   ${PHYSICS_SOURCES}
 )
