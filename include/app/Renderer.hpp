@@ -199,19 +199,25 @@ public:
   }
 
   const vk::raii::Queue& getQueue() const { return *pQueue; }
+  vk::raii::Queue& getQueue() { return *pQueue; }
   const sauce::SwapChain& getSwapChain() const { return *pSwapChain; }
   const vk::raii::CommandPool& getCommandPool() const { return commandPool; }
+  vk::raii::CommandPool& getCommandPool() { return commandPool; }
   const vk::raii::DescriptorSetLayout& getDescriptorSetLayout0() const { return descriptorSetLayout0; }
   const vk::raii::DescriptorSetLayout& getDescriptorSetLayout1() const { return descriptorSetLayout1; }
   uint32_t getFrameIndex() const { return frameIndex; }
   const vk::raii::DescriptorSet& getCurrentDescriptorSet() const { return descriptorSets[frameIndex]; }
-  const vk::raii::DescriptorSet& getEnvironmentDescriptorSet() const { 
-    assert(!environmentDescriptorSets.empty() && "Environment descriptor sets not initialized!");
-    return environmentDescriptorSets[0]; 
+  const vk::raii::DescriptorSet& getEnvironmentDescriptorSet() const {
+    if (environmentDescriptorSets.empty()) {
+        throw std::runtime_error("Environment descriptor sets not initialized");
+    }
+    return environmentDescriptorSets[0];
   }
-  const vk::raii::DescriptorSet& getDefaultMaterialDescriptorSet() const { 
-    assert(!defaultMaterialDescriptorSets.empty() && "Default material descriptor sets not initialized!");
-    return defaultMaterialDescriptorSets[0]; 
+  const vk::raii::DescriptorSet& getDefaultMaterialDescriptorSet() const {
+    if (defaultMaterialDescriptorSets.empty()) {
+        throw std::runtime_error("Default material descriptor sets not initialized");
+    }
+    return defaultMaterialDescriptorSets[0];
   }
   void* getCurrentUniformBufferMapped() const { return uniformBuffersMapped[frameIndex]; }
 

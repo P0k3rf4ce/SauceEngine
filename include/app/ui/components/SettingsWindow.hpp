@@ -1,5 +1,13 @@
 #pragma once
 
+#ifdef _WIN32
+    #ifndef NOMINMAX
+    #define NOMINMAX
+    #endif
+    #include <windows.h>
+    #include <shellapi.h>
+#endif
+
 #include <app/ui/ImGuiComponent.hpp>
 #include <app/Settings.hpp>
 #include <imgui.h>
@@ -78,7 +86,8 @@ public:
     ImGui::Spacing();
     if (ImGui::SmallButton("store.palantir.com")) {
       #ifdef _WIN32
-        system("start https://store.palantir.com");
+        ShellExecuteA(nullptr, "open", "https://store.palantir.com",
+                      nullptr, nullptr, SW_SHOWNORMAL);
       #elif __APPLE__
         system("open https://store.palantir.com");
       #else

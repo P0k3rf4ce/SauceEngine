@@ -18,7 +18,7 @@ namespace sauce::editor {
 
 class GizmoRenderer {
 public:
-  GizmoRenderer(const sauce::PhysicalDevice& physicalDevice,
+  GizmoRenderer(sauce::PhysicalDevice& physicalDevice,
                 const sauce::LogicalDevice& logicalDevice,
                 const vk::raii::DescriptorSetLayout& descriptorSetLayout,
                 vk::Format colorFormat,
@@ -39,7 +39,7 @@ public:
 private:
   void uploadMesh();
 
-  const sauce::PhysicalDevice* pPhysicalDevice;
+  sauce::PhysicalDevice* pPhysicalDevice;
   const sauce::LogicalDevice* pLogicalDevice;
   sauce::Renderer* pRenderer;
 

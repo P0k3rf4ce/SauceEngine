@@ -6,7 +6,7 @@
 namespace sauce::editor {
 
 GizmoRenderer::GizmoRenderer(
-    const sauce::PhysicalDevice& physicalDevice,
+    sauce::PhysicalDevice& physicalDevice,
     const sauce::LogicalDevice& logicalDevice,
     const vk::raii::DescriptorSetLayout& descriptorSetLayout,
     vk::Format colorFormat,
@@ -71,9 +71,9 @@ void GizmoRenderer::uploadMesh() {
   GizmoMeshData meshData = activeGizmo->generateMesh();
   mesh = std::make_unique<sauce::modeling::Mesh>(meshData.vertices, meshData.indices);
 
-  auto& physDev = const_cast<vk::raii::PhysicalDevice&>(**pPhysicalDevice);
-  auto& cmdPool = const_cast<vk::raii::CommandPool&>(pRenderer->getCommandPool());
-  auto& queue = const_cast<vk::raii::Queue&>(pRenderer->getQueue());
+  auto& physDev = **pPhysicalDevice;
+  auto& cmdPool = pRenderer->getCommandPool();
+  auto& queue = pRenderer->getQueue();
   mesh->initVulkanResources(*pLogicalDevice, physDev, cmdPool, queue);
 
   meshDirty = false;
@@ -108,9 +108,8 @@ void GizmoRenderer::render(
   cmd.pushConstants<MeshPushConstants>(pipeline->getLayout(),
     vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, pushData);
 
-  auto& cmdRef = const_cast<vk::raii::CommandBuffer&>(cmd);
-  mesh->bind(cmdRef);
-  mesh->draw(cmdRef);
+  mesh->bind(cmd);
+  mesh->draw(cmd);
 }
 
 } // namespace sauce::editor

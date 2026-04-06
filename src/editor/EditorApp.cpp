@@ -38,9 +38,14 @@
 namespace sauce::editor {
 namespace {
 
-#if !defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32)
 std::filesystem::path getCurrentExecutablePath() {
-#if defined(__APPLE__)
+  wchar_t buf[MAX_PATH] = {};
+  GetModuleFileNameW(nullptr, buf, MAX_PATH);
+  return std::filesystem::weakly_canonical(std::filesystem::path(buf));
+}
+#elif defined(__APPLE__)
+std::filesystem::path getCurrentExecutablePath() {
   uint32_t size = 0;
   _NSGetExecutablePath(nullptr, &size);
   std::string buffer(size, '\0');
@@ -48,7 +53,9 @@ std::filesystem::path getCurrentExecutablePath() {
     return {};
   }
   return std::filesystem::weakly_canonical(std::filesystem::path(buffer.c_str()));
+}
 #else
+std::filesystem::path getCurrentExecutablePath() {
   std::vector<char> buffer(4096, '\0');
   const ssize_t length = readlink("/proc/self/exe", buffer.data(), buffer.size() - 1);
   if (length <= 0) {
@@ -56,18 +63,20 @@ std::filesystem::path getCurrentExecutablePath() {
   }
   buffer[static_cast<size_t>(length)] = '\0';
   return std::filesystem::weakly_canonical(std::filesystem::path(buffer.data()));
-#endif
 }
+#endif
 
 std::filesystem::path getEngineExecutablePath() {
   const std::filesystem::path editorPath = getCurrentExecutablePath();
   if (editorPath.empty()) {
     return {};
   }
-
+#if defined(_WIN32)
+  return editorPath.parent_path() / "SauceEngine.exe";
+#else
   return editorPath.parent_path() / "SauceEngine";
-}
 #endif
+}
 
 } // namespace
 
@@ -151,10 +160,11 @@ void EditorApp::initWindow() {
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 }
 
-void EditorApp::framebufferResizeCallback(GLFWwindow* window, int /*width*/, int /*height*/) {
+void EditorApp::framebufferResizeCallback(GLFWwindow* window, int width, int height) {
   auto* app = static_cast<EditorApp*>(glfwGetWindowUserPointer(window));
   if (app && app->pRenderer) {
     app->pRenderer->setFramebufferResized();
+    app->editorCamera.setScreenSize(static_cast<float>(width), static_cast<float>(height));
   }
 }
 
@@ -221,6 +231,7 @@ void EditorApp::initVulkan() {
     .enableBlending = true,
     .enableCulling = false,
     .depthWrite = false,
+    .depthCompareOp = vk::CompareOp::eLessOrEqual,
     .hasPushConstants = false,
     .pushConstantSize = 0,
   };
@@ -243,6 +254,7 @@ void EditorApp::initVulkan() {
     .enableBlending = false,
     .enableCulling = true,
     .depthWrite = true,
+    .depthCompareOp = vk::CompareOp::eLessOrEqual,
     .hasPushConstants = true,
     .pushConstantSize = sizeof(MeshPushConstants),
   };
@@ -265,6 +277,7 @@ void EditorApp::initVulkan() {
     .enableBlending = true,
     .enableCulling = true,
     .depthWrite = true,
+    .depthCompareOp = vk::CompareOp::eLessOrEqual,
     .hasPushConstants = true,
     .pushConstantSize = sizeof(MeshPushConstants),
   };
@@ -512,9 +525,9 @@ void EditorApp::uploadMeshGPUResources() {
       auto mesh = mrc->getMesh();
       if (!mesh || !mesh->isValid()) continue;
       if (!mesh->hasGPUData()) {
-        auto& physDev = const_cast<vk::raii::PhysicalDevice&>(*physicalDevice);
-        auto& cmdPool = const_cast<vk::raii::CommandPool&>(pRenderer->getCommandPool());
-        auto& queue = const_cast<vk::raii::Queue&>(pRenderer->getQueue());
+        auto& physDev = *physicalDevice;
+        auto& cmdPool = pRenderer->getCommandPool();
+        auto& queue = pRenderer->getQueue();
         mesh->initVulkanResources(logicalDevice, physDev, cmdPool, queue);
       }
     }
@@ -708,9 +721,8 @@ void EditorApp::recordEditorCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t
       cmd.pushConstants<MeshPushConstants>(activePipeline->getLayout(),
         vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, pushData);
 
-      auto& cmdRef = const_cast<vk::raii::CommandBuffer&>(cmd);
-      mesh->bind(cmdRef);
-      mesh->draw(cmdRef);
+      mesh->bind(cmd);
+      mesh->draw(cmd);
     }
   }
 
@@ -1739,8 +1751,44 @@ void EditorApp::startPlayMode() {
   pScene->setCurrentFilePath(originalPath);
 
 #if defined(_WIN32)
-  setStatusMessage("Play mode is not implemented on Windows yet.");
-  return;
+  const std::filesystem::path engineExe = getEngineExecutablePath();
+  if (engineExe.empty() || !std::filesystem::exists(engineExe)) {
+    setStatusMessage("Play: Could not locate SauceEngine executable");
+    SAUCE_LOG("Play", "Could not locate SauceEngine executable");
+    return;
+  }
+
+  // lpCommandLine must be a mutable buffer (Win32 API requirement)
+  std::wstring cmdLine = L"\"" + engineExe.wstring() + L"\" \"" +
+                         std::filesystem::path(playModeTempFile).wstring() + L"\"";
+
+  STARTUPINFOW si{};
+  si.cb = sizeof(si);
+  PROCESS_INFORMATION pi{};
+
+  const BOOL ok = CreateProcessW(
+      nullptr,        // lpApplicationName: nullptr — executable is in cmdLine
+      cmdLine.data(), // lpCommandLine: mutable wchar_t* (C++17 wstring::data() is mutable)
+      nullptr,        // lpProcessAttributes
+      nullptr,        // lpThreadAttributes
+      FALSE,          // bInheritHandles
+      0,              // dwCreationFlags
+      nullptr,        // lpEnvironment: inherit parent
+      nullptr,        // lpCurrentDirectory: inherit parent
+      &si,
+      &pi
+  );
+
+  if (ok) {
+    CloseHandle(pi.hThread); // close immediately — we only need hProcess
+    playProcessPid = pi.hProcess;
+    playModeActive = true;
+    setStatusMessage("Play mode started");
+    SAUCE_LOG("Play", "SauceEngine launched (Windows)");
+  } else {
+    setStatusMessage("Play: Failed to launch engine");
+    SAUCE_LOG("Play", "CreateProcess failed: {}", static_cast<unsigned>(GetLastError()));
+  }
 #else
   const std::filesystem::path engineExe = getEngineExecutablePath();
   if (engineExe.empty() || !std::filesystem::exists(engineExe)) {
@@ -1771,8 +1819,14 @@ void EditorApp::stopPlayMode() {
   if (!playModeActive) return;
 
 #if defined(_WIN32)
+  if (playProcessPid != nullptr) {
+    SAUCE_LOG("Play", "Stopping SauceEngine (Windows)");
+    TerminateProcess(playProcessPid, 0);
+    WaitForSingleObject(playProcessPid, 5000); // 5 second timeout
+    CloseHandle(playProcessPid);
+    playProcessPid = nullptr;
+  }
   playModeActive = false;
-  playProcessPid = nullptr;
   if (!playModeTempFile.empty()) {
     std::error_code ec2;
     std::filesystem::remove(playModeTempFile, ec2);

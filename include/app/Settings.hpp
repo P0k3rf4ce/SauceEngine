@@ -20,7 +20,7 @@ class SettingsManager {
 public:
   using ChangeCallback = std::function<void(const EditorSettings&)>;
 
-  void load(const std::string& path = "sauceengine_settings.json");
+  void load(const std::string& path = "");  // empty = use OS default
   void save() const;
   void save(const std::string& path);
 
@@ -33,7 +33,7 @@ public:
 
 private:
   EditorSettings settings;
-  std::string filePath = "sauceengine_settings.json";
+  std::string filePath;  // set by load() on first call
   ChangeCallback onChange;
 };
 

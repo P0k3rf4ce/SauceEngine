@@ -21,7 +21,9 @@ struct LogicalDevice {
         return (prop.queueFlags & vk::QueueFlagBits::eGraphics) != static_cast<vk::QueueFlags>(0);
     });
 
-    assert(graphicsQueueFamilyProp != queueFamilyProps.end());
+    if (graphicsQueueFamilyProp == queueFamilyProps.end()) {
+        throw std::runtime_error("No graphics queue family found");
+    }
 
     queueIndex = static_cast<uint32_t>(std::distance(queueFamilyProps.begin(), graphicsQueueFamilyProp));
 

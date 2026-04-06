@@ -121,7 +121,7 @@ void printNodeHierarchy(const std::shared_ptr<ModelNode>& node, int depth = 0) {
 int main(int argc, char* argv[]) {
     std::cout << "=== Model Loader Test Program ===\n\n";
 
-    std::string modelPath = "/home/noah/Desktop/projects/SauceEngine/assets/models/monkey.gltf";
+    std::string modelPath = "assets/models/monkey.gltf";
 
     if (argc > 1) {
         modelPath = argv[1];

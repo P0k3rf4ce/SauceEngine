@@ -108,7 +108,7 @@ struct GraphicsPipeline {
       fragShaderCreateInfo,
     };
 
-    initPipelineConfigurable(physicalDevice, logicalDevice, descriptorSetLayouts, colorFormat, shaderStages, config);
+    initPipeline(shaderStages);
   }
 
 
@@ -148,7 +148,6 @@ private:
       .cullMode = config.enableCulling ? vk::CullModeFlagBits::eBack : vk::CullModeFlagBits::eNone,
       .frontFace = vk::FrontFace::eCounterClockwise,
       .depthBiasEnable = vk::False,
-      .depthBiasSlopeFactor = 1.0f,
       .lineWidth = 1.0f,
     };
 
@@ -166,10 +165,21 @@ private:
       .stencilTestEnable = vk::False,
     };
 
-    vk::PipelineColorBlendAttachmentState colorBlendAttachment {
-      .blendEnable = vk::False,
-      .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
-    };
+    vk::PipelineColorBlendAttachmentState colorBlendAttachment {};
+    colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR |
+        vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB |
+        vk::ColorComponentFlagBits::eA;
+    if (config.enableBlending) {
+      colorBlendAttachment.blendEnable = vk::True;
+      colorBlendAttachment.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
+      colorBlendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+      colorBlendAttachment.colorBlendOp = vk::BlendOp::eAdd;
+      colorBlendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+      colorBlendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eZero;
+      colorBlendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
+    } else {
+      colorBlendAttachment.blendEnable = vk::False;
+    }
 
     vk::PipelineColorBlendStateCreateInfo colorBlendInfo {
       .logicOpEnable = vk::False,
@@ -231,130 +241,6 @@ private:
     pipeline = vk::raii::Pipeline { *config.logicalDevice, nullptr, pipelineInfo };
   }
 
-  void initPipelineConfigurable(
-      const sauce::PhysicalDevice& physicalDevice,
-      const sauce::LogicalDevice& logicalDevice,
-      const std::vector<vk::DescriptorSetLayout>& descriptorSetLayouts,
-      vk::Format colorFormat,
-      vk::PipelineShaderStageCreateInfo* shaderStages,
-      const GraphicsPipelineConfig& config
-  ) {
-    auto bindingDescription = Vertex::getBindingDescription();
-    auto attributeDescriptions = Vertex::getAttributeDescription();
-    vk::PipelineVertexInputStateCreateInfo vertexInputInfo {};
-    if (config.hasVertexInput) {
-      uint32_t attrCount = std::min(config.vertexAttributeCount, static_cast<uint32_t>(attributeDescriptions.size()));
-      vertexInputInfo.vertexBindingDescriptionCount = 1;
-      vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-      vertexInputInfo.vertexAttributeDescriptionCount = attrCount;
-      vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
-    }
-
-    vk::PipelineInputAssemblyStateCreateInfo inputAssemblyInfo {
-      .topology = vk::PrimitiveTopology::eTriangleList,
-    };
-
-    vk::PipelineViewportStateCreateInfo viewportStateInfo {
-      .viewportCount = 1,
-      .scissorCount = 1,
-    };
-
-    vk::PipelineRasterizationStateCreateInfo rasterizerInfo {
-      .depthClampEnable = vk::False,
-      .rasterizerDiscardEnable = vk::False,
-      .polygonMode = vk::PolygonMode::eFill,
-      .cullMode = config.enableCulling ? vk::CullModeFlagBits::eBack : vk::CullModeFlagBits::eNone,
-      .frontFace = vk::FrontFace::eCounterClockwise,
-      .depthBiasEnable = vk::False,
-      .lineWidth = 1.0f,
-    };
-
-    vk::PipelineMultisampleStateCreateInfo multisamplingInfo {
-      .rasterizationSamples = vk::SampleCountFlagBits::e1,
-      .sampleShadingEnable = vk::False,
-    };
-
-    vk::PipelineDepthStencilStateCreateInfo depthStencil {
-      .depthTestEnable = config.depthTestEnable ? vk::True : vk::False,
-      .depthWriteEnable = config.depthWrite ? vk::True : vk::False,
-      .depthCompareOp = vk::CompareOp::eLessOrEqual,
-      .depthBoundsTestEnable = vk::False,
-      .stencilTestEnable = vk::False,
-    };
-
-    vk::PipelineColorBlendAttachmentState colorBlendAttachment {};
-    colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-                                          vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
-    if (config.enableBlending) {
-      colorBlendAttachment.blendEnable = vk::True;
-      colorBlendAttachment.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
-      colorBlendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
-      colorBlendAttachment.colorBlendOp = vk::BlendOp::eAdd;
-      colorBlendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
-      colorBlendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eZero;
-      colorBlendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
-    } else {
-      colorBlendAttachment.blendEnable = vk::False;
-    }
-
-    vk::PipelineColorBlendStateCreateInfo colorBlendInfo {
-      .logicOpEnable = vk::False,
-      .logicOp = vk::LogicOp::eCopy,
-      .attachmentCount = 1,
-      .pAttachments = &colorBlendAttachment,
-    };
-
-    std::vector<vk::DynamicState> dynamicStates {
-      vk::DynamicState::eViewport,
-      vk::DynamicState::eScissor,
-    };
-
-    vk::PipelineDynamicStateCreateInfo dynamicStateInfo {
-      .dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
-      .pDynamicStates = dynamicStates.data(),
-    };
-
-    vk::PushConstantRange pushRange {
-      .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-      .offset = 0,
-      .size = config.pushConstantSize,
-    };
-
-    vk::PipelineLayoutCreateInfo pipelineLayoutInfo {
-      .setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size()),
-      .pSetLayouts = descriptorSetLayouts.data(),
-      .pushConstantRangeCount = config.hasPushConstants ? 1u : 0u,
-      .pPushConstantRanges = config.hasPushConstants ? &pushRange : nullptr,
-    };
-
-    layout = vk::raii::PipelineLayout { *logicalDevice, pipelineLayoutInfo };
-
-    vk::Format depthFormat = findDepthFormat(physicalDevice);
-
-    vk::PipelineRenderingCreateInfo renderingCreateInfo {
-      .colorAttachmentCount = 1,
-      .pColorAttachmentFormats = &colorFormat,
-      .depthAttachmentFormat = depthFormat,
-    };
-
-    vk::GraphicsPipelineCreateInfo pipelineInfo {
-      .pNext = &renderingCreateInfo,
-      .stageCount = 2,
-      .pStages = shaderStages,
-      .pVertexInputState = &vertexInputInfo,
-      .pInputAssemblyState = &inputAssemblyInfo,
-      .pViewportState = &viewportStateInfo,
-      .pRasterizationState = &rasterizerInfo,
-      .pMultisampleState = &multisamplingInfo,
-      .pDepthStencilState = &depthStencil,
-      .pColorBlendState = &colorBlendInfo,
-      .pDynamicState = &dynamicStateInfo,
-      .layout = layout,
-      .renderPass = nullptr,
-    };
-
-    pipeline = vk::raii::Pipeline { *logicalDevice, nullptr, pipelineInfo };
-  }
 
 
 public:

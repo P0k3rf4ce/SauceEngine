@@ -3,11 +3,46 @@
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <cmath>
+#include <filesystem>
+
+namespace {
+
+std::string getDefaultSettingsPath() {
+  std::filesystem::path configDir;
+
+#if defined(_WIN32)
+  const char* appdata = getenv("APPDATA");
+  configDir = appdata ? std::filesystem::path(appdata) / "SauceEngine"
+                      : std::filesystem::current_path();
+#elif defined(__APPLE__)
+  const char* home = getenv("HOME");
+  configDir = home ? std::filesystem::path(home) / "Library" / "Application Support" / "SauceEngine"
+                   : std::filesystem::current_path();
+#else
+  const char* xdg = getenv("XDG_CONFIG_HOME");
+  const char* home = getenv("HOME");
+  if (xdg && xdg[0] != '\0') {
+    configDir = std::filesystem::path(xdg) / "sauceengine";
+  } else if (home) {
+    configDir = std::filesystem::path(home) / ".config" / "sauceengine";
+  } else {
+    configDir = std::filesystem::current_path();
+  }
+#endif
+
+  std::error_code ec;
+  std::filesystem::create_directories(configDir, ec);
+  // Silently fall through on failure — save() will log the error
+
+  return (configDir / "sauceengine_settings.json").string();
+}
+
+} // namespace
 
 namespace sauce {
 
 void SettingsManager::load(const std::string& path) {
-  filePath = path;
+  filePath = path.empty() ? getDefaultSettingsPath() : path;
 
   std::ifstream file(filePath);
   if (!file.is_open()) {

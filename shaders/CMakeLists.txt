@@ -30,7 +30,7 @@ function (add_slang_compute_target TARGET)
 endfunction()
 
 find_program(SLANGC_EXECUTABLE slangc HINTS "$ENV{VULKAN_SDK}/bin")
-if(!SLANGC_EXECUTABLE)
+if(NOT SLANGC_EXECUTABLE)
   message(FATAL_ERROR "slangc not found!\nIt should be part of Vulkan SDK; alternatively, install from: https://github.com/shader-slang/slang/releases")
 endif()
 
@@ -66,7 +66,7 @@ function(add_glsl_shader_target TARGET SOURCE OUTPUT)
   add_custom_target(${TARGET} DEPENDS ${SHADERS_DIR}/${OUTPUT})
 endfunction()
 
-if(GLSLC AND NOT WIN32)
+if(GLSLC)
   add_glsl_shader_target(editorGridVert editor_grid.vert editor_grid.vert.spv)
   add_glsl_shader_target(editorGridFrag editor_grid.frag editor_grid.frag.spv)
   add_glsl_shader_target(editorUnlitVert editor_unlit.vert editor_unlit.vert.spv)
@@ -87,10 +87,10 @@ add_custom_target(shaders DEPENDS
   iblIrradianceTarget
   iblPrefilterTarget
   iblEquirectToCubeTarget
-  $<$<AND:$<BOOL:${GLSLC}>,$<NOT:$<BOOL:${WIN32}>>>:editorGridVert>
-  $<$<AND:$<BOOL:${GLSLC}>,$<NOT:$<BOOL:${WIN32}>>>:editorGridFrag>
-  $<$<AND:$<BOOL:${GLSLC}>,$<NOT:$<BOOL:${WIN32}>>>:editorUnlitVert>
-  $<$<AND:$<BOOL:${GLSLC}>,$<NOT:$<BOOL:${WIN32}>>>:editorUnlitFrag>
-  $<$<AND:$<BOOL:${GLSLC}>,$<NOT:$<BOOL:${WIN32}>>>:editorLitVert>
-  $<$<AND:$<BOOL:${GLSLC}>,$<NOT:$<BOOL:${WIN32}>>>:editorLitFrag>
+  $<$<BOOL:${GLSLC}>:editorGridVert>
+  $<$<BOOL:${GLSLC}>:editorGridFrag>
+  $<$<BOOL:${GLSLC}>:editorUnlitVert>
+  $<$<BOOL:${GLSLC}>:editorUnlitFrag>
+  $<$<BOOL:${GLSLC}>:editorLitVert>
+  $<$<BOOL:${GLSLC}>:editorLitFrag>
 )

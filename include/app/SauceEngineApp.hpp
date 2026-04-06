@@ -58,7 +58,7 @@ private:
   GLFWwindow *window;
 
   std::chrono::steady_clock::time_point lastFrameTime = std::chrono::steady_clock::now();
-  double deltaFrame = 0.0f;
+  double deltaFrame = 0.0;
   double deltaUpdate = 0.0;
 
   float lastX = 0.0f;

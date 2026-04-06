@@ -1,4 +1,5 @@
 #include "app/modeling/Mesh.hpp"
+#include "app/Log.hpp"
 #include <glm/glm.hpp>
 #include "app/BufferUtils.hpp"
 #include "app/LogicalDevice.hpp"
@@ -30,7 +31,8 @@ bool Mesh::isValid() const {
 
     // Check that indices count is a multiple of 3 (triangles)
     if (indices.size() % 3 != 0) {
-        // TODO: Log warning or handle invalid index count
+        SAUCE_LOG("Mesh", "isValid: index count {} is not a multiple of 3", indices.size());
+        return false;
     }
 
     return true;

@@ -8,7 +8,6 @@
     "nlohmann-json",
     "stb",
     "tinygltf",
-    "tinyobjloader",
     "boost-program-options",
     {
       "name": "imgui",

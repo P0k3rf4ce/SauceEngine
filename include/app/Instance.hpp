@@ -12,7 +12,7 @@ namespace sauce {
 struct Instance {
   Instance(const char** glfwExtensions, uint32_t glfwExtensionCount) {
     constexpr vk::ApplicationInfo appInfo {
-      .pApplicationName = "Vulkan Playground",
+      .pApplicationName = "SauceEngine",
       .pEngineName = "No Engine",
       .engineVersion = VK_MAKE_VERSION(1, 0, 0),
       .apiVersion = vk::ApiVersion14

@@ -16,7 +16,7 @@ struct PhysicalDevice {
     const auto devIter = std::ranges::find_if(devices, [&](const vk::raii::PhysicalDevice& device) {
       bool supportsVulkan1_3 = device.getProperties().apiVersion >= VK_API_VERSION_1_3;
       std::vector<vk::QueueFamilyProperties> queueFamilies = device.getQueueFamilyProperties();
-      bool supportsGraphicsAndPresent = checkQueueFamilySupport(device.getQueueFamilyProperties(), vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eGraphics);
+      bool supportsGraphicsAndPresent = checkQueueFamilySupport(device.getQueueFamilyProperties(), vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute);
       bool supportsGraphics = std::ranges::any_of(queueFamilies, [](const vk::QueueFamilyProperties& qf) {
           return !!(qf.queueFlags & vk::QueueFlagBits::eGraphics);
       });
@@ -68,9 +68,8 @@ struct PhysicalDevice {
     });
   }
 
-  const vk::raii::PhysicalDevice& operator*() const & noexcept{
-    return physicalDevice;
-  }
+  vk::raii::PhysicalDevice& operator*() & noexcept { return physicalDevice; }
+  const vk::raii::PhysicalDevice& operator*() const & noexcept { return physicalDevice; }
 
   const vk::raii::PhysicalDevice* operator->() const & noexcept {
     return &physicalDevice;

@@ -319,7 +319,7 @@ void SauceEngineApp::initWindow() {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-    window = glfwCreateWindow(width, height, "Vulkan Playground", nullptr, nullptr);
+    window = glfwCreateWindow(width, height, "SauceEngine", nullptr, nullptr);
 
     glfwSetWindowUserPointer(window, this);
     glfwSetCursorPosCallback(window, mouseCallback);
@@ -462,7 +462,13 @@ void SauceEngineApp::frameCameraToScene() {
 }
 
 bool SauceEngineApp::isPhysicsDemoScene() const {
-    return sceneFile.find("testScene") != std::string::npos;
+    if (!pScene) return false;
+    for (const auto& entity : pScene->getEntities()) {
+        if (entity.getComponent<RigidBodyComponent>() != nullptr) {
+            return true;
+        }
+    }
+    return false;
 }
 
 Entity* SauceEngineApp::findDefaultSceneSpinEntity() {
@@ -911,17 +917,17 @@ void SauceEngineApp::uploadMeshGPUResources() {
     for (auto* mrc : mrcs) {
       auto mesh = mrc->getMesh();
       if (mesh && mesh->isValid() && !mesh->hasGPUData()) {
-        auto& physDev = const_cast<vk::raii::PhysicalDevice&>(*physicalDevice);
-        auto& cmdPool = const_cast<vk::raii::CommandPool&>(pRenderer->getCommandPool());
-        auto& queue = const_cast<vk::raii::Queue&>(pRenderer->getQueue());
+        auto& physDev = *physicalDevice;
+        auto& cmdPool = pRenderer->getCommandPool();
+        auto& queue = pRenderer->getQueue();
         mesh->initVulkanResources(logicalDevice, physDev, cmdPool, queue);
       }
 
       auto material = mrc->getMaterial();
       if (material && !material->hasDescriptorSet()) {
-        auto& physDev = const_cast<vk::raii::PhysicalDevice&>(*physicalDevice);
-        auto& cmdPool = const_cast<vk::raii::CommandPool&>(pRenderer->getCommandPool());
-        auto& queue = const_cast<vk::raii::Queue&>(pRenderer->getQueue());
+        auto& physDev = *physicalDevice;
+        auto& cmdPool = pRenderer->getCommandPool();
+        auto& queue = pRenderer->getQueue();
         material->initVulkanResources(
           logicalDevice, physDev, cmdPool, queue,
           pRenderer->getDescriptorPool(),
