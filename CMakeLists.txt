@@ -183,6 +183,7 @@ add_custom_command(TARGET modelviewer POST_BUILD
 add_executable(jenga_scene_builder
   src/jenga_scene_builder.cpp
   src/app/Scene.cpp
+  src/app/components/ClothComponent.cpp
   src/app/components/TransformComponent.cpp
   src/app/components/MeshRendererComponent.cpp
   src/app/components/PointLightComponent.cpp
@@ -197,6 +198,7 @@ add_executable(jenga_scene_builder
   src/app/modeling/Texture.cpp
   src/app/modeling/TextureCache.cpp
   src/app/modeling/Transform.cpp
+  src/physics/Cloth.cpp
 )
 
 target_include_directories(jenga_scene_builder PRIVATE
@@ -265,6 +267,7 @@ add_executable(xpbd_rigid_harness
   src/xpbd_rigid_harness.cpp
   src/app/Scene.cpp
   src/app/PhysicsDemoSetup.cpp
+  src/app/components/ClothComponent.cpp
   src/app/components/TransformComponent.cpp
   src/app/components/MeshRendererComponent.cpp
   src/app/components/RigidBodyComponent.cpp
@@ -280,6 +283,7 @@ add_executable(xpbd_rigid_harness
   src/app/modeling/Texture.cpp
   src/app/modeling/TextureCache.cpp
   src/app/modeling/Transform.cpp
+  src/physics/Cloth.cpp
   src/physics/SphereBVH.cpp
   src/physics/SphereCollider.cpp
   src/physics/XPBD.cpp
