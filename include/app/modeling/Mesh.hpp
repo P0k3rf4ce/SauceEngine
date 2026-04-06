@@ -16,6 +16,7 @@ public:
     Mesh() = default;
     Mesh(const std::vector<sauce::Vertex>& vertices,
          const std::vector<uint32_t>& indices);
+    ~Mesh();
 
     const std::vector<sauce::Vertex>& getVertices() const { return vertices; }
     std::vector<sauce::Vertex>& getVerticesMutable() { return vertices; }
@@ -50,9 +51,11 @@ public:
 
     void generateNormals();
     void generateTangents();
+    void setDynamicVertexBuffer(bool dynamic) { dynamicVertexBuffer = dynamic; }
 
     // Optional GPU upload (Phase 6)
     void initVulkanResources(const sauce::LogicalDevice& logicalDevice, vk::raii::PhysicalDevice& physicalDevice, vk::raii::CommandPool& commandPool, vk::raii::Queue& queue);
+    bool updateVertexBuffer(const sauce::LogicalDevice& logicalDevice, vk::raii::PhysicalDevice& physicalDevice, vk::raii::CommandPool& commandPool, vk::raii::Queue& queue);
 
 private:
     // CPU data
@@ -65,6 +68,9 @@ private:
     std::unique_ptr<vk::raii::Buffer> indexBuffer;
     std::unique_ptr<vk::raii::DeviceMemory> vertexBufferMemory;
     std::unique_ptr<vk::raii::DeviceMemory> indexBufferMemory;
+    vk::DeviceSize vertexBufferSizeBytes = 0;
+    void* mappedVertexData = nullptr;
+    bool dynamicVertexBuffer = false;
 
     vk::raii::PipelineLayout* pipelineLayout = nullptr;
 
@@ -72,6 +78,7 @@ private:
         vk::PhysicalDeviceMemoryProperties memProperties,
         uint32_t typeFilter,
         vk::MemoryPropertyFlags properties);
+    void releaseVertexBuffer();
 };
 
 } // namespace modeling

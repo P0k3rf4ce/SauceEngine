@@ -61,6 +61,10 @@ public:
     return this->pos;
   }
 
+  glm::vec3 getFront() const {
+    return this->front;
+  }
+
   /**
    * Sets camera to look at target from position
    */

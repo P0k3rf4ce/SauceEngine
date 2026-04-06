@@ -150,6 +150,11 @@ void Scene::loadGLTFNodeHierarchy(std::shared_ptr<modeling::ModelNode> node,
             entity.addComponent<ClothComponent>(
                 meshMaterialPairs[0].mesh,
                 node->getClothInfo()->settings);
+            auto* clothComponent = entity.getComponent<ClothComponent>();
+            auto* meshRenderer = entity.getComponent<MeshRendererComponent>();
+            if (clothComponent && meshRenderer && clothComponent->getRuntimeMesh()) {
+                meshRenderer->setMesh(clothComponent->getRuntimeMesh());
+            }
         } else {
             std::cerr << "Scene::loadGLTFNodeHierarchy: Skipping cloth import for node '"
                       << entityName

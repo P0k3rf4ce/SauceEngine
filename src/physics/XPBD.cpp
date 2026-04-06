@@ -6,6 +6,7 @@
 #include <physics/constraints/Constraint.hpp>
 #include <physics/constraints/CollisionConstraint.hpp>
 
+#include <app/ClothSettings.hpp>
 #include <app/Entity.hpp>
 #include <app/components/MeshRendererComponent.hpp>
 #include <app/components/RigidBodyComponent.hpp>
@@ -31,27 +32,45 @@ void resetClothLambdas(ClothData& cloth) {
   }
 }
 
-void projectStretch(std::vector<ClothParticle>& particles, StretchConstraint& c) {
+void projectStretch(std::vector<ClothParticle>& particles, StretchConstraint& c, float h) {
   const uint32_t i0 = c.particleIndices[0];
   const uint32_t i1 = c.particleIndices[1];
-  
+
   if (i0 >= particles.size() || i1 >= particles.size()) {
     return;
   }
-  
+
   glm::vec3& x0 = particles[i0].predictedPosition;
   glm::vec3& x1 = particles[i1].predictedPosition;
-  glm::vec3 delta = x1 - x0;
+  const float w0 = particles[i0].isStatic() ? 0.0f : particles[i0].invMass;
+  const float w1 = particles[i1].isStatic() ? 0.0f : particles[i1].invMass;
+  if (w0 <= 0.0f && w1 <= 0.0f) {
+    return;
+  }
 
-  float currentDist = glm::length(delta);
-  // Avoid division by zero
+  const glm::vec3 delta = x1 - x0;
+  const float currentDist = glm::length(delta);
   if (currentDist < 1e-6f) {
     return;
   }
-  float constraint = currentDist - c.restLength;
- 
-  x0 += (delta/currentDist) * (constraint/2.f);
-  x1 -= (delta/currentDist) * (constraint/2.f);
+
+  const glm::vec3 n = delta / currentDist;
+  const float constraint = currentDist - c.restLength;
+  const float alphaTilde = c.compliance / (h * h);
+  const float denom = w0 + w1 + alphaTilde;
+  if (denom < 1e-14f) {
+    return;
+  }
+
+  const float deltaLambda = (-constraint - alphaTilde * c.getLambda()) / denom;
+  c.setLambda(c.getLambda() + deltaLambda);
+
+  if (w0 > 0.0f) {
+    x0 -= w0 * deltaLambda * n;
+  }
+  if (w1 > 0.0f) {
+    x1 += w1 * deltaLambda * n;
+  }
 }
 
 void projectBend(std::vector<ClothParticle>& particles, BendConstraint& c, float h) {
@@ -266,13 +285,26 @@ std::vector<std::unique_ptr<Constraint>> XPBDSolver::generateCollisionConstraint
     return constraints;
 }
 
-void XPBDSolver::solveCloth(ClothData& cloth, float deltatime, const glm::vec3& externalAcceleration) {
+void XPBDSolver::solveCloth(
+    ClothData& cloth,
+    const sauce::ClothSettings& settings,
+    float deltatime,
+    const glm::vec3& externalAcceleration) {
   if (cloth.empty() || deltatime <= 0.0f) {
     return;
   }
 
-  const int substeps = std::max(1, clothSubsteps);
+  const int substeps = std::max(1, settings.solverSubsteps);
   const float h = deltatime / static_cast<float>(substeps);
+  const float dampingScale = std::clamp(1.0f - settings.damping, 0.0f, 1.0f);
+  const glm::vec3 scaledAcceleration = externalAcceleration * settings.gravityScale;
+
+  for (auto& c : cloth.stretchConstraints) {
+    c.compliance = settings.stretchCompliance;
+  }
+  for (auto& c : cloth.bendConstraints) {
+    c.compliance = settings.bendCompliance;
+  }
 
   auto& particles = cloth.particles;
 
@@ -285,7 +317,8 @@ void XPBDSolver::solveCloth(ClothData& cloth, float deltatime, const glm::vec3& 
         continue;
       }
 
-      p.velocity += externalAcceleration * h;
+      p.velocity *= dampingScale;
+      p.velocity += scaledAcceleration * h;
       p.predictedPosition = p.position + p.velocity * h;
     }
 
@@ -296,7 +329,7 @@ void XPBDSolver::solveCloth(ClothData& cloth, float deltatime, const glm::vec3& 
         projectBend(particles, c, h);
       }
       for (auto& c : cloth.stretchConstraints) {
-        projectStretch(particles, c);
+        projectStretch(particles, c, h);
       }
     }
 

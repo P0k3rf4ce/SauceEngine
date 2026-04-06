@@ -40,7 +40,9 @@ public:
   physics::ClothData* getClothData();
 
   void syncSimulationTransform();
-  bool syncRuntimeMesh();
+  void markRuntimeMeshDirty() { runtimeMeshDirty = true; }
+  bool isRuntimeMeshDirty() const { return runtimeMeshDirty; }
+  bool syncRuntimeMesh(bool regenerateTangents = true);
 
   size_t getParticleCount() const;
   size_t getTriangleCount() const;
@@ -56,6 +58,7 @@ private:
   std::optional<physics::ClothData> clothData;
   ClothSettings settings;
   modeling::Transform lastSimulationTransform;
+  bool runtimeMeshDirty = false;
   std::string lastBuildError;
 };
 

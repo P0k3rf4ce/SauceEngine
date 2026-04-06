@@ -34,6 +34,10 @@ bool approxEqual(const glm::vec3& actual, const glm::vec3& expected, float epsil
   return glm::length(actual - expected) <= epsilon;
 }
 
+bool approxEqual(const glm::vec4& actual, const glm::vec4& expected, float epsilon = kPositionEpsilon) {
+  return glm::length(actual - expected) <= epsilon;
+}
+
 bool isFinite(const glm::vec3& value) {
   return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
 }
@@ -82,6 +86,21 @@ std::shared_ptr<sauce::modeling::Mesh> makeQuadMesh() {
   return mesh;
 }
 
+sauce::ClothSettings makeClothSettings(
+    int solverSubsteps = 4,
+    float stretchCompliance = 0.0f,
+    float bendCompliance = 0.0f,
+    float damping = 0.0f,
+    float gravityScale = 1.0f) {
+  sauce::ClothSettings settings;
+  settings.solverSubsteps = solverSubsteps;
+  settings.stretchCompliance = stretchCompliance;
+  settings.bendCompliance = bendCompliance;
+  settings.damping = damping;
+  settings.gravityScale = gravityScale;
+  return settings;
+}
+
 float computeBendError(const ClothData& cloth, const BendConstraint& constraint) {
   const glm::vec3& x0 = cloth.particles[constraint.oppositeParticleIndices[0]].position;
   const glm::vec3& x1 = cloth.particles[constraint.sharedEdgeParticleIndices[0]].position;
@@ -111,9 +130,13 @@ bool testSubstepsAffectIntegration(std::vector<std::string>& errors) {
   oneSubstep.particles.push_back(makeParticle(glm::vec3(0.0f)));
 
   XPBDSolver oneStepSolver;
-  oneStepSolver.clothSubsteps = 1;
   oneStepSolver.solverIterations = 1;
-  oneStepSolver.solveCloth(oneSubstep, 1.0f, glm::vec3(0.0f, -10.0f, 0.0f));
+  const sauce::ClothSettings oneStepSettings = makeClothSettings(1);
+  oneStepSolver.solveCloth(
+      oneSubstep,
+      oneStepSettings,
+      1.0f,
+      glm::vec3(0.0f, -10.0f, 0.0f));
 
   if (!approxEqual(oneSubstep.particles[0].position.y, -10.0f)) {
     appendError(errors, "substeps=1 integration did not match expected semi-implicit Euler position");
@@ -124,9 +147,13 @@ bool testSubstepsAffectIntegration(std::vector<std::string>& errors) {
   fourSubsteps.particles.push_back(makeParticle(glm::vec3(0.0f)));
 
   XPBDSolver fourStepSolver;
-  fourStepSolver.clothSubsteps = 4;
   fourStepSolver.solverIterations = 1;
-  fourStepSolver.solveCloth(fourSubsteps, 1.0f, glm::vec3(0.0f, -10.0f, 0.0f));
+  const sauce::ClothSettings fourStepSettings = makeClothSettings(4);
+  fourStepSolver.solveCloth(
+      fourSubsteps,
+      fourStepSettings,
+      1.0f,
+      glm::vec3(0.0f, -10.0f, 0.0f));
 
   if (!approxEqual(fourSubsteps.particles[0].position.y, -6.25f)) {
     appendError(errors, "substeps=4 integration did not produce the expected substepped position");
@@ -146,9 +173,9 @@ bool testPinnedParticlesRemainFixed(std::vector<std::string>& errors) {
   cloth.particles.push_back(makeParticle(glm::vec3(1.0f, 2.0f, 3.0f), 0.0f, true));
 
   XPBDSolver solver;
-  solver.clothSubsteps = 4;
   solver.solverIterations = 8;
-  solver.solveCloth(cloth, 0.5f, glm::vec3(0.0f, -9.81f, 0.0f));
+  const sauce::ClothSettings settings = makeClothSettings(4);
+  solver.solveCloth(cloth, settings, 0.5f, glm::vec3(0.0f, -9.81f, 0.0f));
 
   const ClothParticle& particle = cloth.particles[0];
   if (!approxEqual(particle.position, glm::vec3(1.0f, 2.0f, 3.0f))) {
@@ -167,25 +194,99 @@ bool testPinnedParticlesRemainFixed(std::vector<std::string>& errors) {
   return true;
 }
 
-bool testStretchConstraintReducesError(std::vector<std::string>& errors) {
+bool testStretchConstraintRespectsPinningAndInvMass(std::vector<std::string>& errors) {
   ClothData cloth;
-  cloth.particles.push_back(makeParticle(glm::vec3(200.0f, 200.0f, 200.0f), 1.0f, false));
-  cloth.particles.push_back(makeParticle(glm::vec3(1.0f, 1.0f, 1.0f), 1.0f, false));
+  cloth.particles.push_back(makeParticle(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f, true));
+  cloth.particles.push_back(makeParticle(glm::vec3(2.0f, 0.0f, 0.0f), 2.0f, false));
 
-  cloth.stretchConstraints.emplace_back(
-      0,
-      1,
-	  1.f);
+  cloth.stretchConstraints.emplace_back(0, 1, 1.0f, 0.0f);
 
   XPBDSolver solver;
-  solver.clothSubsteps = 4;
-  solver.solverIterations = 20;
-  solver.solveCloth(cloth, 1.0f / 60.0f, glm::vec3(0.0f));
+  solver.solverIterations = 8;
+  const sauce::ClothSettings settings = makeClothSettings(1, 0.0f);
+  solver.solveCloth(cloth, settings, 1.0f, glm::vec3(0.0f));
 
-  if (glm::length(cloth.particles[1].position-cloth.particles[0].position) >= 1.f) {
-    appendError(errors, "what da helll");
+  if (!approxEqual(cloth.particles[0].position, glm::vec3(0.0f, 0.0f, 0.0f))) {
+    appendError(errors, "stretch projection moved a pinned particle");
     return false;
   }
+
+  if (!approxEqual(cloth.particles[1].position, glm::vec3(1.0f, 0.0f, 0.0f))) {
+    appendError(errors, "stretch projection did not move the unpinned particle according to inverse-mass weighting");
+    return false;
+  }
+  return true;
+}
+
+bool testStretchComplianceSoftensProjection(std::vector<std::string>& errors) {
+  ClothData rigidCloth;
+  rigidCloth.particles.push_back(makeParticle(glm::vec3(0.0f, 0.0f, 0.0f)));
+  rigidCloth.particles.push_back(makeParticle(glm::vec3(2.0f, 0.0f, 0.0f)));
+  rigidCloth.stretchConstraints.emplace_back(0, 1, 1.0f, 0.0f);
+
+  ClothData softCloth = rigidCloth;
+  softCloth.stretchConstraints[0].compliance = 10.0f;
+
+  XPBDSolver solver;
+  solver.solverIterations = 1;
+
+  const sauce::ClothSettings rigidSettings = makeClothSettings(1, 0.0f);
+  const sauce::ClothSettings softSettings = makeClothSettings(1, 10.0f);
+  solver.solveCloth(rigidCloth, rigidSettings, 1.0f, glm::vec3(0.0f));
+  solver.solveCloth(softCloth, softSettings, 1.0f, glm::vec3(0.0f));
+
+  const float rigidDistance = glm::length(
+      rigidCloth.particles[1].position - rigidCloth.particles[0].position);
+  const float softDistance = glm::length(
+      softCloth.particles[1].position - softCloth.particles[0].position);
+
+  if (!(approxEqual(rigidDistance, 1.0f) && softDistance > rigidDistance + 0.1f)) {
+    appendError(errors, "stretch compliance did not soften XPBD projection as expected");
+    return false;
+  }
+
+  return true;
+}
+
+bool testDampingAndGravityScaleAffectMotion(std::vector<std::string>& errors) {
+  ClothData dampedCloth;
+  dampedCloth.particles.push_back(
+      makeParticle(glm::vec3(0.0f), 1.0f, false, glm::vec3(0.0f, 10.0f, 0.0f)));
+
+  XPBDSolver solver;
+  solver.solverIterations = 1;
+
+  const sauce::ClothSettings dampingSettings =
+      makeClothSettings(1, 0.0f, 0.0f, 0.5f, 0.0f);
+  solver.solveCloth(
+      dampedCloth,
+      dampingSettings,
+      1.0f,
+      glm::vec3(0.0f, -10.0f, 0.0f));
+
+  if (!approxEqual(dampedCloth.particles[0].position.y, 5.0f) ||
+      !approxEqual(dampedCloth.particles[0].velocity.y, 5.0f)) {
+    appendError(errors, "damping or gravityScale=0 did not affect particle motion correctly");
+    return false;
+  }
+
+  ClothData scaledGravityCloth;
+  scaledGravityCloth.particles.push_back(makeParticle(glm::vec3(0.0f)));
+
+  const sauce::ClothSettings gravitySettings =
+      makeClothSettings(1, 0.0f, 0.0f, 0.0f, 0.25f);
+  solver.solveCloth(
+      scaledGravityCloth,
+      gravitySettings,
+      1.0f,
+      glm::vec3(0.0f, -8.0f, 0.0f));
+
+  if (!approxEqual(scaledGravityCloth.particles[0].position.y, -2.0f) ||
+      !approxEqual(scaledGravityCloth.particles[0].velocity.y, -2.0f)) {
+    appendError(errors, "gravityScale did not scale external acceleration correctly");
+    return false;
+  }
+
   return true;
 }
 
@@ -212,9 +313,9 @@ bool testBendConstraintReducesError(std::vector<std::string>& errors) {
   const float zBefore = cloth.particles[3].position.z;
 
   XPBDSolver solver;
-  solver.clothSubsteps = 4;
   solver.solverIterations = 20;
-  solver.solveCloth(cloth, 1.0f / 60.0f, glm::vec3(0.0f));
+  const sauce::ClothSettings settings = makeClothSettings(4, 0.0f, 0.0f);
+  solver.solveCloth(cloth, settings, 1.0f / 60.0f, glm::vec3(0.0f));
 
   const float errorAfter = computeBendError(cloth, constraint);
   const float zAfter = cloth.particles[3].position.z;
@@ -415,6 +516,56 @@ bool testClothComponentRuntimeMeshSync(std::vector<std::string>& errors) {
   return true;
 }
 
+bool testClothComponentRuntimeMeshTangentSyncModes(std::vector<std::string>& errors) {
+  auto mesh = makeQuadMesh();
+
+  sauce::Entity entity("RuntimeMeshClothTangents");
+  entity.addComponent<sauce::ClothComponent>(mesh);
+
+  auto* clothComponent = entity.getComponent<sauce::ClothComponent>();
+  auto* clothData = clothComponent ? clothComponent->getClothData() : nullptr;
+  const auto runtimeMesh = clothComponent ? clothComponent->getRuntimeMesh() : nullptr;
+  if (!clothComponent || !clothData || !runtimeMesh || clothData->particles.size() < 3 ||
+      runtimeMesh->getVertices().size() < 3) {
+    appendError(errors, "Runtime mesh tangent sync fixture failed to initialize");
+    return false;
+  }
+
+  clothData->particles[2].position = glm::vec3(0.5f, 1.5f, 0.0f);
+
+  const glm::vec4 sentinelTangent(0.25f, 0.5f, 0.75f, -1.0f);
+  runtimeMesh->getVerticesMutable()[0].tangent = sentinelTangent;
+  if (!clothComponent->syncRuntimeMesh(false)) {
+    appendError(errors, "ClothComponent syncRuntimeMesh(false) failed unexpectedly");
+    return false;
+  }
+
+  if (!approxEqual(runtimeMesh->getVertices()[0].tangent, sentinelTangent)) {
+    appendError(errors, "ClothComponent syncRuntimeMesh(false) unexpectedly regenerated tangents");
+    return false;
+  }
+
+  runtimeMesh->getVerticesMutable()[0].tangent = glm::vec4(0.0f);
+  if (!clothComponent->syncRuntimeMesh(true)) {
+    appendError(errors, "ClothComponent syncRuntimeMesh(true) failed unexpectedly");
+    return false;
+  }
+
+  if (approxEqual(runtimeMesh->getVertices()[0].tangent, glm::vec4(0.0f))) {
+    appendError(errors, "ClothComponent syncRuntimeMesh(true) did not regenerate tangents");
+    return false;
+  }
+
+  for (const auto& vertex : runtimeMesh->getVertices()) {
+    if (!isFinite(vertex.normal) || !isFinite(glm::vec3(vertex.tangent))) {
+      appendError(errors, "ClothComponent tangent sync modes produced non-finite basis data");
+      return false;
+    }
+  }
+
+  return true;
+}
+
 } // namespace
 
 int main() {
@@ -423,10 +574,14 @@ int main() {
   const bool substepsOk = testSubstepsAffectIntegration(errors);
   const bool pinnedOk = testPinnedParticlesRemainFixed(errors);
   const bool bendOk = testBendConstraintReducesError(errors);
-  const bool stretchOk = testStretchConstraintReducesError(errors);
+  const bool stretchPinMassOk = testStretchConstraintRespectsPinningAndInvMass(errors);
+  const bool stretchComplianceOk = testStretchComplianceSoftensProjection(errors);
+  const bool dampingGravityOk = testDampingAndGravityScaleAffectMotion(errors);
   const bool componentRebuildOk = testClothComponentRebuildFromMesh(errors);
   const bool componentTransformSyncOk = testClothComponentTransformSync(errors);
   const bool componentRuntimeMeshSyncOk = testClothComponentRuntimeMeshSync(errors);
+  const bool componentRuntimeMeshTangentModesOk =
+      testClothComponentRuntimeMeshTangentSyncModes(errors);
 
   if (!errors.empty()) {
     std::cerr << "XPBD cloth harness failed:\n";
@@ -440,9 +595,13 @@ int main() {
   std::cout << "  substeps: " << (substepsOk ? "ok" : "failed") << "\n";
   std::cout << "  pinned: " << (pinnedOk ? "ok" : "failed") << "\n";
   std::cout << "  bend: " << (bendOk ? "ok" : "failed") << "\n";
-  std::cout << "  stretch: " << (stretchOk ? "ok" : "failed") << "\n";
+  std::cout << "  stretch pin/mass: " << (stretchPinMassOk ? "ok" : "failed") << "\n";
+  std::cout << "  stretch compliance: " << (stretchComplianceOk ? "ok" : "failed") << "\n";
+  std::cout << "  damping/gravity scale: " << (dampingGravityOk ? "ok" : "failed") << "\n";
   std::cout << "  component rebuild: " << (componentRebuildOk ? "ok" : "failed") << "\n";
   std::cout << "  transform sync: " << (componentTransformSyncOk ? "ok" : "failed") << "\n";
   std::cout << "  runtime mesh sync: " << (componentRuntimeMeshSyncOk ? "ok" : "failed") << "\n";
+  std::cout << "  runtime tangent sync modes: "
+            << (componentRuntimeMeshTangentModesOk ? "ok" : "failed") << "\n";
   return 0;
 }

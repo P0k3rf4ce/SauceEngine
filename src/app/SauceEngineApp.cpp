@@ -8,6 +8,7 @@
 #include <app/components/LightComponent.hpp>
 #include <functional>
 #include <cstring>
+#include <algorithm>
 
 #include <physics/XPBD.hpp>
 #include <physics/constraints/Constraint.hpp>
@@ -122,6 +123,12 @@ void SauceEngineApp::processInput(float deltaTime) {
     }
     gravePressedLastFrame = glfwGetKey(window, GLFW_KEY_GRAVE_ACCENT) == GLFW_PRESS;
 
+    const bool spacePressed = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
+    if (spacePressed && !spacePressedLastFrame) {
+      applyClothImpulse();
+    }
+    spacePressedLastFrame = spacePressed;
+
     if (!cursorCaptured || !pScene) {
       return;
     }
@@ -166,6 +173,70 @@ void SauceEngineApp::mouseCallback(GLFWwindow* window, double xposIn, double ypo
     app->pScene->getCameraRW().processMouseMovement(xoffset, yoffset);
   }
 
+void SauceEngineApp::applyClothImpulse() {
+    if (!pScene) {
+      return;
+    }
+
+    const Camera& camera = pScene->getCameraRO();
+    const glm::vec3 impulseDirection = glm::normalize(camera.getFront());
+    constexpr float kImpulseStrength = 2.0f;
+
+    for (auto& entity : pScene->getEntitiesMut()) {
+      if (!entity.getActive()) {
+        continue;
+      }
+
+      for (auto* clothComp : entity.getComponents<ClothComponent>()) {
+        physics::ClothData* cloth = clothComp->getClothData();
+        if (!cloth || cloth->particles.empty()) {
+          continue;
+        }
+
+        glm::vec3 center(0.0f);
+        glm::vec3 minPos = cloth->particles.front().position;
+        glm::vec3 maxPos = cloth->particles.front().position;
+        size_t dynamicCount = 0;
+
+        for (const auto& particle : cloth->particles) {
+          center += particle.position;
+          minPos = glm::min(minPos, particle.position);
+          maxPos = glm::max(maxPos, particle.position);
+          if (!particle.isStatic()) {
+            ++dynamicCount;
+          }
+        }
+
+        if (dynamicCount == 0) {
+          continue;
+        }
+
+        center /= static_cast<float>(cloth->particles.size());
+
+        const float clothRadius =
+            std::max(0.25f, 0.35f * glm::length(maxPos - minPos));
+
+        for (auto& particle : cloth->particles) {
+          if (particle.isStatic()) {
+            continue;
+          }
+
+          const float distance = glm::length(particle.position - center);
+          if (distance > clothRadius) {
+            continue;
+          }
+
+          const float falloff = 1.0f - (distance / clothRadius);
+          const glm::vec3 deltaVelocity =
+              impulseDirection * (kImpulseStrength * falloff);
+
+          particle.velocity += deltaVelocity;
+          particle.predictedPosition += deltaVelocity * (1.0f / 128.0f);
+        }
+      }
+    }
+  }
+
 void SauceEngineApp::mainLoop() {
     while (!glfwWindowShouldClose(window)) {
       auto currentFrameTime = std::chrono::steady_clock::now();
@@ -191,10 +262,23 @@ void SauceEngineApp::mainLoop() {
       }
 
       constexpr float kPhysicsDt = 1.0f / 128.0f;
-      if (deltaUpdate > 1.0) {
-        deltaUpdate = kPhysicsDt;
+      constexpr int kMaxPhysicsStepsPerFrame = 2;
+      constexpr float kMaxPhysicsAccumulation =
+          kPhysicsDt * static_cast<float>(kMaxPhysicsStepsPerFrame);
+      auto& clothPhysicalDevice =
+          const_cast<vk::raii::PhysicalDevice&>(*physicalDevice);
+      auto& clothCommandPool =
+          const_cast<vk::raii::CommandPool&>(pRenderer->getCommandPool());
+      auto& clothQueue =
+          const_cast<vk::raii::Queue&>(pRenderer->getQueue());
+
+      if (deltaUpdate > kMaxPhysicsAccumulation) {
+        deltaUpdate = kMaxPhysicsAccumulation;
       }
-      while (deltaUpdate >= kPhysicsDt) {
+
+      int physicsStepsThisFrame = 0;
+      while (deltaUpdate >= kPhysicsDt &&
+             physicsStepsThisFrame < kMaxPhysicsStepsPerFrame) {
         pSolver->solvePositions(rigidBodies, constraints, kPhysicsDt);
         for (auto& entity : pScene->getEntitiesMut()) {
           if (!entity.getActive()) {
@@ -202,17 +286,79 @@ void SauceEngineApp::mainLoop() {
           }
 
           for (auto* clothComp : entity.getComponents<ClothComponent>()) {
-            if (!clothComp->hasClothData()) {
-              continue;
-            }
+            clothComp->syncSimulationTransform();
 
             physics::ClothData* cloth = clothComp->getClothData();
             if (cloth && !cloth->empty()) {
-              pSolver->solveCloth(*cloth, kPhysicsDt);
+              pSolver->solveCloth(
+                *cloth,
+                clothComp->getSettings(),
+                kPhysicsDt);
+              clothComp->markRuntimeMeshDirty();
             }
           }
         }
         deltaUpdate -= kPhysicsDt;
+        ++physicsStepsThisFrame;
+      }
+
+      for (auto& entity : pScene->getEntitiesMut()) {
+        if (!entity.getActive()) {
+          continue;
+        }
+
+        for (auto* clothComp : entity.getComponents<ClothComponent>()) {
+          auto runtimeMesh = clothComp->getRuntimeMesh();
+          if (!runtimeMesh) {
+            continue;
+          }
+
+          MeshRendererComponent* clothRenderer = nullptr;
+          auto meshRenderers = entity.getComponents<MeshRendererComponent>();
+          for (auto* meshRenderer : meshRenderers) {
+            if (meshRenderer && meshRenderer->getMesh() == runtimeMesh) {
+              clothRenderer = meshRenderer;
+              break;
+            }
+          }
+
+          if (!clothRenderer && !meshRenderers.empty()) {
+            clothRenderer = meshRenderers.front();
+            if (clothRenderer->getMesh() != runtimeMesh) {
+              clothRenderer->setMesh(runtimeMesh);
+            }
+          }
+
+          bool regenerateTangents = true;
+          if (clothRenderer) {
+            const auto material = clothRenderer->getMaterial();
+            regenerateTangents =
+                material && material->getTexture(modeling::TextureType::Normal);
+          }
+
+          if (clothComp->isRuntimeMeshDirty() &&
+              !clothComp->syncRuntimeMesh(regenerateTangents)) {
+            continue;
+          }
+
+          if (!runtimeMesh->isValid()) {
+            continue;
+          }
+
+          if (!runtimeMesh->hasGPUData()) {
+            runtimeMesh->initVulkanResources(
+              logicalDevice,
+              clothPhysicalDevice,
+              clothCommandPool,
+              clothQueue);
+          } else {
+            runtimeMesh->updateVertexBuffer(
+              logicalDevice,
+              clothPhysicalDevice,
+              clothCommandPool,
+              clothQueue);
+          }
+        }
       }
 
       pRenderer->drawFrame(logicalDevice, *pScene, pImGuiRenderer.get());
@@ -392,38 +538,45 @@ void SauceEngineApp::recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint
 
     cmd.beginRendering(renderingInfo);
 
-    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pRenderer->getPipeline());
     cmd.setViewport(0, vk::Viewport(0.0f, 0.0f,
       static_cast<float>(extent.width), static_cast<float>(extent.height), 0.0f, 1.0f));
     cmd.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), extent));
-    
-    // Bind Set 0: Per-frame
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-      pRenderer->getPipeline().getLayout(), 0, { *pRenderer->getCurrentDescriptorSet() }, nullptr);
-    
-    // Bind Set 1: Environment
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-      pRenderer->getPipeline().getLayout(), 1, { pRenderer->getEnvironmentDescriptorSet() }, nullptr);
-
-    cmd.pushConstants<uint32_t>(
-      *pRenderer->getPipeline().getLayout(),
-      vk::ShaderStageFlagBits::eFragment,
-      0u, { lightCount }
-    );
 
     for (auto* mrc : mrcs) {
       auto mesh = mrc->getMesh();
       auto material = mrc->getMaterial();
       if (!mesh || !mesh->hasGPUData()) continue;
+
+      const auto& pipeline =
+        (material && material->getProperties().doubleSided)
+          ? pRenderer->getDoubleSidedPipeline()
+          : pRenderer->getPipeline();
+
+      cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
+
+      // Bind Set 0: Per-frame
+      cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+        pipeline.getLayout(), 0, { *pRenderer->getCurrentDescriptorSet() }, nullptr);
+
+      // Bind Set 1: Environment
+      cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+        pipeline.getLayout(), 1, { pRenderer->getEnvironmentDescriptorSet() }, nullptr);
+
+      cmd.pushConstants<uint32_t>(
+        *pipeline.getLayout(),
+        vk::ShaderStageFlagBits::eFragment,
+        0u, { lightCount }
+      );
+
       mesh->bind(cmd);
 
       // Bind Set 2: Material
       if (material && material->hasDescriptorSet()) {
         cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-          pRenderer->getPipeline().getLayout(), 2, { material->getDescriptorSet() }, nullptr);
+          pipeline.getLayout(), 2, { material->getDescriptorSet() }, nullptr);
       } else {
         cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-          pRenderer->getPipeline().getLayout(), 2, { pRenderer->getDefaultMaterialDescriptorSet() }, nullptr);
+          pipeline.getLayout(), 2, { pRenderer->getDefaultMaterialDescriptorSet() }, nullptr);
       }
       
       mesh->draw(cmd);

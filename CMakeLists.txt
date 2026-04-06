@@ -157,6 +157,26 @@ endif()
 
 add_test(NAME xpbd_cloth_harness COMMAND xpbd_cloth_harness)
 
+add_executable(cloth_scene_smoke src/cloth_scene_smoke.cpp)
+
+target_sources(cloth_scene_smoke PRIVATE ${APP_SOURCES} ${PHYSICS_SOURCES})
+
+target_include_directories(cloth_scene_smoke PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${TINYGLTF_INCLUDE_DIRS}
+)
+
+target_link_libraries(cloth_scene_smoke
+    PUBLIC  Vulkan::Vulkan
+    PRIVATE glfw imgui::imgui nlohmann_json::nlohmann_json
+)
+
+if(NOT WIN32)
+    target_compile_options(cloth_scene_smoke PUBLIC ${SAUCE_WARNINGS})
+endif()
+
+add_test(NAME cloth_scene_smoke COMMAND cloth_scene_smoke)
+
 # ── SauceEditor ──────────────────────────────────────────────────────
 
 file(GLOB_RECURSE EDITOR_SOURCES CONFIGURE_DEPENDS

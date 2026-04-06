@@ -67,6 +67,7 @@ private:
   bool firstMouse = true;
   bool cursorCaptured = true;
   bool gravePressedLastFrame = false;
+  bool spacePressedLastFrame = false;
 
   std::unique_ptr<sauce::Instance> pInstance;
 
@@ -97,6 +98,7 @@ private:
   void setupSceneRenderer();
   void setupXPBDSolver();
   void syncRigidBodiesToTransforms();
+  void applyClothImpulse();
   void recordSceneCommandBuffer(vk::raii::CommandBuffer& cmd, uint32_t imageIndex);
 
 public:

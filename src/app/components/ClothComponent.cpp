@@ -11,6 +11,10 @@
 namespace sauce {
 namespace {
 
+constexpr float kTransformPositionEpsilon = 1e-6f;
+constexpr float kTransformScaleEpsilon = 1e-6f;
+constexpr float kTransformRotationDotEpsilon = 1e-6f;
+
 glm::quat normalizedRotation(const glm::quat& rotation) {
   const float len = glm::length(rotation);
   if (len <= 1e-8f) {
@@ -49,6 +53,24 @@ glm::vec3 toLocalPosition(
          (worldPosition - transform.getTranslation());
 }
 
+bool transformsEquivalent(
+    const modeling::Transform& a,
+    const modeling::Transform& b) {
+  if (glm::length(a.getTranslation() - b.getTranslation()) >
+      kTransformPositionEpsilon) {
+    return false;
+  }
+
+  if (glm::length(a.getScale() - b.getScale()) > kTransformScaleEpsilon) {
+    return false;
+  }
+
+  const glm::quat aRotation = normalizedRotation(a.getRotation());
+  const glm::quat bRotation = normalizedRotation(b.getRotation());
+  const float rotationDot = std::abs(glm::dot(aRotation, bRotation));
+  return std::abs(1.0f - rotationDot) <= kTransformRotationDotEpsilon;
+}
+
 std::shared_ptr<modeling::Mesh> cloneMeshCpuData(
     const std::shared_ptr<modeling::Mesh>& mesh) {
   if (!mesh) {
@@ -58,6 +80,7 @@ std::shared_ptr<modeling::Mesh> cloneMeshCpuData(
   auto clone = std::make_shared<modeling::Mesh>(
       mesh->getVertices(),
       mesh->getIndices());
+  clone->setDynamicVertexBuffer(true);
   for (const auto& [key, value] : mesh->getMetadata()) {
     clone->setMetadata(key, value);
   }
@@ -147,6 +170,7 @@ bool ClothComponent::rebuildFromMesh(
 
   runtimeMesh = cloneMeshCpuData(sourceMesh);
   lastSimulationTransform = getSimulationTransform(getOwner());
+  runtimeMeshDirty = true;
 
   for (auto& particle : clothData->particles) {
     const glm::vec3 worldPosition =
@@ -186,6 +210,7 @@ void ClothComponent::clear() {
   runtimeMesh.reset();
   clothData.reset();
   lastSimulationTransform = {};
+  runtimeMeshDirty = false;
   lastBuildError.clear();
 }
 
@@ -229,6 +254,11 @@ void ClothComponent::syncSimulationTransform() {
     return;
   }
 
+  if (transformsEquivalent(lastSimulationTransform, currentTransform)) {
+    lastSimulationTransform = currentTransform;
+    return;
+  }
+
   const glm::quat previousRotation =
       normalizedRotation(lastSimulationTransform.getRotation());
   const glm::quat currentRotation =
@@ -249,9 +279,10 @@ void ClothComponent::syncSimulationTransform() {
   }
 
   lastSimulationTransform = currentTransform;
+  runtimeMeshDirty = true;
 }
 
-bool ClothComponent::syncRuntimeMesh() {
+bool ClothComponent::syncRuntimeMesh(bool regenerateTangents) {
   if (!clothData.has_value() || !runtimeMesh) {
     lastBuildError = "No cloth data or runtime mesh available.";
     return false;
@@ -269,7 +300,10 @@ bool ClothComponent::syncRuntimeMesh() {
   }
 
   runtimeMesh->generateNormals();
-  runtimeMesh->generateTangents();
+  if (regenerateTangents) {
+    runtimeMesh->generateTangents();
+  }
+  runtimeMeshDirty = false;
   lastBuildError.clear();
   return true;
 }
