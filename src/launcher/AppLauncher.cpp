@@ -306,7 +306,7 @@ std::array<float, 3> AppLauncher::suggestedModelRotationDegrees() const {
       state.selectedLaunchTarget >= 0 &&
       state.selectedLaunchTarget < static_cast<int>(state.catalog.launchTargets.size())) {
     const auto& selectedEntry = state.catalog.launchTargets[static_cast<size_t>(state.selectedLaunchTarget)];
-    if (selectedEntry.group == "Scenes") {
+    if (selectedEntry.authoredScene) {
       return {0.0f, 0.0f, 0.0f};
     }
     return defaultModelRotationDegrees();

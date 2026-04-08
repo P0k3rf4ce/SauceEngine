@@ -5,6 +5,7 @@
 #include <cmath>
 #include <set>
 #include <sstream>
+#include <string_view>
 
 namespace sauce::launcher {
 
@@ -21,6 +22,12 @@ std::string lowercase(std::string value) {
 
 bool hasExtension(const fs::path& path, const std::set<std::string>& extensions) {
   return extensions.contains(lowercase(path.extension().string()));
+}
+
+bool containsAnyToken(const std::string& value, std::initializer_list<std::string_view> tokens) {
+  return std::any_of(tokens.begin(), tokens.end(), [&](std::string_view token) {
+    return value.find(token) != std::string::npos;
+  });
 }
 
 std::string toDisplayPath(const fs::path& rootPath, const fs::path& path) {
@@ -50,43 +57,105 @@ std::string quoteIfNeeded(const std::string& value) {
   return escaped;
 }
 
-void appendMatches(std::vector<AssetEntry>& out,
-                   const fs::path& rootPath,
-                   const fs::path& directory,
-                   const std::string& group,
-                   const std::set<std::string>& extensions,
-                   bool recursive) {
-  if (!fs::exists(directory) || !fs::is_directory(directory)) {
+std::string directoryGroup(const fs::path& rootPath, const fs::path& path, const std::string& fallback) {
+  std::error_code ec;
+  const fs::path relativeParent = fs::relative(path.parent_path(), rootPath, ec);
+  if (ec || relativeParent.empty() || relativeParent == ".") {
+    return fallback;
+  }
+  return relativeParent.generic_string();
+}
+
+bool shouldSkipDirectory(const fs::path& path) {
+  const std::string name = lowercase(path.filename().string());
+  if (name.empty()) {
+    return false;
+  }
+
+  if (name.front() == '.') {
+    return true;
+  }
+
+  return name == "build" ||
+         name == "out" ||
+         name == "dist" ||
+         name == "vcpkg_installed" ||
+         name.starts_with("cmake-build");
+}
+
+bool looksLikeEnvironmentMap(const fs::path& rootPath, const fs::path& path) {
+  const std::string extension = lowercase(path.extension().string());
+  if (extension == ".hdr" || extension == ".exr") {
+    return true;
+  }
+
+  const std::string normalizedPath = lowercase(toDisplayPath(rootPath, path));
+  return containsAnyToken(normalizedPath, {"hdr", "ibl", "env", "sky"});
+}
+
+bool looksLikeAuthoredScene(const fs::path& rootPath, const fs::path& path) {
+  const std::string normalizedPath = lowercase(toDisplayPath(rootPath, path));
+  if (containsAnyToken(normalizedPath, {"assets/models", "/models/", "models/"})) {
+    return false;
+  }
+
+  return containsAnyToken(normalizedPath, {"testscene", "/scene", "scene_", "_scene", "/scenes/"});
+}
+
+void appendDiscoveredMatches(AssetCatalog& catalog,
+                             const fs::path& rootPath,
+                             const std::set<std::string>& sceneExtensions,
+                             const std::set<std::string>& iblExtensions) {
+  std::error_code ec;
+  if (!fs::exists(rootPath, ec) || !fs::is_directory(rootPath, ec)) {
     return;
   }
 
-  auto pushEntry = [&](const fs::directory_entry& entry) {
-    if (!entry.is_regular_file()) {
-      return;
+  fs::recursive_directory_iterator it(rootPath, fs::directory_options::skip_permission_denied, ec);
+  const fs::recursive_directory_iterator end;
+  while (!ec && it != end) {
+    const fs::directory_entry entry = *it;
+
+    if (entry.is_directory(ec)) {
+      if (!ec && shouldSkipDirectory(entry.path())) {
+        it.disable_recursion_pending();
+      }
+      ec.clear();
+      it.increment(ec);
+      continue;
     }
 
-    const fs::path path = entry.path();
-    if (!hasExtension(path, extensions)) {
-      return;
+    if (ec) {
+      ec.clear();
+      it.increment(ec);
+      continue;
     }
 
-    out.push_back(AssetEntry{
-        .label = path.stem().string(),
-        .description = toDisplayPath(rootPath, path),
-        .path = path.generic_string(),
-        .group = group,
-        .builtin = false,
-    });
-  };
+    if (entry.is_regular_file(ec)) {
+      const fs::path path = entry.path();
+      if (hasExtension(path, sceneExtensions)) {
+        catalog.launchTargets.push_back(AssetEntry{
+            .label = path.stem().string(),
+            .description = toDisplayPath(rootPath, path),
+            .path = path.generic_string(),
+            .group = directoryGroup(rootPath, path, "Project Files"),
+            .builtin = false,
+            .authoredScene = looksLikeAuthoredScene(rootPath, path),
+        });
+      } else if (hasExtension(path, iblExtensions) && looksLikeEnvironmentMap(rootPath, path)) {
+        catalog.iblMaps.push_back(AssetEntry{
+            .label = path.stem().string(),
+            .description = toDisplayPath(rootPath, path),
+            .path = path.generic_string(),
+            .group = directoryGroup(rootPath, path, "Project Files"),
+            .builtin = false,
+            .authoredScene = false,
+        });
+      }
+    }
 
-  if (recursive) {
-    for (const auto& entry : fs::recursive_directory_iterator(directory)) {
-      pushEntry(entry);
-    }
-  } else {
-    for (const auto& entry : fs::directory_iterator(directory)) {
-      pushEntry(entry);
-    }
+    ec.clear();
+    it.increment(ec);
   }
 }
 
@@ -126,12 +195,7 @@ AssetCatalog discoverAssetCatalog(const fs::path& rootPath) {
   static const std::set<std::string> sceneExtensions = {".gltf", ".glb"};
   static const std::set<std::string> iblExtensions = {".hdr", ".exr", ".jpg", ".jpeg", ".png"};
 
-  appendMatches(catalog.launchTargets, rootPath, rootPath / "assets" / "models", "Models", sceneExtensions, true);
-  appendMatches(catalog.launchTargets, rootPath, rootPath / "testScene", "Scenes", sceneExtensions, true);
-
-  appendMatches(catalog.iblMaps, rootPath, rootPath / "testScene", "Environment Maps", iblExtensions, false);
-  appendMatches(catalog.iblMaps, rootPath, rootPath / "assets" / "hdr", "Environment Maps", iblExtensions, false);
-  appendMatches(catalog.iblMaps, rootPath, rootPath / "assets" / "ibl", "Environment Maps", iblExtensions, false);
+  appendDiscoveredMatches(catalog, rootPath, sceneExtensions, iblExtensions);
 
   sortEntries(catalog.launchTargets);
   sortEntries(catalog.iblMaps);

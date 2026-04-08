@@ -14,6 +14,7 @@ struct AssetEntry {
   std::string path;
   std::string group;
   bool builtin = false;
+  bool authoredScene = false;
 };
 
 struct AssetCatalog {
